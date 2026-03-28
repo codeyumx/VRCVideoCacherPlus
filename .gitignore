@@ -1,7 +1,6 @@
 # Build outputs
 **/bin/
 **/obj/
-Build/
 publish/
 
 # IDE
@@ -14,3 +13,9 @@ publish/
 # Runtime files
 *.log
 nul
+
+# Build files
+/Build
+/Build/linux-x64/VRCVideoCacher.pdb
+/Build/linux-x64/yt-dlp-stub.exe
+/Build/win-x64/VRCVideoCacher.pdb
