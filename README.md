@@ -30,6 +30,11 @@ You can make cache downloads pause automatically when VRChat is playing a stream
 You can limit how fast cache downloads run (in MB/s). Set to 0 for unlimited.
 
 **Recommended usage:** Set the pause delay to 300 seconds to cover switching videos or queuing songs, and use the speed limit as a backup for longer playback.
+
+#### Download queue & manual downloads
+
+You can manually queue videos for caching from the **Downloads** tab. Paste one or more YouTube URLs (one per line) into the text box and click **Add**. YouTube playlists are also supported — paste the playlist URL and all videos in the playlist will be added to the queue automatically.
+
 ---
 
 ### Wiki

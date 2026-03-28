@@ -12,6 +12,28 @@
 
 **Language:** [English](./README.md) | [日本語](./README_ja-JP.md) | [Magyar](./README_hu-HU.md) | 한국어
 
+### 포크 변경 사항 ([EllyVR/VRCVideoCacher](https://github.com/EllyVR/VRCVideoCacher) 대비)
+
+이 포크는 VRChat이 동영상을 재생 중일 때 대역폭을 너무 많이 사용하지 않도록 **캐시 설정**에 설정을 추가합니다.
+
+#### 스트리밍 중 캐시 다운로드 일시 중지
+
+VRChat이 스트리밍 동영상을 재생하는 동안 캐시 다운로드를 자동으로 일시 중지할 수 있습니다. 스트림이 멈춘 후 다운로드가 재개될 때까지의 지연 시간(초)을 설정하세요. 0으로 설정하면 비활성화됩니다.
+
+**팁:** 긴 동영상이나 반복 콘텐츠를 시청하는 경우 아래의 속도 제한을 함께 사용하세요.
+
+#### 캐시 다운로드 속도 제한
+
+캐시 다운로드 속도를 제한할 수 있습니다 (MB/s 단위). 0으로 설정하면 무제한입니다.
+
+**권장 설정:** 일시 중지 지연을 300초로 설정하여 동영상 전환이나 노래 대기열에 대응하고, 긴 재생에는 속도 제한을 백업으로 사용하세요.
+
+#### 다운로드 대기열 및 수동 다운로드
+
+**다운로드** 탭에서 수동으로 동영상을 캐시 대기열에 추가할 수 있습니다. 텍스트 상자에 YouTube URL을 한 줄에 하나씩 붙여넣고 **추가**를 클릭하세요. YouTube 재생목록도 지원됩니다 — 재생목록 URL을 붙여넣으면 모든 동영상이 자동으로 대기열에 추가됩니다.
+
+---
+
 ### 위키 (영문)
 - [실행 옵션](https://github.com/EllyVR/VRCVideoCacher/wiki/Launch-Options)
 - [CLI 설정](https://github.com/EllyVR/VRCVideoCacher/wiki/Config-Options)

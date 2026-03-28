@@ -12,6 +12,28 @@
 
 **Language:** [English](./README.md) | [日本語](./README_ja-JP.md) | **Magyar** | [한국어](./README_ko-KR.md)
 
+### Fork változások (vs [EllyVR/VRCVideoCacher](https://github.com/EllyVR/VRCVideoCacher))
+
+Ez a fork beállításokat ad hozzá a **Gyorsítótár beállítások** alatt, hogy elkerüld a túlzott sávszélesség-használatot, amikor a VRChat videót játszik le.
+
+#### Gyorsítótár letöltések szüneteltetése streamelés közben
+
+A gyorsítótár letöltéseket automatikusan szüneteltetheted, amikor a VRChat streaming videót játszik le. Állítsd be a késleltetést (másodpercben), hogy a stream leállása után mennyi idő múlva folytatódjanak a letöltések. 0-ra állítva letiltja.
+
+**Tipp:** Ha hosszú videókat vagy ismétlődő tartalmakat nézel, használd az alábbi sebességkorlátot is (vagy ehelyett).
+
+#### Gyorsítótár letöltési sebességkorlát
+
+Korlátozhatod a gyorsítótár letöltések sebességét (MB/s-ban). 0-ra állítva korlátlan.
+
+**Ajánlott használat:** Állítsd a szüneteltetési késleltetést 300 másodpercre a videóváltáshoz vagy a dalok sorba állításához, és használd a sebességkorlátot tartalékként hosszabb lejátszáshoz.
+
+#### Letöltési sor és kézi letöltés
+
+A **Letöltések** fülön kézzel is hozzáadhatsz videókat a gyorsítótár sorhoz. Illessz be egy vagy több YouTube URL-t (soronként egyet) a szövegmezőbe, és kattints a **Hozzáadás** gombra. A YouTube lejátszási listák is támogatottak — illeszd be a lejátszási lista URL-jét, és az összes videó automatikusan hozzáadódik a sorhoz.
+
+---
+
 ### Micsoda a VRCVideoCacher?
 
 VRCVideoCacher egy segédprogram, amely a VRChat videókat a helyi merevlemezre menti, és kijavítja a YouTube videók betöltési hibáit.
