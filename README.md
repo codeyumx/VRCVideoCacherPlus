@@ -17,25 +17,19 @@
 
 ### Fork changes (vs [EllyVR/VRCVideoCacher](https://github.com/EllyVR/VRCVideoCacher))
 
-This fork adds settings under **Cache Settings** to manage bandwidth when VRChat is actively streaming a video.
+This fork adds settings under **Cache Settings** to avoid using too much bandwidth when VRChat is playing a video.
 
-#### Pause cache downloads while streaming 
-When set to a non-zero value (e.g. 120), cache downloads are paused whenever VRChat requests a streaming URL, and only resume after that many seconds of no new stream requests.
+#### Pause cache downloads while streaming
 
-**Pause/resume**
-- For YouTube downloads, the yt-dlp process is killed and restarted with `-c` (`--continue`). yt-dlp writes `.part` files while downloading; YouTube's CDN supports HTTP range requests so it picks up exactly where it left off.
-- For direct downloads (PyPyDance, VRDancing), the HTTP stream is cancelled via `CancellationToken` and resumed using an HTTP `Range: bytes=X-` header, appending to the partial file.
+You can make cache downloads pause automatically when VRChat is playing a streaming video. Set the delay (in seconds) to how long after the stream stops before downloads resume. Set to 0 to disable.
 
-**Limitation:** A looping video or a long video playing past the idle window - For those cases, use the rate limit below.
+**Tip:** If you watch long videos or looping content, use the speed limit below instead (or alongside this).
 
 #### Cache download speed limit
 
-Caps the bandwidth used by cache downloads in MB/s. Set to 0 for unlimited.
+You can limit how fast cache downloads run (in MB/s). Set to 0 for unlimited.
 
-- For YouTube downloads, this passes `--limit-rate XM` directly to yt-dlp.
-- For direct downloads, a manual throttle is applied to the HTTP stream copy.
-
-**Recommended usage:** Set the idle window to 120–300 seconds to handle the common case of someone switching videos or queuing songs and set the rate limit as a safety net for long-running playback.
+**Recommended usage:** Set the pause delay to 300 seconds to cover switching videos or queuing songs, and use the speed limit as a backup for longer playback.
 ---
 
 ### Wiki
