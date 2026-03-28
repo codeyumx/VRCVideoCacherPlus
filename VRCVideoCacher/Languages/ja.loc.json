@@ -80,7 +80,7 @@
   "CurrentDownload": "現在のダウンロード",
   "NoActiveDownload": "有効なダウンロードはありません",
   "AddManualDownload": "手動でダウンロードを追加",
-  "EnterVideoUrl": "動画の URL を入力...",
+  "EnterVideoUrl": "動画の URL を入力（1行に1つ、プレイリスト対応）...",
   "QueuedDownloads": "キューされたダウンロード",
   "QueueIsEmpty": "キューは空です",
 

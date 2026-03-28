@@ -12,6 +12,11 @@
 
 **Language:** [English](./README.md) | **日本語** | [Magyar](./README_hu-HU.md) | [한국어](./README_ko-KR.md)
 
+### ダウンロード
+
+- [Chrome 拡張機能](https://chromewebstore.google.com/detail/vrcvideocacher-cookies-ex/kfgelknbegappcajiflgfbjbdpbpokge)
+- [Firefox 拡張機能](https://addons.mozilla.org/en-US/firefox/addon/vrcvideocachercookiesexporter)
+
 ### フォークの変更点 ([EllyVR/VRCVideoCacher](https://github.com/EllyVR/VRCVideoCacher) との違い)
 
 このフォークでは、VRChat が動画を再生中に帯域幅を使いすぎないようにするための設定を**キャッシュ設定**に追加しています。

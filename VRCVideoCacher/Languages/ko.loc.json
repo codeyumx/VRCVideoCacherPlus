@@ -80,7 +80,7 @@
   "CurrentDownload": "현재 다운로드",
   "NoActiveDownload": "진행 중인 다운로드 없음",
   "AddManualDownload": "수동 다운로드 추가",
-  "EnterVideoUrl": "동영상 URL 입력...",
+  "EnterVideoUrl": "동영상 URL 입력 (한 줄에 하나씩, 재생목록 지원)...",
   "QueuedDownloads": "대기 중인 다운로드",
   "QueueIsEmpty": "대기열이 비었음",
 

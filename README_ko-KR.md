@@ -12,6 +12,11 @@
 
 **Language:** [English](./README.md) | [日本語](./README_ja-JP.md) | [Magyar](./README_hu-HU.md) | 한국어
 
+### 다운로드
+
+- [Chrome 확장 프로그램](https://chromewebstore.google.com/detail/vrcvideocacher-cookies-ex/kfgelknbegappcajiflgfbjbdpbpokge)
+- [Firefox 확장 프로그램](https://addons.mozilla.org/en-US/firefox/addon/vrcvideocachercookiesexporter)
+
 ### 포크 변경 사항 ([EllyVR/VRCVideoCacher](https://github.com/EllyVR/VRCVideoCacher) 대비)
 
 이 포크는 VRChat이 동영상을 재생 중일 때 대역폭을 너무 많이 사용하지 않도록 **캐시 설정**에 설정을 추가합니다.

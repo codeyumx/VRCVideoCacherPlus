@@ -12,6 +12,11 @@
 
 **Language:** [English](./README.md) | [日本語](./README_ja-JP.md) | **Magyar** | [한국어](./README_ko-KR.md)
 
+### Letöltés
+
+- [Chrome bővítmény](https://chromewebstore.google.com/detail/vrcvideocacher-cookies-ex/kfgelknbegappcajiflgfbjbdpbpokge)
+- [Firefox bővítmény](https://addons.mozilla.org/en-US/firefox/addon/vrcvideocachercookiesexporter)
+
 ### Fork változások (vs [EllyVR/VRCVideoCacher](https://github.com/EllyVR/VRCVideoCacher))
 
 Ez a fork beállításokat ad hozzá a **Gyorsítótár beállítások** alatt, hogy elkerüld a túlzott sávszélesség-használatot, amikor a VRChat videót játszik le.

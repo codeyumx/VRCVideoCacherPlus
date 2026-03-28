@@ -12,6 +12,8 @@
 
 - [Windows — VRCVideoCacher.exe](https://github.com/dwonderg/VRCVideoCacher/releases/latest/download/VRCVideoCacher.exe)
 - [Linux — VRCVideoCacher](https://github.com/dwonderg/VRCVideoCacher/releases/latest/download/VRCVideoCacher)
+- [Chrome Extension](https://chromewebstore.google.com/detail/vrcvideocacher-cookies-ex/kfgelknbegappcajiflgfbjbdpbpokge)
+- [Firefox Extension](https://addons.mozilla.org/en-US/firefox/addon/vrcvideocachercookiesexporter)
 
 ---
 

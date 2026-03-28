@@ -81,7 +81,7 @@
   "CurrentDownload": "Aktuális Letöltés",
   "NoActiveDownload": "Nincs aktív letöltés",
   "AddManualDownload": "Töltés Hozzáadása Kézileg",
-  "EnterVideoUrl": "Írd be a videó linkjét...",
+  "EnterVideoUrl": "Írd be a videó URL-eket (soronként egy, lejátszási listák támogatottak)...",
   "QueuedDownloads": "Sorban Álló Letöltések",
   "QueueIsEmpty": "A sor üres",
 

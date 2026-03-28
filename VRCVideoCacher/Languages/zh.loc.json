@@ -80,7 +80,7 @@
   "CurrentDownload": "当前下载",
   "NoActiveDownload": "暂无下载任务",
   "AddManualDownload": "手动添加下载",
-  "EnterVideoUrl": "输入视频 URL...",
+  "EnterVideoUrl": "输入视频 URL（每行一个，支持播放列表）...",
   "QueuedDownloads": "排队中的下载",
   "QueueIsEmpty": "队列为空",
 
