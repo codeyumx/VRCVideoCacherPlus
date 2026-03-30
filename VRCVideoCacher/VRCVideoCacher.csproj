@@ -3,7 +3,7 @@
     <PropertyGroup>
         <OutputType>WinExe</OutputType>
         <TargetFramework>net10.0</TargetFramework>
-        <Version>2026.3.15</Version>
+        <Version>2026.3.17</Version>
         <SentryNoSourceLink>true</SentryNoSourceLink>
         <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
         <Nullable>enable</Nullable>
@@ -99,6 +99,15 @@
         <EmbeddedResource Include="yt-dlp-stub.exe">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </EmbeddedResource>
+        <None Update="OpenVR\openvr_api.dll">
+          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+          <TargetPath>openvr_api.dll</TargetPath>
+        </None>
+        <None Update="OpenVR\libopenvr_api.so">
+          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+          <TargetPath>libopenvr_api.so</TargetPath>
+        </None>
+        <EmbeddedResource Include="manifest.vrmanifest" />
     </ItemGroup>
 
     <ItemGroup>

@@ -180,6 +180,7 @@ public partial class SettingsViewModel : ViewModelBase
     partial void OnCacheVRDancingChanged(bool value) => SetHasChanges();
     partial void OnDeferCacheDownloadsChanged(bool value) => SetHasChanges();
     partial void OnCacheDownloadRateLimitKBsChanged(int value) => SetHasChanges();
+    partial void OnCacheOnlyChanged(bool value) => SetHasChanges();
     partial void OnPatchResoniteChanged(bool value) => SetHasChanges();
     partial void OnPatchVRCChanged(bool value) => SetHasChanges();
     partial void OnAutoUpdateChanged(bool value) => SetHasChanges();
@@ -210,6 +211,7 @@ public partial class SettingsViewModel : ViewModelBase
         config.CacheVrDancing = CacheVRDancing;
         config.DeferCacheDownloads = DeferCacheDownloads;
         config.CacheDownloadRateLimitKBs = CacheDownloadRateLimitKBs;
+        config.CacheOnly = CacheOnly;
         config.PatchResonite = PatchResonite;
         config.PatchVrChat = PatchVRC;
         config.AutoUpdateVrcVideoCacher = AutoUpdate;
