@@ -178,7 +178,7 @@ public partial class HistoryViewModel : ViewModelBase
             return;
         }
         _isRefreshing = true;
-        
+
         var historyCache = DatabaseManager.GetVideoHistoryAsCache();
 
         HistoryItems.Clear();
