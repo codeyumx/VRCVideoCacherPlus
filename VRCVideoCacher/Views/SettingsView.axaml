@@ -150,6 +150,7 @@
                                            IsVisible="{Binding IsRateLimitEnabled}"
                                            ToolTip.Tip="{loc:Tr CacheDownloadRateLimitTooltip}"/>
                         </StackPanel>
+                        <CheckBox IsChecked="{Binding RedirectVRDancing}" Content="{loc:Tr RedirectVRDancing}"/>
                     </StackPanel>
                 </Border>
 

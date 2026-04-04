@@ -163,7 +163,8 @@ public class ConfigModel
     public bool CloseToTray = true;
     public bool StartMinimized = false;
     public bool CookieSetupCompleted = false;
-
+    public bool RedirectVRDancing = false;
+    
     // Localization
     public string Language = "en";
 
