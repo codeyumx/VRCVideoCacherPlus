@@ -52,6 +52,12 @@
 
                             <!-- Action Buttons -->
                             <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+                                <Button Command="{Binding SaveToCacheCommand}"
+                                        ToolTip.Tip="Save to cache"
+                                        Padding="8"
+                                        IsVisible="{Binding CanSaveToCache}">
+                                    <mi:MaterialIcon Kind="Download" Width="18" Height="18"/>
+                                </Button>
                                 <Button Command="{Binding OpenUrlCommand}" ToolTip.Tip="Open URL" Padding="8">
                                     <mi:MaterialIcon Kind="OpenInNew" Width="18" Height="18"/>
                                 </Button>

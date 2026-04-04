@@ -75,48 +75,33 @@ public class CacheManager
             return;
 
         var recentPlayHistory = DatabaseManager.GetPlayHistory();
-        var watchStatsMap = DatabaseManager.GetAllVideoWatchStats();
 
-        // Score each cached video — higher score = more valuable = delete last
-        var scored = CachedAssets.Select(kvp =>
-        {
-            var videoId = Path.GetFileNameWithoutExtension(kvp.Value.FileName);
-            watchStatsMap.TryGetValue(videoId, out var stats);
+        // LRU eviction — LastModified is updated on every cache hit, so it acts as "last accessed"
+        var lru = CachedAssets
+            .OrderBy(kvp => kvp.Value.LastModified)
+            .ToList();
 
-            var watchCount = stats?.WatchCount ?? 0;
-            var lastWatched = stats?.LastWatchedAt ?? kvp.Value.LastModified;
-            var daysSinceWatched = (DateTime.UtcNow - lastWatched).TotalDays;
-
-            // Score formula: watch frequency rewards, recency rewards, large files slightly penalized
-            var score = watchCount * 10.0
-                        + Math.Max(0, 30.0 - daysSinceWatched) // bonus for recently watched (within 30 days)
-                        - kvp.Value.Size / (1024.0 * 1024.0 * 1024.0); // slight penalty per GB
-
-            return new { Key = kvp.Key, Cache = kvp.Value, VideoId = videoId, Score = score };
-        })
-        .OrderBy(x => x.Score) // lowest score = least valuable = delete first
-        .ToList();
-
-        foreach (var item in scored)
+        foreach (var kvp in lru)
         {
             if (cacheSize < maxCacheSize)
                 break;
 
-            var filePath = Path.Join(CachePath, item.Cache.FileName);
+            var videoId = Path.GetFileNameWithoutExtension(kvp.Value.FileName);
+            var filePath = Path.Join(CachePath, kvp.Value.FileName);
             if (File.Exists(filePath))
             {
                 File.Delete(filePath);
-                cacheSize -= item.Cache.Size;
+                cacheSize -= kvp.Value.Size;
 
                 // delete thumbnail if not in recent history
-                if (recentPlayHistory.All(h => h.Id != item.VideoId))
+                if (recentPlayHistory.All(h => h.Id != videoId))
                 {
-                    var thumbnailPath = ThumbnailManager.GetThumbnailPath(item.VideoId);
+                    var thumbnailPath = ThumbnailManager.GetThumbnailPath(videoId);
                     if (File.Exists(thumbnailPath))
                         File.Delete(thumbnailPath);
                 }
             }
-            CachedAssets.TryRemove(item.Key, out _);
+            CachedAssets.TryRemove(kvp.Key, out _);
         }
     }
 

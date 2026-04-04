@@ -127,6 +127,7 @@ public partial class SettingsViewModel : ViewModelBase
     public SettingsViewModel()
     {
         ConfigManager.OnConfigChanged += LoadFromConfig;
+        PlusConfigManager.OnConfigChanged += LoadFromConfig;
         LoadFromConfig();
     }
 
@@ -147,16 +148,17 @@ public partial class SettingsViewModel : ViewModelBase
         CachePyPyDance = config.CachePyPyDance;
         CacheVRDancing = config.CacheVrDancing;
         CacheOnly = config.CacheOnly;
-        IsDelayEnabled = config.CacheDownloadIdleSeconds > 0;
-        CacheDownloadIdleSeconds = config.CacheDownloadIdleSeconds > 0 ? config.CacheDownloadIdleSeconds : 30;
-        IsRateLimitEnabled = config.CacheDownloadRateLimitMBs > 0;
-        CacheDownloadRateLimitMBs = config.CacheDownloadRateLimitMBs > 0 ? config.CacheDownloadRateLimitMBs : 5;
+        var plusConfig = PlusConfigManager.Config;
+        IsDelayEnabled = plusConfig.CacheDownloadIdleSeconds > 0;
+        CacheDownloadIdleSeconds = plusConfig.CacheDownloadIdleSeconds > 0 ? plusConfig.CacheDownloadIdleSeconds : 30;
+        IsRateLimitEnabled = plusConfig.CacheDownloadRateLimitMBs > 0;
+        CacheDownloadRateLimitMBs = plusConfig.CacheDownloadRateLimitMBs > 0 ? plusConfig.CacheDownloadRateLimitMBs : 5;
         PatchResonite = config.PatchResonite;
         PatchVRC = config.PatchVrChat;
         AutoUpdate = config.AutoUpdateVrcVideoCacher;
         CloseToTray = config.CloseToTray;
         StartMinimized = config.StartMinimized;
-        RedirectVRDancing = config.RedirectVRDancing;
+        RedirectVRDancing = plusConfig.RedirectVRDancing;
         BlockedUrls.Clear();
         foreach (var url in config.BlockedUrls)
         {
@@ -199,6 +201,7 @@ public partial class SettingsViewModel : ViewModelBase
     partial void OnAutoUpdateChanged(bool value) => SetHasChanges();
     partial void OnCloseToTrayChanged(bool value) => SetHasChanges();
     partial void OnStartMinimizedChanged(bool value) => SetHasChanges();
+    partial void OnRedirectVRDancingChanged(bool value) => SetHasChanges();
 
     [RelayCommand]
     private void SaveSettings()
@@ -223,8 +226,9 @@ public partial class SettingsViewModel : ViewModelBase
         config.CachePyPyDance = CachePyPyDance;
         config.CacheVrDancing = CacheVRDancing;
         config.CacheOnly = CacheOnly;
-        config.CacheDownloadIdleSeconds = IsDelayEnabled ? CacheDownloadIdleSeconds : 0;
-        config.CacheDownloadRateLimitMBs = IsRateLimitEnabled ? CacheDownloadRateLimitMBs : 0;
+        var plusConfig = PlusConfigManager.Config;
+        plusConfig.CacheDownloadIdleSeconds = IsDelayEnabled ? CacheDownloadIdleSeconds : 0;
+        plusConfig.CacheDownloadRateLimitMBs = IsRateLimitEnabled ? CacheDownloadRateLimitMBs : 0;
         config.PatchResonite = PatchResonite;
         config.PatchVrChat = PatchVRC;
         config.AutoUpdateVrcVideoCacher = AutoUpdate;
@@ -232,8 +236,16 @@ public partial class SettingsViewModel : ViewModelBase
         config.StartMinimized = StartMinimized;
         config.BlockedUrls = BlockedUrls.ToArray();
         config.BlockRedirect = BlockRedirect;
-        config.RedirectVRDancing = RedirectVRDancing;
+        plusConfig.RedirectVRDancing = RedirectVRDancing;
+
+        // Temporarily unhook config-changed events to avoid redundant LoadFromConfig calls during save
+        ConfigManager.OnConfigChanged -= LoadFromConfig;
+        PlusConfigManager.OnConfigChanged -= LoadFromConfig;
         ConfigManager.TrySaveConfig();
+        PlusConfigManager.TrySaveConfig();
+        ConfigManager.OnConfigChanged += LoadFromConfig;
+        PlusConfigManager.OnConfigChanged += LoadFromConfig;
+
         HasChanges = false;
         StatusMessage = Loc.Tr("SettingsSaved");
     }

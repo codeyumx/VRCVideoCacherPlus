@@ -16,6 +16,17 @@ public partial class DownloadItemViewModel : ViewModelBase
     public string UrlType { get; init; } = string.Empty;
     public string Format { get; init; } = string.Empty;
     public string QueuedAt { get; init; } = string.Empty;
+    public string? Title { get; init; }
+
+    public string DisplayTitle
+    {
+        get
+        {
+            if (!string.IsNullOrEmpty(Title))
+                return Title.Length > 50 ? Title[..47] + "..." : Title;
+            return VideoId;
+        }
+    }
 }
 
 public partial class DownloadQueueViewModel : ViewModelBase
@@ -52,8 +63,14 @@ public partial class DownloadQueueViewModel : ViewModelBase
         DatabaseManager.OnPendingDownloadsChanged += OnQueueChanged;
     }
 
+    private static string? LookupTitle(string videoId)
+    {
+        return DatabaseManager.GetVideoInfoCache(videoId)?.Title;
+    }
+
     private void OnDownloadStarted(VideoInfo video)
     {
+        var title = LookupTitle(video.VideoId);
         Dispatcher.UIThread.InvokeAsync(() =>
         {
             CurrentDownload = new DownloadItemViewModel
@@ -61,9 +78,10 @@ public partial class DownloadQueueViewModel : ViewModelBase
                 VideoUrl = video.VideoUrl,
                 VideoId = video.VideoId,
                 UrlType = video.UrlType.ToString(),
-                Format = video.DownloadFormat.ToString()
+                Format = video.DownloadFormat.ToString(),
+                Title = title
             };
-            CurrentStatus = $"Downloading {video.VideoId}...";
+            CurrentStatus = $"Downloading {CurrentDownload.DisplayTitle}...";
             DownloadProgress = 0;
             IsDownloading = true;
             RefreshQueue();
@@ -72,13 +90,15 @@ public partial class DownloadQueueViewModel : ViewModelBase
 
     private void OnDownloadCompleted(VideoInfo video, bool success)
     {
+        var title = LookupTitle(video.VideoId);
+        var displayName = !string.IsNullOrEmpty(title) ? title : video.VideoId;
         Dispatcher.UIThread.InvokeAsync(() =>
         {
             CurrentDownload = null;
             CurrentStatus = success ? "Completed" : "Failed";
             StatusMessage = success
-                ? $"Downloaded: {video.VideoId}"
-                : $"Failed to download: {video.VideoId}";
+                ? $"Downloaded: {displayName}"
+                : $"Failed to download: {displayName}";
             DownloadProgress = 0;
             IsDownloading = false;
             RefreshQueue();
@@ -129,7 +149,8 @@ public partial class DownloadQueueViewModel : ViewModelBase
                 VideoId = item.VideoId,
                 UrlType = item.UrlType.ToString(),
                 Format = item.DownloadFormat.ToString(),
-                QueuedAt = item.QueuedAt.ToLocalTime().ToString("g")
+                QueuedAt = item.QueuedAt.ToLocalTime().ToString("g"),
+                Title = LookupTitle(item.VideoId)
             });
         }
 
@@ -142,13 +163,14 @@ public partial class DownloadQueueViewModel : ViewModelBase
                 VideoUrl = current.VideoUrl,
                 VideoId = current.VideoId,
                 UrlType = current.UrlType.ToString(),
-                Format = current.DownloadFormat.ToString()
+                Format = current.DownloadFormat.ToString(),
+                Title = LookupTitle(current.VideoId)
             };
             CurrentStatus = state switch
             {
                 DownloadState.Paused => "Paused — waiting for stream to finish",
                 DownloadState.WaitingForIdle => "Waiting for streaming to stop...",
-                _ => $"Downloading {current.VideoId}..."
+                _ => $"Downloading {CurrentDownload.DisplayTitle}..."
             };
         }
         else
@@ -173,7 +195,7 @@ public partial class DownloadQueueViewModel : ViewModelBase
         else
             VideoDownloader.RemoveFromQueue(item.VideoId, Enum.Parse<DownloadFormat>(item.Format));
 
-        StatusMessage = $"Removed: {item.VideoId}";
+        StatusMessage = $"Removed: {item.DisplayTitle}";
         RefreshQueue();
     }
 

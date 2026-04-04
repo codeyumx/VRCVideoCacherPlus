@@ -34,7 +34,7 @@
                 <Grid ColumnDefinitions="Auto, *, Auto" IsVisible="{Binding CurrentDownload, Converter={x:Static ObjectConverters.IsNotNull}}">
                     <mi:MaterialIcon Grid.Column="0" Kind="Download" Width="24" Height="24" Foreground="#64B5F6"/>
                     <StackPanel Grid.Column="1" Margin="15,0">
-                        <TextBlock Text="{Binding CurrentDownload.VideoId}" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding CurrentDownload.DisplayTitle}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
                         <StackPanel Orientation="Horizontal" Spacing="10">
                             <TextBlock Text="{Binding CurrentDownload.UrlType}" Foreground="#888888" FontSize="12"/>
                             <TextBlock Text="{Binding CurrentDownload.Format}" Foreground="#888888" FontSize="12"/>
@@ -105,7 +105,7 @@
                             <Grid ColumnDefinitions="Auto, *, Auto, Auto" Margin="5">
                                 <mi:MaterialIcon Grid.Column="0" Kind="Clock" Width="20" Height="20" Foreground="#888888"/>
                                 <StackPanel Grid.Column="1" Margin="15,0">
-                                    <TextBlock Text="{Binding VideoId}" FontWeight="SemiBold"/>
+                                    <TextBlock Text="{Binding DisplayTitle}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
                                     <StackPanel Orientation="Horizontal" Spacing="10">
                                         <TextBlock Text="{Binding UrlType}" Foreground="#888888" FontSize="12"/>
                                         <TextBlock Text="{Binding Format}" Foreground="#888888" FontSize="12"/>

@@ -110,6 +110,40 @@ public partial class HistoryItemViewModel : ViewModelBase
         }
     }
 
+    [ObservableProperty]
+    private bool _isSavingToCache;
+
+    public bool CanSaveToCache => !IsCached && !IsInQueue && !IsSavingToCache;
+
+    partial void OnIsCachedChanged(bool value) => OnPropertyChanged(nameof(CanSaveToCache));
+    partial void OnIsInQueueChanged(bool value) => OnPropertyChanged(nameof(CanSaveToCache));
+    partial void OnIsSavingToCacheChanged(bool value) => OnPropertyChanged(nameof(CanSaveToCache));
+
+    [RelayCommand]
+    private async Task SaveToCache()
+    {
+        if (string.IsNullOrEmpty(Url)) return;
+
+        IsSavingToCache = true;
+        try
+        {
+            var videoInfo = await VideoId.GetVideoId(Url, true);
+            if (videoInfo != null)
+            {
+                VideoDownloader.QueueDownload(videoInfo);
+                UpdateStatus();
+            }
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Error(ex, "Failed to save {Url} to cache.", Url);
+        }
+        finally
+        {
+            IsSavingToCache = false;
+        }
+    }
+
     [RelayCommand]
     private void OpenUrl()
     {
@@ -148,7 +182,7 @@ public partial class HistoryViewModel : ViewModelBase
     {
         DatabaseManager.OnPlayHistoryAdded += () => Avalonia.Threading.Dispatcher.UIThread.Post(Refresh);
 
-        // Causes infinite loop because we update cache inside LoadMetadataAsync, which triggers this event again.
+        // LoadMetadataAsync updates the cache, which fires this event — _isRefreshing guard prevents re-entry.
         DatabaseManager.OnVideoInfoCacheUpdated += () => Avalonia.Threading.Dispatcher.UIThread.Post(Refresh);
 
         // Update status icons when queue or cache changes

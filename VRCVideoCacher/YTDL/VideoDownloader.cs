@@ -69,7 +69,7 @@ public class VideoDownloader
         {
             await Task.Delay(500);
 
-            var idleSeconds = ConfigManager.Config.CacheDownloadIdleSeconds;
+            var idleSeconds = PlusConfigManager.Config.CacheDownloadIdleSeconds;
 
             if (idleSeconds > 0 && !ActiveStreamTracker.IsIdle(idleSeconds))
             {
@@ -272,7 +272,7 @@ public class VideoDownloader
 
         var args = new List<string> { "-c", "--newline", "--no-warnings" }; // -c resumes from .part file if killed, --newline for progress parsing
 
-        var rateLimitMBs = ConfigManager.Config.CacheDownloadRateLimitMBs;
+        var rateLimitMBs = PlusConfigManager.Config.CacheDownloadRateLimitMBs;
         if (rateLimitMBs > 0)
             args.Add($"--limit-rate {rateLimitMBs}M");
 
@@ -494,7 +494,7 @@ public class VideoDownloader
                 await using var fileStream = new FileStream(TempDownloadMp4Path, fileMode, FileAccess.Write, FileShare.None);
 
                 var totalBytes = (response.Content.Headers.ContentLength ?? 0) + resumeFrom;
-                var rateLimitMBs = ConfigManager.Config.CacheDownloadRateLimitMBs;
+                var rateLimitMBs = PlusConfigManager.Config.CacheDownloadRateLimitMBs;
                 if (rateLimitMBs > 0)
                     await ThrottledCopyAsync(stream, fileStream, rateLimitMBs * 1024L * 1024L, totalBytes, cts.Token);
                 else
