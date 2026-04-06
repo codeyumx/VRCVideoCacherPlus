@@ -9,6 +9,7 @@ public class YouTubeHandler : ISiteHandler
     private static readonly ILogger Log = Program.Logger.ForContext<YouTubeHandler>();
     private static readonly string[] Hosts = ["youtube.com", "youtu.be", "www.youtube.com", "m.youtube.com", "music.youtube.com"];
     private static readonly Regex IdRegex = new(@"(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|live\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})");
+    private static readonly Regex BareIdRegex = new(@"^\/(?=[a-zA-Z0-9_-]*[\d_A-Z-])[a-zA-Z0-9_-]{11}$");
     private const string AVProFormat = "(mp4/best)[height<=?1080][height>=?64][width>=?64]";
     private const string UnityPlayerFormat = "(mp4/best)[vcodec!=av01][vcodec!=vp9.2][height<=?1080][height>=?64][width>=?64][protocol^=http]";
 
@@ -23,6 +24,8 @@ public class YouTubeHandler : ISiteHandler
             videoId = match.Groups[1].Value;
         else if (uri.AbsolutePath.StartsWith("/shorts/"))
             videoId = uri.AbsolutePath.Split('/')[^1];
+        else if (BareIdRegex.IsMatch(uri.AbsolutePath))
+            videoId = uri.AbsolutePath.TrimStart('/');
 
         if (string.IsNullOrEmpty(videoId))
         {

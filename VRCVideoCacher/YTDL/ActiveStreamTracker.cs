@@ -45,20 +45,16 @@ public static class ActiveStreamTracker
 
             if (!string.IsNullOrEmpty(videoId))
             {
+                // A new stream means the user moved on — clear previous entries
+                // so skipped videos don't stack their durations.
+                _expectedEndTimes.Clear();
+
                 var expectedEnd = durationSeconds > 0
                     ? DateTime.UtcNow.AddSeconds(durationSeconds.Value)
                     : DateTime.UtcNow;
 
-                // Keep the latest (longest) expected end time for this video
-                if (!_expectedEndTimes.TryGetValue(videoId, out var existing) || expectedEnd > existing)
-                    _expectedEndTimes[videoId] = expectedEnd;
+                _expectedEndTimes[videoId] = expectedEnd;
             }
-
-            // Clean up entries that have long since passed (> 1 hour stale)
-            var cutoff = DateTime.UtcNow.AddHours(-1);
-            var stale = _expectedEndTimes.Where(kv => kv.Value < cutoff).Select(kv => kv.Key).ToList();
-            foreach (var key in stale)
-                _expectedEndTimes.Remove(key);
         }
         Task.Run(() => OnStreamingActivity?.Invoke());
     }

@@ -145,9 +145,6 @@ public class ConfigModel
     public bool CachePyPyDance = false;
     public bool CacheVrDancing = false;
     public bool CacheOnly = false;
-    public int CacheDownloadIdleSeconds = 30; // 0 = disabled; downloads start after this many seconds of no streaming requests
-    public int CacheDownloadRateLimitMBs = 0; // 0 = unlimited
-
     // Cache Rules
     public string[] BlockedUrls = ["https://na2.vrdancing.club/sampleurl.mp4"];
     public string BlockRedirect = "https://www.youtube.com/watch?v=byv2bKekeWQ";
@@ -164,7 +161,7 @@ public class ConfigModel
     public bool StartMinimized = false;
     public bool CookieSetupCompleted = false;
     public bool RedirectVRDancing = false;
-    
+
     // Localization
     public string Language = "en";
 

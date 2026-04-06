@@ -52,11 +52,26 @@ public class PlusConfigManager
     /// </summary>
     private static void MigrateFromMainConfig()
     {
-        var main = ConfigManager.Config;
-        Config.CacheDownloadRateLimitMBs = main.CacheDownloadRateLimitMBs;
-        Config.CacheDownloadIdleSeconds = main.CacheDownloadIdleSeconds;
-        Config.RedirectVRDancing = main.RedirectVRDancing;
-        Log.Information("Migrated Plus settings from main Config.json.");
+        var configPath = Path.Join(Program.DataPath, "Config.json");
+        if (!File.Exists(configPath))
+            return;
+
+        try
+        {
+            var json = JsonConvert.DeserializeObject<Dictionary<string, object>>(File.ReadAllText(configPath));
+            if (json == null)
+                return;
+
+            if (json.TryGetValue("CacheDownloadRateLimitMBs", out var rate))
+                Config.CacheDownloadRateLimitMBs = Convert.ToInt32(rate);
+            if (json.TryGetValue("CacheDownloadIdleSeconds", out var idle))
+                Config.CacheDownloadIdleSeconds = Convert.ToInt32(idle);
+            Log.Information("Migrated Plus settings from main Config.json.");
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to migrate Plus settings from main Config.json, using defaults.");
+        }
     }
 
     public static void TrySaveConfig()
@@ -77,5 +92,4 @@ public class PlusConfigModel
 {
     public int CacheDownloadRateLimitMBs { get; set; } // 0 = unlimited
     public int CacheDownloadIdleSeconds { get; set; } = 30; // 0 = disabled
-    public bool RedirectVRDancing { get; set; }
 }

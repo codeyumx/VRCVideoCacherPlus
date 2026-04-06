@@ -81,7 +81,7 @@ public class ApiController : WebApiController
 
         Log.Information("Request URL: {URL}", requestUrl);
 
-        if (requestUrl.StartsWith("https://eu2.vrdancing.club/weekend/") && PlusConfigManager.Config.RedirectVRDancing)
+        if (requestUrl.StartsWith("https://eu2.vrdancing.club/weekend/") && ConfigManager.Config.RedirectVRDancing)
         {
             await HttpContext.SendStringAsync(requestUrl.Replace("eu2", "na2"), "text/plain", Encoding.UTF8);
             return;
@@ -191,10 +191,35 @@ public class ApiController : WebApiController
         Log.Information("Responding with URL: {URL}", response);
         await HttpContext.SendStringAsync(response, "text/plain", Encoding.UTF8);
 
-        // Record streaming activity so cache downloads are deferred until idle.
-        // Use the video's known duration so downloads wait until it's likely finished.
-        var cachedMeta = DatabaseManager.GetVideoInfoCache(videoInfo.VideoId);
-        ActiveStreamTracker.RecordActivity(videoInfo.VideoId, cachedMeta?.Duration);
+        // Record activity immediately with whatever duration we already have cached,
+        // so download deferral and queueing are never blocked by a slow yt-dlp call.
+        var cachedDuration = DatabaseManager.GetVideoInfoCache(videoInfo.VideoId)?.Duration;
+        ActiveStreamTracker.RecordActivity(videoInfo.VideoId, cachedDuration);
+
+        // If we don't have duration yet for a YouTube video, fetch it in the background
+        // with a timeout so the tracker gets updated when it's available.
+        if (videoInfo.UrlType == UrlType.YouTube && cachedDuration is not > 0)
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+                    var duration = await VideoId.FetchAndCacheYouTubeMetadataAsync(videoInfo.VideoId)
+                        .WaitAsync(cts.Token);
+                    if (duration is > 0)
+                        ActiveStreamTracker.RecordActivity(videoInfo.VideoId, duration);
+                }
+                catch (OperationCanceledException)
+                {
+                    Log.Warning("Metadata fetch for {VideoId} timed out, using fallback duration.", videoInfo.VideoId);
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning("Background metadata fetch for {VideoId} failed: {Error}", videoInfo.VideoId, ex.Message);
+                }
+            });
+        }
 
         // check if file is cached again to handle race condition
         (isCached, _, _) = GetCachedFile(videoInfo.VideoId, avPro);

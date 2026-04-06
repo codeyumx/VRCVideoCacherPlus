@@ -75,6 +75,59 @@ public class VideoId
         return handler == null ? null : await handler.GetVideoInfo(url, uri, avPro);
     }
 
+    /// <summary>
+    /// Fetches YouTube video metadata (duration, title, etc.) via yt-dlp -j and caches it.
+    /// Returns the duration in seconds, or null if it couldn't be fetched.
+    /// This is called in the streaming path so that ActiveStreamTracker knows how long
+    /// to defer cache downloads.
+    /// </summary>
+    public static async Task<double?> FetchAndCacheYouTubeMetadataAsync(string videoId)
+    {
+        // Check if we already have duration cached
+        var existing = DatabaseManager.GetVideoInfoCache(videoId);
+        if (existing?.Duration is > 0)
+            return existing.Duration;
+
+        try
+        {
+            var url = $"https://www.youtube.com/watch?v={videoId}";
+            var args = new List<string>
+            {
+                "-j",
+                "--impersonate=\"safari\"",
+                "--extractor-args=\"youtube:player_client=web\""
+            };
+
+            var (rawData, error, exitCode) = await RunYtdlpAsync(args, url);
+            if (exitCode != 0 || string.IsNullOrEmpty(rawData))
+            {
+                Log.Warning("Failed to fetch metadata for {VideoId}: {Error}", videoId, error);
+                return null;
+            }
+
+            var data = JsonSerializer.Deserialize(rawData, VideoIdJsonContext.Default.YtdlpVideoInfo);
+            if (data?.Duration is null)
+                return null;
+
+            DatabaseManager.AddVideoInfoCache(new VideoInfoCache
+            {
+                Id = data.Id ?? videoId,
+                Title = data.Name,
+                Author = data.Author,
+                Duration = data.Duration,
+                Type = UrlType.YouTube
+            });
+
+            Log.Information("Cached metadata for {VideoId}: duration={Duration}s", videoId, data.Duration);
+            return data.Duration;
+        }
+        catch (Exception ex)
+        {
+            Log.Warning("Failed to fetch metadata for {VideoId}: {Error}", videoId, ex.Message);
+            return null;
+        }
+    }
+
     public static async Task<string> TryGetYouTubeVideoId(string url)
     {
         var args = new List<string>();
@@ -112,7 +165,7 @@ public class VideoId
         }
         if (data.Duration > ConfigManager.Config.CacheYouTubeMaxLength * 60)
         {
-            Log.Warning("Failed to get video ID: Video is longer than configured max length ({Length})", data.Duration / 60 / ConfigManager.Config.CacheYouTubeMaxLength);
+            Log.Warning("Failed to get video ID: Video is longer than configured max length ({VideoMin}min > {MaxMin}min)", data.Duration / 60, ConfigManager.Config.CacheYouTubeMaxLength);
             return string.Empty;
         }
 

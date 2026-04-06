@@ -158,7 +158,7 @@ public partial class SettingsViewModel : ViewModelBase
         AutoUpdate = config.AutoUpdateVrcVideoCacher;
         CloseToTray = config.CloseToTray;
         StartMinimized = config.StartMinimized;
-        RedirectVRDancing = plusConfig.RedirectVRDancing;
+        RedirectVRDancing = config.RedirectVRDancing;
         BlockedUrls.Clear();
         foreach (var url in config.BlockedUrls)
         {
@@ -236,15 +236,21 @@ public partial class SettingsViewModel : ViewModelBase
         config.StartMinimized = StartMinimized;
         config.BlockedUrls = BlockedUrls.ToArray();
         config.BlockRedirect = BlockRedirect;
-        plusConfig.RedirectVRDancing = RedirectVRDancing;
+        config.RedirectVRDancing = RedirectVRDancing;
 
         // Temporarily unhook config-changed events to avoid redundant LoadFromConfig calls during save
         ConfigManager.OnConfigChanged -= LoadFromConfig;
         PlusConfigManager.OnConfigChanged -= LoadFromConfig;
-        ConfigManager.TrySaveConfig();
-        PlusConfigManager.TrySaveConfig();
-        ConfigManager.OnConfigChanged += LoadFromConfig;
-        PlusConfigManager.OnConfigChanged += LoadFromConfig;
+        try
+        {
+            ConfigManager.TrySaveConfig();
+            PlusConfigManager.TrySaveConfig();
+        }
+        finally
+        {
+            ConfigManager.OnConfigChanged += LoadFromConfig;
+            PlusConfigManager.OnConfigChanged += LoadFromConfig;
+        }
 
         HasChanges = false;
         StatusMessage = Loc.Tr("SettingsSaved");
