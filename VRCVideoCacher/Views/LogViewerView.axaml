@@ -44,17 +44,18 @@
         <Border Grid.Row="2" Background="#1a1a1a" CornerRadius="8" Padding="10">
             <ListBox x:Name="LogListBox"
                      ItemsSource="{Binding FilteredLogEntries}"
+                     SelectionMode="Multiple"
                      Background="Transparent"
                      ScrollViewer.VerticalScrollBarVisibility="Auto">
+                <ListBox.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="Copy" Tag="full" Click="OnCopyLogEntries"/>
+                        <MenuItem Header="Copy Message Only" Tag="message" Click="OnCopyLogEntries"/>
+                    </ContextMenu>
+                </ListBox.ContextMenu>
                 <ListBox.ItemTemplate>
                     <DataTemplate DataType="{x:Type models:LogEntry}">
                         <Grid ColumnDefinitions="80, 40, 100, *" Margin="5,2">
-                            <Grid.ContextMenu>
-                                <ContextMenu>
-                                    <MenuItem Header="Copy" Tag="full" Click="OnCopyLogEntry"/>
-                                    <MenuItem Header="Copy Message Only" Tag="message" Click="OnCopyLogEntry"/>
-                                </ContextMenu>
-                            </Grid.ContextMenu>
                             <TextBlock Grid.Column="0"
                                        Text="{Binding Timestamp, StringFormat='{}{0:HH:mm:ss}'}"
                                        FontFamily="Consolas"

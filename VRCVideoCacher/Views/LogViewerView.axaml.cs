@@ -51,14 +51,20 @@ public partial class LogViewerView : UserControl
         }
     }
 
-    private async void OnCopyLogEntry(object? sender, RoutedEventArgs e)
+    private async void OnCopyLogEntries(object? sender, RoutedEventArgs e)
     {
         if (sender is not MenuItem menuItem) return;
-        if (menuItem.DataContext is not LogEntry entry) return;
 
-        var text = menuItem.Tag?.ToString() == "message"
-            ? entry.Message
-            : $"[{entry.Timestamp:HH:mm:ss}] [{entry.Level}] [{entry.Source}] {entry.Message}";
+        var selected = LogListBox.SelectedItems;
+        if (selected == null || selected.Count == 0) return;
+
+        var messageOnly = menuItem.Tag?.ToString() == "message";
+        var lines = selected.OfType<LogEntry>()
+            .Select(entry => messageOnly
+                ? entry.Message
+                : $"[{entry.Timestamp:HH:mm:ss}] [{entry.Level}] [{entry.Source}] {entry.Message}");
+
+        var text = string.Join(Environment.NewLine, lines);
 
         if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
