@@ -206,6 +206,20 @@ public partial class DownloadQueueViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private void DownloadNow(DownloadItemViewModel? item)
+    {
+        if (item == null) return;
+
+        // Bump to top of queue first (unless it's already first in DB)
+        if (item.DbKey > 0)
+            VideoDownloader.BumpToTopOfQueue(item.DbKey);
+
+        VideoDownloader.ForceDownloadNext();
+        StatusMessage = $"Force downloading: {item.DisplayTitle}";
+        RefreshQueue();
+    }
+
+    [RelayCommand]
     private void RemoveFromQueue(DownloadItemViewModel? item)
     {
         if (item == null) return;

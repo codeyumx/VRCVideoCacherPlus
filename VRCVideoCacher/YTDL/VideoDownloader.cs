@@ -35,6 +35,7 @@ public class VideoDownloader
     private static readonly object StateLock = new();
     private static VideoInfo? _pausedDownload;
     private static volatile bool _pauseRequested;
+    private static volatile bool _forceDownloadNext;
     private static Process? _currentProcess;
     private static CancellationTokenSource? _downloadCts;
 
@@ -71,7 +72,7 @@ public class VideoDownloader
 
             var idleSeconds = PlusConfigManager.Config.CacheDownloadIdleSeconds;
 
-            if (idleSeconds > 0 && !ActiveStreamTracker.IsIdle(idleSeconds))
+            if (idleSeconds > 0 && !ActiveStreamTracker.IsIdle(idleSeconds) && !_forceDownloadNext)
             {
                 var waitState = _state is DownloadState.Paused ? DownloadState.Paused : DownloadState.WaitingForIdle;
                 if (_state != waitState)
@@ -87,7 +88,7 @@ public class VideoDownloader
             }
 
             // Log when idle threshold is met and we're about to resume
-            if ((_state is DownloadState.WaitingForIdle or DownloadState.Paused) && idleSeconds > 0)
+            if ((_state is DownloadState.WaitingForIdle or DownloadState.Paused) && idleSeconds > 0 && !_forceDownloadNext)
             {
                 Log.Information("Idle threshold reached ({IdleSeconds}s) — resuming cache downloads.", idleSeconds);
             }
@@ -98,7 +99,7 @@ public class VideoDownloader
             {
                 _pauseRequested = false;
 
-                if (_pausedDownload != null)
+                if (_pausedDownload != null && !_forceDownloadNext)
                 {
                     queueItem = _pausedDownload;
                     _pausedDownload = null;
@@ -107,10 +108,19 @@ public class VideoDownloader
                 }
                 else
                 {
+                    // If force-downloading, re-queue the paused download back to DB
+                    // so it isn't silently lost.
+                    if (_forceDownloadNext && _pausedDownload != null)
+                    {
+                        Log.Information("Re-queuing paused download for {VideoId} due to force download.", _pausedDownload.VideoId);
+                        DatabaseManager.AddPendingDownload(_pausedDownload);
+                        _pausedDownload = null;
+                    }
                     // Dequeue from persistent DB
                     var pending = DatabaseManager.GetPendingDownloads();
                     if (pending.Count == 0)
                     {
+                        _forceDownloadNext = false;
                         if (_state != DownloadState.Idle)
                         {
                             Log.Information("Download queue is empty — returning to idle.");
@@ -135,11 +145,11 @@ public class VideoDownloader
                 // Set _currentDownload inside the lock so OnStreamingActivity
                 // cannot fire between dequeue and assignment and miss the pause.
                 _currentDownload = queueItem;
+                _forceDownloadNext = false;
             }
 
             if (isResume)
                 Log.Information("Resuming cache download for {VideoId}.", queueItem.VideoId);
-
             _state = DownloadState.Downloading;
             OnDownloadStarted?.Invoke(queueItem);
 
@@ -215,6 +225,20 @@ public class VideoDownloader
     public static void RemoveFromQueueByKey(int key)
     {
         DatabaseManager.RemovePendingDownloadByKey(key);
+        OnQueueChanged?.Invoke();
+    }
+
+    public static void ForceDownloadNext()
+    {
+        _forceDownloadNext = true;
+        Log.Information("Force download requested — skipping idle delay for next item.");
+        OnQueueChanged?.Invoke();
+    }
+
+    public static void BumpToTopOfQueue(int key)
+    {
+        DatabaseManager.BumpToTopOfQueue(key);
+        Log.Information("Bumped item {Key} to top of download queue.", key);
         OnQueueChanged?.Invoke();
     }
 

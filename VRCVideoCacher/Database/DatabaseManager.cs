@@ -207,6 +207,28 @@ public static class DatabaseManager
             .ToList();
     }
 
+    public static void BumpToTopOfQueue(int key)
+    {
+        using var db = _contextFactory.CreateDbContext();
+        var item = db.PendingDownloads.Find(key);
+        if (item == null) return;
+
+        var earliest = db.PendingDownloads
+            .Where(p => p.Key != key)
+            .OrderBy(p => p.QueuedAt)
+            .Select(p => (DateTime?)p.QueuedAt)
+            .FirstOrDefault();
+
+        // Use a fixed epoch so repeated bumps don't drift QueuedAt unboundedly into the past.
+        var floor = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var target = earliest.HasValue && earliest.Value > floor
+            ? earliest.Value.AddSeconds(-1)
+            : DateTime.UtcNow;
+        item.QueuedAt = target;
+        db.SaveChanges();
+        OnPendingDownloadsChanged?.Invoke();
+    }
+
     public static void ClearPendingDownloads()
     {
         using var db = _contextFactory.CreateDbContext();

@@ -42,6 +42,8 @@ You can manually queue videos for caching from the **Downloads** tab. Paste one 
 - Update banner — shows a banner when a new version is available
 - Better log entries in the log viewer
 - Watch history with stats tracking intelligently saves cache space, keeping your favorite videos
+- "Download Now" button on queued items — immediately starts downloading a specific item, skipping the idle-wait delay
+- Video titles shown in the download queue
 
 ---
 
