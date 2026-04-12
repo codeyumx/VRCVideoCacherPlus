@@ -46,8 +46,13 @@ You can manually queue videos for caching from the **Downloads** tab. Paste one 
 - "Download Now" button on queued items — immediately starts downloading a specific item, skipping the idle-wait delay
 - Video titles shown in the download queue
 
-#### Linux
-Currently untested, but published in releases if you want to try it out.
+#### Builds
+##### Windows
+Tested on Windows.
+##### Linux
+Linux is currently untested, but published in releases if you want to try it out.
+##### Steam
+Not supported, for now.
 
 ---
 
