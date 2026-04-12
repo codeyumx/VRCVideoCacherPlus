@@ -10,8 +10,9 @@
 
 ### Download
 
-- [Windows — VRCVideoCacher.exe](https://github.com/dwonderg/VRCVideoCacher/releases/latest/download/VRCVideoCacher.exe)
-- [Linux — VRCVideoCacher](https://github.com/dwonderg/VRCVideoCacher/releases/latest/download/VRCVideoCacher)
+- [Windows — VRCVideoCacher.exe](https://github.com/codeyumx/VRCVideoCacherPlus/releases/latest/download/VRCVideoCacher.exe)
+- [Linux — VRCVideoCacher](https://github.com/codeyumx/VRCVideoCacherPlus/releases/latest/download/VRCVideoCacher)
+Use the original extension from VRCVideoCacher for now:
 - [Chrome Extension](https://chromewebstore.google.com/detail/vrcvideocacher-cookies-ex/kfgelknbegappcajiflgfbjbdpbpokge)
 - [Firefox Extension](https://addons.mozilla.org/en-US/firefox/addon/vrcvideocachercookiesexporter)
 
@@ -44,6 +45,9 @@ You can manually queue videos for caching from the **Downloads** tab. Paste one 
 - Watch history with stats tracking intelligently saves cache space, keeping your favorite videos
 - "Download Now" button on queued items — immediately starts downloading a specific item, skipping the idle-wait delay
 - Video titles shown in the download queue
+
+#### Linux
+Currently untested, but published in releases if you want to try it out.
 
 ---
 
