@@ -6,15 +6,15 @@ public class LaunchArgs
     private const string NoGuiArg = "--no-gui";
     private const string DisableErrorReportingArg = "--disable-error-reporting";
     private const string GlobalPathArg = "--global-path";
-    private const string OldPidArg = "--old-pid";
     private const string KillExistingInstanceArg = "--kill-existing-instance";
+    private const string WaitForPidArg = "--wait-for-pid";
 
     public static bool IsBypassArgumentPresent;
     public static bool HasGui = true;
     public static bool ErrorReporting = true;
     public static bool UseGlobalPath;
-    public static int? OldPid;
     public static bool KillExistingInstance = false;
+    public static int? WaitForPid;
 
     public static void SetupArguments(params string[] args)
     {
@@ -34,15 +34,15 @@ public class LaunchArgs
             if (arg.Equals(GlobalPathArg, StringComparison.OrdinalIgnoreCase))
                 UseGlobalPath = true;
 
-            if (arg.StartsWith(OldPidArg, StringComparison.OrdinalIgnoreCase))
-            {
-                var pidStr = arg.Substring(OldPidArg.Length + 1);
-                if (int.TryParse(pidStr, out var pid))
-                    OldPid = pid;
-            }
-
             if (arg.Equals(KillExistingInstanceArg, StringComparison.OrdinalIgnoreCase))
                 KillExistingInstance = true;
+
+            if (arg.StartsWith(WaitForPidArg + "=", StringComparison.OrdinalIgnoreCase))
+            {
+                var pidStr = arg.Substring(WaitForPidArg.Length + 1);
+                if (int.TryParse(pidStr, out var pid))
+                    WaitForPid = pid;
+            }
         }
     }
 

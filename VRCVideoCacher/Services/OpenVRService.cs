@@ -65,7 +65,6 @@ public class OpenVRService
                                     "launch_type" : "binary",
                                     "binary_path_windows": "{{exeName}}",
                                     "binary_path_linux": "{{exeName}}",
-                                    "arguments": "--kill-existing-instance",
                                     "is_dashboard_overlay" : true,
                                     "strings": {
                                         "en_us": {

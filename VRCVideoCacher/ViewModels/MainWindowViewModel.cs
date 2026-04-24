@@ -121,15 +121,15 @@ public partial class MainWindowViewModel : ViewModelBase
     private async Task ApplyUpdate()
     {
         if (_pendingRelease == null) return;
+        IsUpdatePending = true;
+        UpdateVersionText = "Downloading update...";
+        // ApplyUpdate exits the process on success, so the failure message only shows
+        // when the swap or download legitimately failed.
         var ok = await Updater.ApplyUpdate(_pendingRelease);
-        if (ok)
+        if (!ok)
         {
-            IsUpdatePending = true;
-            UpdateVersionText = $"Update downloaded — will install when you close the app.";
-        }
-        else
-        {
-            UpdateVersionText = "Update download failed. Check logs and try again.";
+            IsUpdatePending = false;
+            UpdateVersionText = "Update failed. Check logs and try again.";
         }
     }
 
@@ -137,6 +137,22 @@ public partial class MainWindowViewModel : ViewModelBase
     private void DismissUpdate()
     {
         IsUpdateAvailable = false;
+    }
+
+    [RelayCommand]
+    private void OpenReleasesPage()
+    {
+        var url = _pendingRelease?.html_url
+                  ?? "https://github.com/codeyumx/VRCVideoCacherPlus/releases/latest";
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = url,
+                UseShellExecute = true
+            });
+        }
+        catch { /* ignore — best effort */ }
     }
 
     public void CheckDnsFailure()

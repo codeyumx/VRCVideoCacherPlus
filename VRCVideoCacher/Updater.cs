@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 using Newtonsoft.Json;
 using Semver;
@@ -12,22 +11,17 @@ namespace VRCVideoCacher;
 public class Updater
 {
     private const string UpdateUrl = "https://api.github.com/repos/codeyumx/VRCVideoCacherPlus/releases/latest";
-    // Asset name on the GitHub release — fixed by the publisher regardless of what the user has renamed their local exe to.
     private static readonly string ReleaseAssetName = OperatingSystem.IsWindows() ? "VRCVideoCacher.exe" : "VRCVideoCacher";
     private static readonly HttpClient HttpClient = new()
     {
         DefaultRequestHeaders = { { "User-Agent", "VRCVideoCacher.Updater" } }
     };
     private static readonly ILogger Log = Program.Logger.ForContext<Updater>();
-    // Target the actually-running executable, not a hardcoded name — otherwise a user who renamed
-    // their exe would have the updater overwrite an unrelated file sitting next to it.
+
+    // Target the actually-running executable, not a hardcoded name — supports renamed exes.
     private static readonly string FilePath = Environment.ProcessPath ?? Path.Join(Program.CurrentProcessPath, ReleaseAssetName);
-    private static readonly string BaseName = Path.GetFileNameWithoutExtension(FilePath);
-    private static readonly string Extension = Path.GetExtension(FilePath);
-    private static readonly string BackupFilePath = Path.Join(Program.CurrentProcessPath, $"{BaseName}.bkp");
-    private static readonly string TempFilePath = Path.Join(Program.CurrentProcessPath, $"{BaseName}.Temp{Extension}");
-    private static readonly string TempProcessName = $"{BaseName}.Temp";
-    private static readonly string UpdaterLogPath = Path.Join(Program.DataPath, "Logs", "updater.log");
+    private static readonly string NewFilePath = FilePath + ".new";
+    private static readonly string OldFilePath = FilePath + ".old";
 
     public static async Task<UpdateInfo?> CheckForUpdates()
     {
@@ -42,19 +36,16 @@ public class Updater
             return null;
         }
 
-        HttpResponseMessage response;
         string data;
         try
         {
-            response = await HttpClient.GetAsync(UpdateUrl);
+            using var response = await HttpClient.GetAsync(UpdateUrl);
             if (!response.IsSuccessStatusCode)
             {
                 Log.Warning("Failed to check for updates.");
-                response.Dispose();
                 return null;
             }
             data = await response.Content.ReadAsStringAsync();
-            response.Dispose();
         }
         catch (HttpRequestException ex)
         {
@@ -66,10 +57,11 @@ public class Updater
             Log.Warning(ex, "Update check timed out.");
             return null;
         }
+
         var latestRelease = JsonConvert.DeserializeObject<GitHubRelease>(data);
         if (latestRelease == null)
         {
-            Console.Error.WriteLine("Failed to parse update response.");
+            Log.Warning("Failed to parse update response.");
             return null;
         }
         if (!SemVersion.TryParse(latestRelease.tag_name, SemVersionStyles.Any, out var latestVersion))
@@ -92,302 +84,148 @@ public class Updater
         return new UpdateInfo(latestVersion.ToString(), latestRelease);
     }
 
-    public static async Task<bool> ApplyUpdate(GitHubRelease release)
-    {
-        return await DownloadAndStageAsync(release);
-    }
-
+    /// <summary>
+    /// Removes leftover files from a previous in-place update. Safe to call any time at startup.
+    /// </summary>
     public static void Cleanup()
     {
-        if (File.Exists(BackupFilePath))
-        {
-            Log.Information("Leftover temp file found, deleting.");
-            File.Delete(BackupFilePath);
-        }
+        TryDelete(OldFilePath);
+        TryDelete(NewFilePath);
     }
 
-    private static async Task<bool> DownloadAndStageAsync(GitHubRelease release)
+    /// <summary>
+    /// If launched by the updater, block until the previous process has exited so the new process
+    /// owns the web server port, DB, and yt-dlp stubs before it runs the single-instance check.
+    /// </summary>
+    public static void WaitForPreviousInstance()
     {
-        foreach (var asset in release.assets)
-        {
-            if (asset.name != ReleaseAssetName)
-                continue;
-
-            try
-            {
-                if (File.Exists(TempFilePath))
-                {
-                    Log.Information("Temp file found from a previous update, deleting.");
-                    File.Delete(TempFilePath);
-                }
-
-                await using (var stream = await HttpClient.GetStreamAsync(asset.browser_download_url))
-                await using (var fileStream = new FileStream(TempFilePath, FileMode.Create, FileAccess.Write, FileShare.None))
-                {
-                    await stream.CopyToAsync(fileStream);
-                }
-
-                if (!await HashCheck(asset.digest))
-                {
-                    Log.Warning("Hash check failed, aborting update.");
-                    TryDeleteTempFile();
-                    return false;
-                }
-
-                if (!OperatingSystem.IsWindows())
-                    FileTools.MarkFileExecutable(TempFilePath);
-
-                Log.Information("Update {Version} downloaded. Will install when the app exits.", release.tag_name);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Log.Error(ex, "Failed to download update.");
-                TryDeleteTempFile();
-                return false;
-            }
-        }
-        Log.Warning("No matching asset ({FileName}) found in release {Tag}.", ReleaseAssetName, release.tag_name);
-        return false;
-    }
-
-    public static void FinalizeUpdateOnExit()
-    {
-        // Startup cleanup (RunUpdateHandler, OldPid==null branch) removes any stale temp file,
-        // so its presence here means DownloadAndStageAsync successfully staged it this session.
-        if (!File.Exists(TempFilePath))
+        if (LaunchArgs.WaitForPid is not { } pid)
             return;
-
         try
         {
-            var pid = Environment.ProcessId;
-            var args = LaunchArgs.BuildArgs();
-            args.Add($"--old-pid={pid}");
-            var argsString = string.Join(' ', args);
-            Log.Information("Launching staged updater on exit. Args: {Args}", argsString);
-            LogToFile("INFO", $"Launching staged updater on exit. pid={pid} argsString={argsString}");
-
-            var process = new Process
-            {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = TempFilePath,
-                    UseShellExecute = true,
-                    WorkingDirectory = Program.CurrentProcessPath,
-                    Arguments = argsString
-                }
-            };
-            var started = process.Start();
-            LogToFile("INFO", $"Staged updater Process.Start returned {started}.");
+            using var old = Process.GetProcessById(pid);
+            if (!old.WaitForExit(15_000))
+                Log.Warning("Previous process (pid {Pid}) did not exit within 15s. Continuing anyway.", pid);
+        }
+        catch (ArgumentException)
+        {
+            // Process already gone — nothing to wait for.
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Failed to launch staged updater on exit.");
-            LogToFile("ERROR", $"Failed to launch staged updater on exit: {ex}");
+            Log.Warning(ex, "Failed to wait for previous process (pid {Pid}).", pid);
         }
     }
 
-    private static void LogToFile(string level, string message)
+    /// <summary>
+    /// Downloads the new release, swaps it in place, launches it, and exits the current process.
+    /// Returns false (with no exit) only if the swap could not be completed.
+    /// </summary>
+    public static async Task<bool> ApplyUpdate(GitHubRelease release)
     {
-        try
+        var asset = release.assets.FirstOrDefault(a => a.name == ReleaseAssetName);
+        if (asset == null)
         {
-            var dir = Path.GetDirectoryName(UpdaterLogPath);
-            if (!string.IsNullOrEmpty(dir))
-                Directory.CreateDirectory(dir);
-            File.AppendAllText(UpdaterLogPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} [{level}] {message}{Environment.NewLine}");
-        }
-        catch
-        {
-            // best-effort
-        }
-    }
-
-    // If a staged updater (VRCVideoCacher.Temp.exe) is currently swapping the real exe, a user
-    // who relaunches from the desktop shortcut can race it and end up running the old exe or
-    // hitting a file lock. Wait (bounded) for it to finish before we proceed.
-    private static void WaitForStagedUpdaterToFinish()
-    {
-        const int maxWaitMs = 15_000;
-        var waited = 0;
-        var announced = false;
-        while (waited < maxWaitMs)
-        {
-            var temps = Process.GetProcessesByName(TempProcessName);
-            if (temps.Length == 0)
-                return;
-            foreach (var p in temps) p.Dispose();
-            if (!announced)
-            {
-                Console.WriteLine("An update is in progress, waiting for it to finish...");
-                LogToFile("INFO", "Detected staged updater running at startup; waiting for it to finish.");
-                announced = true;
-            }
-            Thread.Sleep(500);
-            waited += 500;
-        }
-        Console.Error.WriteLine("Staged updater did not finish within the timeout period. Continuing anyway.");
-        LogToFile("WARN", "Staged updater did not exit within 15s. Continuing startup.");
-    }
-
-    private static void TryDeleteTempFile()
-    {
-        // When running as the staged Temp.exe, we can't delete our own image on Windows.
-        // The next clean launch of the real exe will clean it up via the cleanup branch.
-        if (string.Equals(Environment.ProcessPath, TempFilePath, StringComparison.OrdinalIgnoreCase))
-            return;
-
-        try
-        {
-            if (File.Exists(TempFilePath))
-                File.Delete(TempFilePath);
-        }
-        catch (Exception ex)
-        {
-            Log.Warning(ex, "Failed to delete temp update file: {Path}", TempFilePath);
-        }
-    }
-
-    private static async Task<bool> HashCheck(string githubHash)
-    {
-        using var sha256 = SHA256.Create();
-        await using var stream = File.Open(TempFilePath, FileMode.Open);
-        var hashBytes = await sha256.ComputeHashAsync(stream);
-        var hashString = Convert.ToHexString(hashBytes);
-        githubHash = githubHash.Split(':')[1];
-        var hashMatches = string.Equals(githubHash, hashString, StringComparison.OrdinalIgnoreCase);
-        Log.Information("FileHash: {FileHash} GitHubHash: {GitHubHash} HashMatch: {HashMatches}", hashString, githubHash, hashMatches);
-        return hashMatches;
-    }
-
-    private static bool FilesHashMatch(string pathA, string pathB)
-    {
-        using var sha = SHA256.Create();
-        using var a = File.OpenRead(pathA);
-        using var b = File.OpenRead(pathB);
-        var hashA = Convert.ToHexString(sha.ComputeHash(a));
-        sha.Initialize();
-        var hashB = Convert.ToHexString(sha.ComputeHash(b));
-        var match = string.Equals(hashA, hashB, StringComparison.OrdinalIgnoreCase);
-        Log.Information("[Updater] Hash self={HashA} copy={HashB} match={Match}", hashA, hashB, match);
-        return match;
-    }
-
-    public static bool RunUpdateHandler()
-    {
-        if (LaunchArgs.OldPid == null)
-        {
-            // Cleanup branch — only the post-update real exe runs this. If the user double-clicks
-            // the shortcut while a staged updater is mid-swap, wait for it so we don't race the copy.
-            WaitForStagedUpdaterToFinish();
-
-            // Drop the staged temp file.
-            if (Environment.ProcessPath != TempFilePath && File.Exists(TempFilePath))
-            {
-                Console.WriteLine("Update temp file exists. Deleting temp file.");
-                try { File.Delete(TempFilePath); } catch { /* best-effort */ }
-            }
+            Log.Warning("No matching asset ({FileName}) found in release {Tag}.", ReleaseAssetName, release.tag_name);
             return false;
         }
 
-        // From here on we are the staged Temp.exe. ANY failure must terminate this process
-        // — never fall through to running as the app, otherwise the user ends up running
-        // Temp.exe while the on-disk VRCVideoCacher.exe is still the old version.
-        LogToFile("INFO", $"Staged updater started. ProcessPath={Environment.ProcessPath} TargetPath={FilePath} OldPid={LaunchArgs.OldPid}");
         try
         {
-            if (Environment.ProcessPath == null)
+            TryDelete(NewFilePath);
+
+            await using (var stream = await HttpClient.GetStreamAsync(asset.browser_download_url))
+            await using (var fileStream = new FileStream(NewFilePath, FileMode.Create, FileAccess.Write, FileShare.None))
             {
-                Console.Error.WriteLine("Process path is null. Aborting update.");
-                LogToFile("ERROR", "Process path is null. Aborting update.");
-                AbortStagedUpdate();
-            }
-            if (Environment.ProcessPath == FilePath)
-            {
-                Console.Error.WriteLine("Process path is the same as the target file path. Aborting update to prevent self-deletion.");
-                LogToFile("ERROR", $"Process path equals target path ({FilePath}). Aborting to prevent self-deletion.");
-                AbortStagedUpdate();
+                await stream.CopyToAsync(fileStream);
             }
 
-            try
+            if (!await HashCheck(NewFilePath, asset.digest))
             {
-                using var oldProcess = Process.GetProcessById(LaunchArgs.OldPid.Value);
-                if (!oldProcess.WaitForExit(10_000))
-                {
-                    Console.Error.WriteLine("Old process did not exit within the timeout period. Aborting update.");
-                    LogToFile("ERROR", $"Old process (pid {LaunchArgs.OldPid}) did not exit within 10s. Aborting update.");
-                    AbortStagedUpdate();
-                }
-            }
-            catch
-            {
-                // Process already gone — that's fine
+                Log.Warning("Hash check failed, aborting update.");
+                TryDelete(NewFilePath);
+                return false;
             }
 
-            // Windows can hold the executable lock for a surprisingly long time after the owning
-            // process exits (antivirus, shell extensions, etc). Retry aggressively to ride it out.
-            const int maxAttempts = 20;
-            Exception? lastError = null;
-            for (var attempt = 1; attempt <= maxAttempts; attempt++)
-            {
-                try
-                {
-                    File.Copy(Environment.ProcessPath, FilePath, overwrite: true);
-                    lastError = null;
-                    LogToFile("INFO", $"Copied new exe to {FilePath} on attempt {attempt}.");
-                    break;
-                }
-                catch (Exception ex)
-                {
-                    lastError = ex;
-                    Console.Error.WriteLine($"Copy attempt {attempt}/{maxAttempts} failed: {ex.Message}");
-                    LogToFile("WARN", $"Copy attempt {attempt}/{maxAttempts} failed: {ex.Message}");
-                    Thread.Sleep(500);
-                }
-            }
-            if (lastError != null)
-            {
-                Console.Error.WriteLine($"Failed to copy new version to target path after {maxAttempts} attempts: {lastError}");
-                LogToFile("ERROR", $"Failed to copy new version after {maxAttempts} attempts: {lastError}");
-                AbortStagedUpdate();
-            }
-
-            if (!FilesHashMatch(Environment.ProcessPath, FilePath))
-            {
-                Console.Error.WriteLine("Hash check failed after copying new version. Aborting update to prevent potential corruption.");
-                LogToFile("ERROR", "Hash mismatch between staged temp exe and copied target exe. Aborting.");
-                AbortStagedUpdate();
-            }
-
-            var args = LaunchArgs.BuildArgs();
-            var argsString = string.Join(' ', args);
-            var process = new Process
-            {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = FilePath,
-                    UseShellExecute = true,
-                    WorkingDirectory = Path.GetDirectoryName(FilePath),
-                    Arguments = argsString
-                }
-            };
-            var started = process.Start();
-            LogToFile("INFO", $"Relaunched new exe at {FilePath}. Process.Start returned {started}.");
-            return true;
+            if (!OperatingSystem.IsWindows())
+                FileTools.MarkFileExecutable(NewFilePath);
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"Unexpected error during staged update: {ex}");
-            LogToFile("ERROR", $"Unexpected error during staged update: {ex}");
-            AbortStagedUpdate();
-            return false; // unreachable, AbortStagedUpdate terminates the process
+            Log.Error(ex, "Failed to download update.");
+            TryDelete(NewFilePath);
+            return false;
         }
+
+        // In-place swap: rename the running exe out of the way, then move the new file into its slot.
+        // Both Windows and Linux allow renaming/unlinking a running executable on the same volume.
+        try
+        {
+            TryDelete(OldFilePath);
+            File.Move(FilePath, OldFilePath);
+            File.Move(NewFilePath, FilePath);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to swap new exe into place.");
+            // Best-effort rollback so the user isn't left with a broken install.
+            try
+            {
+                if (!File.Exists(FilePath) && File.Exists(OldFilePath))
+                    File.Move(OldFilePath, FilePath);
+            }
+            catch { /* nothing more to do */ }
+            return false;
+        }
+
+        try
+        {
+            var args = LaunchArgs.BuildArgs();
+            args.Add($"--wait-for-pid={Environment.ProcessId}");
+            var argsString = string.Join(' ', args);
+            Log.Information("Launching new version and exiting.");
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = FilePath,
+                UseShellExecute = true,
+                WorkingDirectory = Program.CurrentProcessPath,
+                Arguments = argsString
+            });
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to launch updated exe.");
+            return false;
+        }
+
+        // Hand off — the new process waits on our PID, then cleans up the .old file on startup.
+        Environment.Exit(0);
+        return true; // unreachable
     }
 
-    [DoesNotReturn]
-    private static void AbortStagedUpdate()
+    private static async Task<bool> HashCheck(string path, string githubHash)
     {
-        TryDeleteTempFile();
-        Environment.Exit(1);
+        using var sha256 = SHA256.Create();
+        await using var stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        var hashBytes = await sha256.ComputeHashAsync(stream);
+        var hashString = Convert.ToHexString(hashBytes);
+        var expected = githubHash.Contains(':') ? githubHash.Split(':')[1] : githubHash;
+        var match = string.Equals(expected, hashString, StringComparison.OrdinalIgnoreCase);
+        Log.Information("FileHash: {FileHash} GitHubHash: {GitHubHash} HashMatch: {HashMatches}", hashString, expected, match);
+        return match;
+    }
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to delete {Path}", path);
+        }
     }
 }
 

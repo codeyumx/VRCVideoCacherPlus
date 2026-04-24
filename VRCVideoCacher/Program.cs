@@ -86,11 +86,7 @@ internal sealed class Program
         AppDomain.CurrentDomain.ProcessExit += (_, _) => SteamAPI.Shutdown();
 #endif
         LaunchArgs.SetupArguments(args);
-        if (Updater.RunUpdateHandler())
-        {
-            Environment.Exit(0);
-            return;
-        }
+        Updater.WaitForPreviousInstance();
         var processes = Process.GetProcessesByName("VRCVideoCacher");
         if (processes.Length > 1)
         {
@@ -120,6 +116,8 @@ internal sealed class Program
         }
         foreach (var process in processes)
             process.Dispose();
+
+        Updater.Cleanup();
 
         if (LaunchArgs.ErrorReporting)
         {
@@ -173,7 +171,6 @@ internal sealed class Program
         {
             // Run backend only (console mode)
             InitVrcVideoCacher().GetAwaiter().GetResult();
-            Updater.FinalizeUpdateOnExit();
             return;
         }
 
@@ -199,11 +196,6 @@ internal sealed class Program
 
         // Start the UI — blocks until Avalonia shuts down
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
-
-        // Launch the staged updater here (not in ProcessExit) so it runs while the process
-        // is still fully alive — the ProcessExit handler has a short budget and ShellExecute
-        // from inside it is flaky on Windows.
-        Updater.FinalizeUpdateOnExit();
 
         // Force-exit so background threads (web server, download loop, OpenVR) don't keep the process alive
         Environment.Exit(0);
@@ -250,7 +242,6 @@ internal sealed class Program
 #if !STEAMRELEASE
         await Updater.CheckForUpdates();
 #endif
-        Updater.Cleanup();
         if (Environment.CommandLine.Contains("--Reset"))
         {
             FileTools.RestoreAllYtdl();

@@ -17,15 +17,21 @@
         <!-- Update Banner -->
         <Border Grid.Row="0" Background="#2d7d46" Padding="10,8"
                 IsVisible="{Binding IsUpdateAvailable}">
-            <Grid ColumnDefinitions="*, Auto, Auto">
+            <Grid ColumnDefinitions="*, Auto, Auto, Auto">
                 <TextBlock Grid.Column="0" Text="{Binding UpdateVersionText}"
                            VerticalAlignment="Center" Foreground="White" FontWeight="Bold"/>
                 <Button Grid.Column="1" Content="Update Now" Margin="10,0"
                         Command="{Binding ApplyUpdateCommand}"
                         IsVisible="{Binding !IsUpdatePending}"
                         Background="#1b5e30" Foreground="White" Padding="12,4"/>
-                <Button Grid.Column="2" Content="Dismiss"
+                <Button Grid.Column="2" Content="Download Manually" Margin="0,0,10,0"
+                        Command="{Binding OpenReleasesPageCommand}"
+                        IsVisible="{Binding !IsUpdatePending}"
+                        ToolTip.Tip="Open the GitHub releases page in your browser to download the new version manually."
+                        Background="Transparent" Foreground="White" Padding="8,4"/>
+                <Button Grid.Column="3" Content="Dismiss"
                         Command="{Binding DismissUpdateCommand}"
+                        IsVisible="{Binding !IsUpdatePending}"
                         Background="Transparent" Foreground="White" Padding="8,4"/>
             </Grid>
         </Border>
