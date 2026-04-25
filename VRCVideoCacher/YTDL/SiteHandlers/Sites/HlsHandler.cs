@@ -37,7 +37,16 @@ public class HlsHandler : ISiteHandler
         "vnd.apple.mpegurl"
     ];
 
-    private sealed record ProbeResult(bool IsHls, double? Duration, bool IsComplete, string? Title);
+    // IsTransportStream covers raw progressive MPEG-TS endpoints (no playlist, just a
+    // single binary stream with Content-Length). Treated as a sibling of HLS for caching
+    // — they share the AVPro pass-through and the yt-dlp remux-to-MP4 download path.
+    private sealed record ProbeResult(
+        bool IsHls,
+        double? Duration,
+        bool IsComplete,
+        string? Title,
+        bool IsTransportStream = false,
+        long? ContentLength = null);
 
     private static readonly ConcurrentDictionary<string, (ProbeResult Result, DateTime At)> ProbeCache = new();
     private static readonly ConcurrentDictionary<string, Lazy<Task<ProbeResult>>> InFlightProbes = new();
@@ -62,12 +71,15 @@ public class HlsHandler : ISiteHandler
 
     /// <summary>
     /// Content-based detection for URLs that don't look like HLS by shape.
-    /// Caches the probe result so GetVideoInfo can reuse it without a second fetch.
+    /// True for HLS manifests AND raw progressive MPEG-TS streams — both are routed
+    /// through this handler so the streaming pass-through and cache-on-play machinery
+    /// can reuse a single code path. Caches the probe result so GetVideoInfo can reuse
+    /// it without a second fetch.
     /// </summary>
-    public static async Task<bool> LooksLikeHls(string url)
+    public static async Task<bool> LooksLikeStreamable(string url)
     {
         var probe = await ProbeCached(url);
-        return probe.IsHls;
+        return probe.IsHls || probe.IsTransportStream;
     }
 
     // Skip the content probe for URLs that are obviously not HLS. Avoids a blocking
@@ -87,16 +99,18 @@ public class HlsHandler : ISiteHandler
 
     /// <summary>
     /// Returns the in-memory probe result if still cached. Used by cache-gating to check
-    /// whether a manifest has #EXT-X-ENDLIST without re-probing.
+    /// whether a manifest has #EXT-X-ENDLIST (or, for raw TS, has a finite Content-Length)
+    /// without re-probing.
     /// </summary>
-    public static (double? Duration, bool IsComplete)? TryGetCachedProbe(string url)
+    public static (double? Duration, bool IsComplete, bool IsTransportStream, long? ContentLength)? TryGetCachedProbe(string url)
     {
         if (ProbeCache.TryGetValue(ProbeKey(url), out var entry) && DateTime.UtcNow - entry.At < EffectiveTtl(entry.Result))
-            return (entry.Result.Duration, entry.Result.IsComplete);
+            return (entry.Result.Duration, entry.Result.IsComplete, entry.Result.IsTransportStream, entry.Result.ContentLength);
         return null;
     }
 
-    private static TimeSpan EffectiveTtl(ProbeResult result) => result.IsHls ? ProbeTtl : NegativeProbeTtl;
+    private static TimeSpan EffectiveTtl(ProbeResult result) =>
+        (result.IsHls || result.IsTransportStream) ? ProbeTtl : NegativeProbeTtl;
 
     public async Task<VideoInfo?> GetVideoInfo(string url, Uri uri, bool avPro)
     {
@@ -126,7 +140,9 @@ public class HlsHandler : ISiteHandler
                     Type = UrlType.Hls
                 });
             }
-            if (probe.Duration is > 0)
+            if (probe.IsTransportStream)
+                Log.Information("MPEG-TS {URL}: content-length={Bytes}", url, probe.ContentLength);
+            else if (probe.Duration is > 0)
                 Log.Information("HLS {URL}: duration={Duration:F1}s, complete={Complete}",
                     url, probe.Duration, probe.IsComplete);
             else
@@ -261,10 +277,19 @@ public class HlsHandler : ISiteHandler
                 return new ProbeResult(false, null, false, null);
 
             var ct = res.Content.Headers.ContentType?.MediaType?.ToLowerInvariant() ?? string.Empty;
+            var contentLength = res.Content.Headers.ContentLength;
             var contentTypeMatch = HlsContentTypes.Any(t => ct.Contains(t, StringComparison.Ordinal));
 
+            // MPEG-TS progressive stream — a finished video served as raw transport-stream
+            // (video/mp2t, video/MP2T, video/mpegts). Cacheable as a single binary download;
+            // skip the body read since there's no manifest to parse.
+            if (!contentTypeMatch && (ct.Contains("mp2t", StringComparison.Ordinal) || ct.Contains("mpegts", StringComparison.Ordinal)))
+                return new ProbeResult(false, null, false, null, IsTransportStream: true, ContentLength: contentLength);
+
             // Short-circuit on media/image content types that can't be an HLS manifest —
-            // avoids pulling 64 KiB of binary just to fail the #EXTM3U check.
+            // avoids pulling 64 KiB of binary just to fail the #EXTM3U check. Excludes
+            // application/octet-stream and missing types so we still magic-byte sniff
+            // those (some CDNs serve TS without a proper Content-Type).
             if (!contentTypeMatch && ct.Length > 0 &&
                 (ct.StartsWith("video/") || ct.StartsWith("image/") || ct.StartsWith("audio/")) &&
                 !ct.Contains("mpegurl"))
@@ -273,8 +298,15 @@ public class HlsHandler : ISiteHandler
             // Read at most 64 KiB — cheap for a non-HLS false positive and enough for
             // most manifests. Longer media playlists are handled via the truncation flag.
             await using var stream = await res.Content.ReadAsStreamAsync();
-            var (body, truncated) = await ReadBoundedAsync(stream, ProbeBodyCap);
+            var (bytes, truncated) = await ReadBoundedBytesAsync(stream, ProbeBodyCap);
 
+            // MPEG-TS magic: 0x47 sync byte every 188 bytes. Check the first three packets
+            // so we don't false-positive on a random file that happens to start with 'G'.
+            if (!contentTypeMatch && bytes.Length >= 377 &&
+                bytes[0] == 0x47 && bytes[188] == 0x47 && bytes[376] == 0x47)
+                return new ProbeResult(false, null, false, null, IsTransportStream: true, ContentLength: contentLength);
+
+            var body = System.Text.Encoding.UTF8.GetString(bytes);
             // Strip UTF-8 BOM if present so the #EXTM3U prefix check still matches.
             if (body.Length > 0 && body[0] == '﻿') body = body[1..];
 
@@ -320,7 +352,7 @@ public class HlsHandler : ISiteHandler
         }
     }
 
-    private static async Task<(string Body, bool Truncated)> ReadBoundedAsync(Stream stream, int maxBytes)
+    private static async Task<(byte[] Bytes, bool Truncated)> ReadBoundedBytesAsync(Stream stream, int maxBytes)
     {
         var buffer = new byte[Math.Min(8192, maxBytes)];
         using var ms = new MemoryStream();
@@ -336,7 +368,7 @@ public class HlsHandler : ISiteHandler
             try { truncated = await stream.ReadAsync(probe.AsMemory(0, 1)) > 0; }
             catch { /* stream may be closed — assume not truncated */ }
         }
-        return (System.Text.Encoding.UTF8.GetString(ms.ToArray()), truncated);
+        return (ms.ToArray(), truncated);
     }
 
     private static (double? Duration, bool IsComplete) ParseMediaPlaylist(string body)

@@ -249,6 +249,8 @@ public class ApiController : WebApiController
 
     // HLS playlists are only cacheable if the probe observed an #EXT-X-ENDLIST and parsed a
     // finite duration under the configured max — otherwise yt-dlp may sit on a live stream.
+    // Raw MPEG-TS streams are progressive single-file downloads: a finite Content-Length is
+    // the equivalent "this is a complete video, not a live feed" signal.
     private static bool IsHlsCacheable(VideoInfo videoInfo, double? cachedDuration)
     {
         var probe = HlsHandler.TryGetCachedProbe(videoInfo.VideoUrl);
@@ -256,6 +258,15 @@ public class ApiController : WebApiController
         {
             Log.Information("HLS {VideoId}: skipping cache — probe result unavailable.", videoInfo.VideoId);
             return false;
+        }
+        if (probe.Value.IsTransportStream)
+        {
+            if (probe.Value.ContentLength is not > 0)
+            {
+                Log.Information("MPEG-TS {VideoId}: skipping cache — no Content-Length (likely a live stream).", videoInfo.VideoId);
+                return false;
+            }
+            return true;
         }
         if (!probe.Value.IsComplete)
         {

@@ -58,7 +58,10 @@ public static class SiteHandlerRegistry
         if (!ConfigManager.Config.CacheHlsPlaylists)
             return handler;
 
-        if (await HlsHandler.LooksLikeHls(url))
+        // LooksLikeStreamable returns true for HLS manifests AND raw progressive MPEG-TS
+        // streams — both are routed through HlsHandler, which surfaces the distinction
+        // via TryGetCachedProbe so cache-gating can apply the right rule.
+        if (await HlsHandler.LooksLikeStreamable(url))
             return Handlers.OfType<HlsHandler>().First();
 
         return handler; // GenericHandler or null
