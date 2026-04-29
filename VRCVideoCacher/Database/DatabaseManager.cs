@@ -69,10 +69,10 @@ public static class DatabaseManager
             .FirstOrDefault();
     }
 
-    public static Dictionary<string, string> GetLatestHistoryUrls(IEnumerable<string> videoIds)
+    public static Dictionary<string, (string Url, UrlType Type)> GetLatestHistoryUrls(IEnumerable<string> videoIds)
     {
         var ids = videoIds.Where(id => !string.IsNullOrEmpty(id)).Distinct().ToList();
-        if (ids.Count == 0) return new Dictionary<string, string>();
+        if (ids.Count == 0) return new Dictionary<string, (string, UrlType)>();
 
         using var db = _contextFactory.CreateDbContext();
         return db.PlayHistory
@@ -80,7 +80,7 @@ public static class DatabaseManager
             .Where(h => h.Id != null && ids.Contains(h.Id))
             .GroupBy(h => h.Id!)
             .Select(g => g.OrderByDescending(h => h.Timestamp).First())
-            .ToDictionary(h => h.Id!, h => h.Url);
+            .ToDictionary(h => h.Id!, h => (h.Url, h.Type));
     }
 
     public static VRDancingTitle? GetVRDancingTitle(string code)

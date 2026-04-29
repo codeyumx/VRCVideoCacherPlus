@@ -29,7 +29,7 @@ public partial class CacheItemViewModel : ViewModelBase
     [ObservableProperty]
     private string? _originalUrl;
 
-    public bool IsYouTube => UrlType == UrlType.YouTube || (VideoId.Length == 11 && UrlType == UrlType.Other);
+    public bool IsYouTube => UrlType == UrlType.YouTube;
 
     public bool HasOpenSourceLink => !IsYouTube && !string.IsNullOrEmpty(OriginalUrl);
 
@@ -51,7 +51,7 @@ public partial class CacheItemViewModel : ViewModelBase
     // Event to notify parent when item is deleted
     public event Action<CacheItemViewModel>? OnDeleted;
 
-    public async Task LoadMetadataAsync(string? originalUrl = null)
+    public async Task LoadMetadataAsync(string? originalUrl = null, UrlType? historyType = null)
     {
         // Load from DB
         var videoInfo = await YouTubeMetadataService.GetVideoMetadataAsync(VideoId);
@@ -64,6 +64,11 @@ public partial class CacheItemViewModel : ViewModelBase
                 Title = videoInfo.Title;
                 OnPropertyChanged(nameof(DisplayTitle));
             }
+        }
+        else if (historyType.HasValue)
+        {
+            // No VideoInfoCache row (legacy item) — classify from the latest History entry instead.
+            UrlType = historyType.Value;
         }
 
         // Original URL for non-YouTube items so we can open the source stream/page.
@@ -240,12 +245,12 @@ public partial class CacheBrowserViewModel : ViewModelBase
         // Load metadata (titles + thumbnails) asynchronously in the background
         _ = Task.Run(async () =>
         {
-            // Batch-fetch original URLs in one query instead of N.
-            var urls = DatabaseManager.GetLatestHistoryUrls(itemsToLoad.Select(i => i.VideoId));
+            // Batch-fetch original URLs (and history-derived type) in one query instead of N.
+            var history = DatabaseManager.GetLatestHistoryUrls(itemsToLoad.Select(i => i.VideoId));
             foreach (var item in itemsToLoad)
             {
-                urls.TryGetValue(item.VideoId, out var url);
-                await item.LoadMetadataAsync(url);
+                history.TryGetValue(item.VideoId, out var entry);
+                await item.LoadMetadataAsync(entry.Url, entry.Url == null ? null : entry.Type);
             }
         });
     }
