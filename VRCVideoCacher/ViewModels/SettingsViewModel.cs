@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
+using System.ComponentModel;
 using System.Globalization;
 using CodingSeb.Localization;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -9,8 +11,21 @@ namespace VRCVideoCacher.ViewModels;
 
 public record LanguageOption(string Code, string DisplayName);
 
+public partial class BlockedUrlEntry : ObservableObject
+{
+    [ObservableProperty]
+    private string _url;
+
+    public BlockedUrlEntry(string url)
+    {
+        _url = url;
+    }
+}
+
 public partial class SettingsViewModel : ViewModelBase
 {
+    private bool _isLoadingConfig;
+
     // Server Settings
     [ObservableProperty]
     private string _webServerUrl = string.Empty;
@@ -91,7 +106,7 @@ public partial class SettingsViewModel : ViewModelBase
     private bool _startMinimized;
 
     // Blocked URLs
-    public ObservableCollection<string> BlockedUrls { get; } = [];
+    public ObservableCollection<BlockedUrlEntry> BlockedUrls { get; } = [];
 
     [ObservableProperty]
     private string _blockRedirect = string.Empty;
@@ -131,6 +146,7 @@ public partial class SettingsViewModel : ViewModelBase
 
     public SettingsViewModel()
     {
+        BlockedUrls.CollectionChanged += OnBlockedUrlsCollectionChanged;
         ConfigManager.OnConfigChanged += LoadFromConfig;
         PlusConfigManager.OnConfigChanged += LoadFromConfig;
         LoadFromConfig();
@@ -138,6 +154,7 @@ public partial class SettingsViewModel : ViewModelBase
 
     private void LoadFromConfig()
     {
+        _isLoadingConfig = true;
         var config = ConfigManager.Config;
 
         WebServerUrl = config.YtdlpWebServerUrl;
@@ -169,7 +186,7 @@ public partial class SettingsViewModel : ViewModelBase
         BlockedUrls.Clear();
         foreach (var url in config.BlockedUrls)
         {
-            BlockedUrls.Add(url);
+            BlockedUrls.Add(new BlockedUrlEntry(url));
         }
         BlockRedirect = config.BlockRedirect;
 
@@ -178,12 +195,47 @@ public partial class SettingsViewModel : ViewModelBase
 
         HasChanges = false;
         StatusMessage = string.Empty;
+        _isLoadingConfig = false;
     }
 
     private void SetHasChanges()
     {
+        if (_isLoadingConfig)
+        {
+            return;
+        }
+
         HasChanges = true;
         StatusMessage = Loc.Tr("SettingsUnsavedChanges");
+    }
+
+    private void OnBlockedUrlsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.OldItems is not null)
+        {
+            foreach (var oldItem in e.OldItems.OfType<BlockedUrlEntry>())
+            {
+                oldItem.PropertyChanged -= OnBlockedUrlEntryPropertyChanged;
+            }
+        }
+
+        if (e.NewItems is not null)
+        {
+            foreach (var newItem in e.NewItems.OfType<BlockedUrlEntry>())
+            {
+                newItem.PropertyChanged += OnBlockedUrlEntryPropertyChanged;
+            }
+        }
+
+        SetHasChanges();
+    }
+
+    private void OnBlockedUrlEntryPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(BlockedUrlEntry.Url))
+        {
+            SetHasChanges();
+        }
     }
 
     partial void OnWebServerUrlChanged(string value) => SetHasChanges();
@@ -211,6 +263,7 @@ public partial class SettingsViewModel : ViewModelBase
     partial void OnStartMinimizedChanged(bool value) => SetHasChanges();
     partial void OnRedirectVRDancingChanged(bool value) => SetHasChanges();
     partial void OnStartWithSteamVrChanged(bool value) => SetHasChanges();
+    partial void OnBlockRedirectChanged(string value) => SetHasChanges();
 
     [RelayCommand]
     private void SaveSettings()
@@ -245,7 +298,9 @@ public partial class SettingsViewModel : ViewModelBase
         config.CloseToTray = CloseToTray;
         config.StartMinimized = StartMinimized;
         config.StartWithSteamVr = StartWithSteamVr;
-        config.BlockedUrls = BlockedUrls.ToArray();
+        config.BlockedUrls = BlockedUrls
+            .Select(item => item.Url)
+            .ToArray();
         config.BlockRedirect = BlockRedirect;
         config.RedirectVRDancing = RedirectVRDancing;
 
@@ -277,14 +332,12 @@ public partial class SettingsViewModel : ViewModelBase
     [RelayCommand]
     private void AddBlockedUrl()
     {
-        BlockedUrls.Add("https://");
-        SetHasChanges();
+        BlockedUrls.Add(new BlockedUrlEntry("https://"));
     }
 
     [RelayCommand]
-    private void RemoveBlockedUrl(string url)
+    private void RemoveBlockedUrl(BlockedUrlEntry url)
     {
         BlockedUrls.Remove(url);
-        SetHasChanges();
     }
 }
