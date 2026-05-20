@@ -291,7 +291,11 @@ public class VideoDownloader
 
     // Public accessors for UI
     public static IReadOnlyList<Database.Models.PendingDownload> GetQueueSnapshot() => DatabaseManager.GetPendingDownloads();
-    public static int GetQueueCount() => DatabaseManager.GetPendingDownloads().Count;
+    public static int GetQueueCount()
+    {
+        var count = DatabaseManager.GetPendingDownloads().Count;
+        return _currentDownload != null ? Math.Max(0, count - 1) : count;
+    }
     public static VideoInfo? GetCurrentDownload() => _currentDownload;
     public static VideoInfo? GetPausedDownload() { lock (StateLock) return _pausedDownload; }
     public static DownloadState GetDownloadState() => _state;
@@ -342,7 +346,7 @@ public class VideoDownloader
         if (rateLimitMBs > 0)
             args.Add($"--limit-rate {rateLimitMBs}M");
 
-        var process = new Process
+        using var process = new Process
         {
             StartInfo =
             {
@@ -794,4 +798,5 @@ public class VideoDownloader
 
         return (true, null);
     }
+
 }

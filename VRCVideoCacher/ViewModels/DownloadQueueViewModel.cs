@@ -1,6 +1,6 @@
 using System.Collections.ObjectModel;
 using Avalonia.Threading;
-using CodingSeb.Localization;
+using Jeek.Avalonia.Localization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using VRCVideoCacher.Database;
@@ -94,7 +94,7 @@ public partial class DownloadQueueViewModel : ViewModelBase
         // Format: "SkipReasonTooLong|34|10" for parameterized keys
         var parts = failReason.Split('|');
         var key = parts[0];
-        var translated = Loc.Tr(key);
+        var translated = Localizer.Get(key);
         if (translated == key)
             return failReason; // not a translation key, use as-is (e.g. exception messages)
         if (parts.Length > 1)
@@ -114,11 +114,11 @@ public partial class DownloadQueueViewModel : ViewModelBase
             CurrentDownload = null;
             CurrentStatus = success ? "Completed" : "Failed";
             if (success)
-                StatusMessage = string.Format(Loc.Tr("DownloadCompleted"), displayName);
+                StatusMessage = string.Format(Localizer.Get("DownloadCompleted"), displayName);
             else if (!string.IsNullOrEmpty(failReason))
-                StatusMessage = string.Format(Loc.Tr("DownloadSkipped"), displayName, TranslateFailReason(failReason));
+                StatusMessage = string.Format(Localizer.Get("DownloadSkipped"), displayName, TranslateFailReason(failReason));
             else
-                StatusMessage = string.Format(Loc.Tr("DownloadFailed"), displayName);
+                StatusMessage = string.Format(Localizer.Get("DownloadFailed"), displayName);
             DownloadProgress = 0;
             IsDownloading = false;
             RefreshQueue();

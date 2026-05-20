@@ -8,7 +8,7 @@ public class WebServerLogger : ILogger
 {
     public LogLevel LogLevel { get; } = LogLevel.Info;
     private static readonly Regex RequestIdPrefix = new(@"^\[.*?\]\s*", RegexOptions.Compiled);
-    
+
     public void Dispose()
     {
         GC.SuppressFinalize(this);
@@ -23,8 +23,6 @@ public class WebServerLogger : ILogger
         switch (logEvent.MessageType)
         {
             case LogLevel.Error:
-                WebServer.Log.Error("{WebServerLogEvent:l}", message);
-                break;
             case LogLevel.Warning:
                 WebServer.Log.Warning("{WebServerLogEvent:l}", message);
                 break;

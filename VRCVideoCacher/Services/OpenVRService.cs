@@ -1,5 +1,6 @@
 using Serilog;
 using Valve.VR;
+using VRCVideoCacher.Utils;
 
 namespace VRCVideoCacher.Services;
 
@@ -9,6 +10,8 @@ public class OpenVRService
 
     public static void Start(string dataPath)
     {
+        if (!LaunchArgs.OVR)
+            return;
         // Register as background app on a background thread with retry so SteamVR
         // doesn't activate theater mode, even if vrserver starts after us.
         Task.Run(async () =>

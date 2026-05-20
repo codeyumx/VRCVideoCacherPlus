@@ -146,6 +146,7 @@
   "TrayShow": "표시",
   "TrayOpenCacheFolder": "캐시 폴더 열기",
   "TrayExit": "종료",
+  "TrayMinimizeNotice": "VRCVideoCacher is still running in the background. Click the tray icon to reopen it.",
 
   "CreatedBy": "제작자: ",
   "ReportAnIssue": "문제 보고",

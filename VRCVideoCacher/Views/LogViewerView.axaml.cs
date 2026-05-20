@@ -1,7 +1,7 @@
 using System.Collections.Specialized;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using VRCVideoCacher.Models;
 using VRCVideoCacher.ViewModels;
@@ -66,11 +66,8 @@ public partial class LogViewerView : UserControl
 
         var text = string.Join(Environment.NewLine, lines);
 
-        if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-        {
-            var clipboard = desktop.MainWindow?.Clipboard;
-            if (clipboard != null)
-                await clipboard.SetTextAsync(text);
-        }
+        IClipboard? clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+        if (clipboard != null)
+            await clipboard.SetTextAsync(text);
     }
 }

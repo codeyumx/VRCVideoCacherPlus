@@ -147,6 +147,7 @@
   "TrayShow": "表示",
   "TrayOpenCacheFolder": "キャッシュフォルダーを開く",
   "TrayExit": "終了",
+  "TrayMinimizeNotice": "VRCVideoCacher is still running in the background. Click the tray icon to reopen it.",
 
   "CreatedBy": "開発者:",
   "ReportAnIssue": "問題を報告",

@@ -151,6 +151,7 @@
   "TrayShow": "Show",
   "TrayOpenCacheFolder": "Open Cache Folder",
   "TrayExit": "Exit",
+  "TrayMinimizeNotice": "VRCVideoCacher is still running in the background. Click the tray icon to reopen it.",
 
   "CreatedBy": "Created By",
   "ReportAnIssue": "Report an Issue",

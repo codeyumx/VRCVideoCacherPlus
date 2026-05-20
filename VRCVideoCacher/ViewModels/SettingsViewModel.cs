@@ -2,9 +2,9 @@ using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Globalization;
-using CodingSeb.Localization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Jeek.Avalonia.Localization;
 using VRCVideoCacher.API;
 
 namespace VRCVideoCacher.ViewModels;
@@ -99,9 +99,15 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty]
     private bool _patchVRC;
 
-    [ObservableProperty] 
+    [ObservableProperty]
     private bool _redirectVRDancing;
-    
+
+
+    // Updates
+    [ObservableProperty]
+    private bool _autoUpdate;
+
+
     [ObservableProperty]
     private bool _closeToTray;
 
@@ -117,6 +123,9 @@ public partial class SettingsViewModel : ViewModelBase
     // Status
     [ObservableProperty]
     private string _statusMessage = string.Empty;
+    
+    [ObservableProperty]
+    private string _statusMessageColor = string.Empty;
 
     [ObservableProperty]
     private bool _startWithSteamVr;
@@ -126,7 +135,7 @@ public partial class SettingsViewModel : ViewModelBase
 
     // Language selection
     public IReadOnlyList<LanguageOption> AvailableLanguageOptions =>
-        Loc.Instance.AvailableLanguages
+        Localizer.Languages
             .Select(code => new LanguageOption(code, GetLanguageDisplayName(code)))
             .ToList();
 
@@ -136,7 +145,7 @@ public partial class SettingsViewModel : ViewModelBase
     partial void OnSelectedLanguageOptionChanged(LanguageOption? value)
     {
         if (value is null) return;
-        Loc.Instance.CurrentLanguage = value.Code;
+        Localizer.Language = value.Code;
         ConfigManager.Config.Language = value.Code;
         ConfigManager.TrySaveConfig();
     }
@@ -187,6 +196,7 @@ public partial class SettingsViewModel : ViewModelBase
         StartMinimized = config.StartMinimized;
         StartWithSteamVr = config.StartWithSteamVr;
         RedirectVRDancing = config.RedirectVRDancing;
+        AutoUpdate = config.AutoUpdateVrcVideoCacher;
         BlockedUrls.Clear();
         foreach (var url in config.BlockedUrls)
         {
@@ -199,6 +209,7 @@ public partial class SettingsViewModel : ViewModelBase
 
         HasChanges = false;
         StatusMessage = string.Empty;
+        StatusMessageColor = "#81C784";
         _isLoadingConfig = false;
     }
 
@@ -210,7 +221,8 @@ public partial class SettingsViewModel : ViewModelBase
         }
 
         HasChanges = true;
-        StatusMessage = Loc.Tr("SettingsUnsavedChanges");
+        StatusMessage = Localizer.Get("SettingsUnsavedChanges");
+        StatusMessageColor = "#FFB74D";
     }
 
     private void OnBlockedUrlsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -267,6 +279,7 @@ public partial class SettingsViewModel : ViewModelBase
     partial void OnCloseToTrayChanged(bool value) => SetHasChanges();
     partial void OnStartMinimizedChanged(bool value) => SetHasChanges();
     partial void OnRedirectVRDancingChanged(bool value) => SetHasChanges();
+    partial void OnAutoUpdateChanged(bool value) => SetHasChanges();
     partial void OnStartWithSteamVrChanged(bool value) => SetHasChanges();
     partial void OnBlockRedirectChanged(string value) => SetHasChanges();
 
@@ -309,6 +322,7 @@ public partial class SettingsViewModel : ViewModelBase
             .ToArray();
         config.BlockRedirect = BlockRedirect;
         config.RedirectVRDancing = RedirectVRDancing;
+        config.AutoUpdateVrcVideoCacher = AutoUpdate;
 
         // Temporarily unhook config-changed events to avoid redundant LoadFromConfig calls during save
         ConfigManager.OnConfigChanged -= LoadFromConfig;
@@ -325,14 +339,16 @@ public partial class SettingsViewModel : ViewModelBase
         }
 
         HasChanges = false;
-        StatusMessage = Loc.Tr("SettingsSaved");
+        StatusMessage = Localizer.Get("SettingsSaved");
+        StatusMessageColor = "#81C784";
     }
 
     [RelayCommand]
     private void ResetToDefaults()
     {
         LoadFromConfig();
-        StatusMessage = Loc.Tr("SettingsReset");
+        StatusMessage = Localizer.Get("SettingsReset");
+        StatusMessageColor = "#81C784";
     }
 
     [RelayCommand]

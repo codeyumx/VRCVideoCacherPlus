@@ -1,7 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mi="using:Material.Icons.Avalonia"
-             xmlns:loc="using:CodingSeb.Localization.Avalonia"
+             xmlns:l="using:Jeek.Avalonia.Localization"
              xmlns:vm="clr-namespace:VRCVideoCacher.ViewModels"
              x:Class="VRCVideoCacher.Views.AboutView"
              x:DataType="vm:AboutViewModel">
@@ -10,13 +10,13 @@
         <StackPanel Spacing="20" Margin="10">
 
             <!-- Header -->
-            <TextBlock Text="{loc:Tr About}" FontSize="24" FontWeight="Bold"/>
+            <TextBlock Text="{l:Localize About}" FontSize="24" FontWeight="Bold"/>
 
             <!-- Plus Fork -->
             <Border Background="#2d2d2d" CornerRadius="8" Padding="20">
                 <StackPanel Spacing="15">
                     <TextBlock FontSize="16">
-                        <Run Text="{loc:Tr VRCVideoCacherPlus}" FontWeight="SemiBold"/>
+                        <Run Text="{l:Localize VRCVideoCacherPlus}" FontWeight="SemiBold"/>
                         <Run Text=" "/>
                         <Run Text="{Binding Version}"/>
                     </TextBlock>
@@ -40,7 +40,7 @@
                     <TextBlock Text="VRCVideoCacher" FontWeight="SemiBold" FontSize="16"/>
 
                     <StackPanel Spacing="5">
-                        <TextBlock Text="{loc:Tr CreatedBy}" Foreground="#AAAAAA"/>
+                        <TextBlock Text="{l:Localize CreatedBy}" Foreground="#AAAAAA"/>
                         <TextBlock Text="{Binding CreatedBy}" Foreground="#AAAAAA"/>
                     </StackPanel>
 
@@ -58,14 +58,22 @@
             <!-- Report an Issue -->
             <Border Background="#2d2d2d" CornerRadius="8" Padding="20">
                 <StackPanel Spacing="15">
-                    <TextBlock Text="{loc:Tr ReportAnIssue}" FontWeight="SemiBold" FontSize="16"/>
+                    <TextBlock Text="{l:Localize ReportAnIssue}" FontWeight="SemiBold" FontSize="16"/>
 
-                    <Button ToolTip.Tip="{loc:Tr OpenIssueOnGitHub}" Click="OnGitHubIssueClick">
-                        <StackPanel Orientation="Horizontal" Spacing="5">
-                            <mi:MaterialIcon Kind="Github" Width="24" Height="24"/>
-                            <TextBlock Text="{loc:Tr OpenIssueOnGitHub}" VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </Button>
+                    <StackPanel Orientation="Horizontal" Spacing="15">
+                        <Button ToolTip.Tip="{l:Localize OpenIssueOnGitHub}" Click="OnGitHubIssueClick">
+                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                <mi:MaterialIcon Kind="Github" Width="24" Height="24"/>
+                                <TextBlock Text="{l:Localize OpenIssueOnGitHub}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button ToolTip.Tip="{l:Localize JoinOurDiscord}" Click="OnDiscordIssueClick">
+                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                <mi:MaterialIcon Kind="Forum" Width="24" Height="24"/>
+                                <TextBlock Text="{l:Localize JoinOurDiscord}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
                 </StackPanel>
             </Border>
         </StackPanel>

@@ -147,6 +147,7 @@
   "TrayShow": "Megjelenítés",
   "TrayOpenCacheFolder": "Gyorsítótár Mappa Megnyitása",
   "TrayExit": "Kilépés",
+  "TrayMinimizeNotice": "VRCVideoCacher is still running in the background. Click the tray icon to reopen it.",
 
   "CreatedBy": "Készítette",
   "ReportAnIssue": "Hiba Jelentése",

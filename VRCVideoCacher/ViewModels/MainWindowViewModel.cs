@@ -1,6 +1,6 @@
-using CodingSeb.Localization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Jeek.Avalonia.Localization;
 using VRCVideoCacher.Models;
 using VRCVideoCacher.Utils;
 
@@ -12,7 +12,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private ViewModelBase _currentView;
 
     [ObservableProperty]
-    private string _statusText = Loc.Tr("ServerRunning");
+    private string _statusText = Localizer.Get("ServerRunning");
 
     [ObservableProperty]
     private string _cacheStatusText = "Cache: 0 B";
@@ -61,7 +61,7 @@ public partial class MainWindowViewModel : ViewModelBase
         UpdateCacheStatus();
 
         // Refresh localized strings when language changes
-        Loc.Instance.CurrentLanguageChanged += (_, _) => StatusText = Loc.Tr("ServerRunning");
+        Localizer.LanguageChanged += (_, _) => StatusText = Localizer.Get("ServerRunning");
     }
 
     private void UpdateCacheStatus()
@@ -84,7 +84,7 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         string[] suffixes = ["B", "KB", "MB", "GB", "TB"];
         if (bytes == 0) return "0 B";
-        var mag = (int)Math.Log(bytes, 1024);
+        var mag = Math.Min((int)Math.Log(bytes, 1024), suffixes.Length - 1);
         var adjustedSize = bytes / Math.Pow(1024, mag);
         return $"{adjustedSize:N2} {suffixes[mag]}";
     }

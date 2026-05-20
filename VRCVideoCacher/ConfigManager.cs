@@ -1,5 +1,5 @@
 using System.Globalization;
-using CodingSeb.Localization;
+using Jeek.Avalonia.Localization;
 using Newtonsoft.Json;
 using Serilog;
 using VRCVideoCacher.Utils;
@@ -122,7 +122,7 @@ public class ConfigManager
     private static string GetSystemLanguage()
     {
         var culture = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
-        return Loc.Instance.AvailableLanguages.Contains(culture) ? culture : "en";
+        return Localizer.Languages.Contains(culture) ? culture : "en";
     }
 }
 
@@ -133,6 +133,7 @@ public class ConfigModel
     public string YtdlpWebServerUrl = "http://localhost:9696";
     public bool YtdlpUseCookies = true;
     public bool YtdlpAutoUpdate = true;
+    public bool AutoUpdateVrcVideoCacher = true;
     public string YtdlpAdditionalArgs = string.Empty;
     public string YtdlpDubLanguage = string.Empty;
 

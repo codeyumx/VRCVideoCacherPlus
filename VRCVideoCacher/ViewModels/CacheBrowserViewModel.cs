@@ -1,8 +1,9 @@
 using System.Collections.ObjectModel;
+using Avalonia.Input.Platform;
 using Avalonia.Threading;
-using CodingSeb.Localization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Jeek.Avalonia.Localization;
 using VRCVideoCacher.Database;
 using VRCVideoCacher.Models;
 using VRCVideoCacher.Services;
@@ -228,7 +229,7 @@ public partial class CacheBrowserViewModel : ViewModelBase
             }
         }
 
-        StatusText = string.Format(Loc.Tr("VideosCountFormat"), FilteredVideos.Count, CachedVideos.Count);
+        StatusText = string.Format(Localizer.Get("VideosCountFormat"), FilteredVideos.Count, CachedVideos.Count);
     }
 
     [RelayCommand]
@@ -286,7 +287,7 @@ public partial class CacheBrowserViewModel : ViewModelBase
         {
             CachedVideos.Remove(item);
             FilteredVideos.Remove(item);
-            StatusText = string.Format(Loc.Tr("VideosCountFormat"), FilteredVideos.Count, CachedVideos.Count);
+            StatusText = string.Format(Localizer.Get("VideosCountFormat"), FilteredVideos.Count, CachedVideos.Count);
         });
     }
 
@@ -304,10 +305,10 @@ public partial class CacheBrowserViewModel : ViewModelBase
         }
 
         var message = string.Format(
-            Loc.Tr("ConfirmClearCacheFormat"),
+            Localizer.Get("ConfirmClearCacheFormat"),
             CachedVideos.Count);
-        var dialog = Views.PopupWindow.CreateConfirm(message, Loc.Tr("Yes"), Loc.Tr("No"));
-        dialog.Title = Loc.Tr("ConfirmClearCacheTitle");
+        var dialog = Views.PopupWindow.CreateConfirm(message, Localizer.Get("Yes"), Localizer.Get("No"));
+        dialog.Title = Localizer.Get("ConfirmClearCacheTitle");
         await dialog.ShowDialog(owner);
         if (dialog.Confirmed)
             CacheManager.ClearCache();

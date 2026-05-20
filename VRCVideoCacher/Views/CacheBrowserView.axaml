@@ -3,43 +3,39 @@
              xmlns:vm="using:VRCVideoCacher.ViewModels"
              xmlns:mi="using:Material.Icons.Avalonia"
              xmlns:asyncImageLoader="using:AsyncImageLoader"
-             xmlns:loc="using:CodingSeb.Localization.Avalonia"
+             xmlns:l="using:Jeek.Avalonia.Localization"
              x:Class="VRCVideoCacher.Views.CacheBrowserView"
              x:DataType="vm:CacheBrowserViewModel"
              x:CompileBindings="True">
 
-    <Grid RowDefinitions="Auto, *, Auto">
+    <Grid RowDefinitions="Auto, Auto, *, Auto">
         <!-- Header -->
         <Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="10">
-            <TextBlock Text="{loc:Tr CacheBrowser}" FontSize="24" FontWeight="Bold"/>
+            <TextBlock Text="{l:Localize CacheBrowser}" FontSize="24" FontWeight="Bold"/>
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
-                <Button ToolTip.Tip="{loc:Tr SearchVideosWatermark}">
-                    <mi:MaterialIcon Kind="Magnify" Width="20" Height="20"/>
-                    <Button.Flyout>
-                        <Flyout Placement="BottomEdgeAlignedRight">
-                            <TextBox Text="{Binding SearchFilter}" Watermark="{loc:Tr SearchVideosWatermark}"
-                                     Width="300">
-                                <TextBox.InnerLeftContent>
-                                    <mi:MaterialIcon Kind="Magnify" Width="16" Height="16" Margin="5,0"/>
-                                </TextBox.InnerLeftContent>
-                            </TextBox>
-                        </Flyout>
-                    </Button.Flyout>
-                </Button>
-                <Button Command="{Binding RefreshCacheCommand}" ToolTip.Tip="{loc:Tr Refresh}">
+                <Button Command="{Binding RefreshCacheCommand}" ToolTip.Tip="{l:Localize Refresh}">
                     <mi:MaterialIcon Kind="Refresh" Width="20" Height="20"/>
                 </Button>
-                <Button Command="{Binding OpenInExplorerCommand}" ToolTip.Tip="{loc:Tr OpenFolder}">
+                <Button Command="{Binding OpenInExplorerCommand}" ToolTip.Tip="{l:Localize OpenFolder}">
                     <mi:MaterialIcon Kind="FolderOpen" Width="20" Height="20"/>
                 </Button>
-                <Button Command="{Binding DeleteAllCommand}" ToolTip.Tip="{loc:Tr DeleteAllCache}" Background="#CF6679">
+                <Button Command="{Binding DeleteAllCommand}" ToolTip.Tip="{l:Localize DeleteAllCache}" Background="#CF6679">
                     <mi:MaterialIcon Kind="DeleteSweep" Width="20" Height="20"/>
                 </Button>
             </StackPanel>
         </Grid>
 
+        <!-- Search -->
+        <Grid Grid.Row="1" Margin="10,0,10,10">
+            <TextBox Text="{Binding SearchFilter}" PlaceholderText="{l:Localize SearchVideosWatermark}">
+                <TextBox.InnerLeftContent>
+                    <mi:MaterialIcon Kind="Magnify" Width="16" Height="16" Margin="5,0"/>
+                </TextBox.InnerLeftContent>
+            </TextBox>
+        </Grid>
+
         <!-- Video List -->
-        <ListBox Grid.Row="1"
+        <ListBox Grid.Row="2"
                  ItemsSource="{Binding FilteredVideos}"
                  SelectedItem="{Binding SelectedItem}"
                  Margin="10,0"
@@ -95,7 +91,7 @@
         </ListBox>
 
         <!-- Status Bar -->
-        <Border Grid.Row="2" Background="#252525" Padding="10,5" Margin="10,10,10,0">
+        <Border Grid.Row="3" Background="#252525" Padding="10,5" Margin="10,10,10,0">
             <TextBlock Text="{Binding StatusText}"/>
         </Border>
     </Grid>

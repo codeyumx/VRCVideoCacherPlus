@@ -47,8 +47,16 @@ public class FileTools
         }
         else if (OperatingSystem.IsLinux())
         {
-            var compatPath = GetCompatPath("438100") ?? throw new Exception("Unable to find VRChat compat data");
-            localLowPath = Path.Join(compatPath, "pfx/drive_c/users/steamuser/AppData/LocalLow");
+            var compatPath = GetCompatPath("438100");
+            if (string.IsNullOrEmpty(compatPath))
+            {
+                Log.Warning("Unable to find VRChat compat data, VRChat yt-dlp patching will be unavailable.");
+                localLowPath = string.Empty;
+            }
+            else
+            {
+                localLowPath = Path.Join(compatPath, "pfx/drive_c/users/steamuser/AppData/LocalLow");
+            }
         }
         else
         {

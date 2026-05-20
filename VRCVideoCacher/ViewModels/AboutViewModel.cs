@@ -1,4 +1,4 @@
-using CodingSeb.Localization;
+using Jeek.Avalonia.Localization;
 
 namespace VRCVideoCacher.ViewModels;
 
@@ -11,6 +11,6 @@ public class AboutViewModel : ViewModelBase
     public AboutViewModel()
     {
         Version = VRCVideoCacher.Program.Version;
-        CreatedBy = $"{VRCVideoCacher.Program.Creator_Elly}, {VRCVideoCacher.Program.Creator_Natsumi}, {VRCVideoCacher.Program.Creator_Haxy}, {VRCVideoCacher.Program.Creator_Hauskaz}, {VRCVideoCacher.Program.Creator_DubyaDude}";
+        CreatedBy = Localizer.Get("CreatedBy") + $" {VRCVideoCacher.Program.Creator_Elly}, {VRCVideoCacher.Program.Creator_Natsumi}, {VRCVideoCacher.Program.Creator_Haxy}, {VRCVideoCacher.Program.Creator_Hauskaz}, {VRCVideoCacher.Program.Creator_DubyaDude}";
     }
 }

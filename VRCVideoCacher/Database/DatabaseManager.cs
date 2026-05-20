@@ -210,7 +210,7 @@ public static class DatabaseManager
             .ToDictionary(v => v.Id);
 
         // Project to ViewModel in-memory
-        return histories.Select(h => 
+        return histories.Select(h =>
         {
             cacheDict.TryGetValue(h.Id ?? string.Empty, out var meta);
             return new HistoryItemViewModel(h, meta);

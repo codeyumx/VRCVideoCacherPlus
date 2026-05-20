@@ -42,9 +42,15 @@ public class ApiController : WebApiController
             "https://*.akamaiedge.net",  // Akamai CDN for video delivery
         };
 
-        foreach (var origin in allowedOrigins)
+        var requestOrigin = HttpContext.Request.Headers["Origin"] ?? string.Empty;
+        if (!string.IsNullOrEmpty(requestOrigin))
         {
-            HttpContext.Response.Headers.Add("Access-Control-Allow-Origin", origin);
+            var isAllowed = allowedOrigins.Any(o =>
+                o.StartsWith("https://*.", StringComparison.Ordinal)
+                    ? requestOrigin.EndsWith(o[9..], StringComparison.OrdinalIgnoreCase)
+                    : requestOrigin.Equals(o, StringComparison.OrdinalIgnoreCase));
+            if (isAllowed)
+                HttpContext.Response.Headers["Access-Control-Allow-Origin"] = requestOrigin;
         }
 
         using var reader = new StreamReader(HttpContext.OpenRequestStream(), Encoding.UTF8);
@@ -105,7 +111,7 @@ public class ApiController : WebApiController
             await HttpContext.SendStringAsync(requestUrl.Replace("eu2", "na2"), "text/plain", Encoding.UTF8);
             return;
         }
-        
+
         if (ConfigManager.Config.BlockedUrls.Any(blockedUrl => requestUrl.StartsWith(blockedUrl)))
         {
             Log.Warning("URL Is Blocked: {URL}", requestUrl);

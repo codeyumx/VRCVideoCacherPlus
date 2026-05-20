@@ -8,6 +8,8 @@ public class LaunchArgs
     private const string GlobalPathArg = "--global-path";
     private const string KillExistingInstanceArg = "--kill-existing-instance";
     private const string WaitForPidArg = "--wait-for-pid";
+    private const string NoSteamArg = "--no-steam";
+    private const string NoOvrArg = "--no-ovr";
 
     public static bool IsBypassArgumentPresent;
     public static bool HasGui = true;
@@ -15,6 +17,8 @@ public class LaunchArgs
     public static bool UseGlobalPath;
     public static bool KillExistingInstance = false;
     public static int? WaitForPid;
+    public static bool SteamSdk = true;
+    public static bool OVR = true;
 
     public static void SetupArguments(params string[] args)
     {
@@ -43,6 +47,12 @@ public class LaunchArgs
                 if (int.TryParse(pidStr, out var pid))
                     WaitForPid = pid;
             }
+
+            if (arg.Equals(NoSteamArg, StringComparison.OrdinalIgnoreCase))
+                SteamSdk = false;
+
+            if (arg.Equals(NoOvrArg, StringComparison.OrdinalIgnoreCase))
+                OVR = false;
         }
     }
 

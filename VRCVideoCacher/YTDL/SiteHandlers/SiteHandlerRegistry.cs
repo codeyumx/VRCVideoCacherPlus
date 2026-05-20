@@ -13,7 +13,7 @@ public static class SiteHandlerRegistry
         // fallthrough last
         new GenericHandler(),
     ];
-    
+
     // Rewriters run first, in order, before handler resolution
     private static readonly List<ISiteHandler> Rewriters =
     [
@@ -22,7 +22,7 @@ public static class SiteHandlerRegistry
         new ThirdPartyYTResolver(), // dmn.moe, u2b.cx etc → real YT url
         new HlsHandler(),         // Dropbox ?dl=0 → ?dl=1, GDrive /file/d/<id>/view → /uc?...
     ];
-    
+
     public static async Task<string> ApplyRewrites(string url)
     {
         foreach (var rewriter in Rewriters)

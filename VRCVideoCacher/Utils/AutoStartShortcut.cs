@@ -180,7 +180,7 @@ public class AutoStartShortcut
                 {
                     // Only don't use the steam shortcut if we know for certain that the VRCX version is older than 2026.3.14, which is when the url method was completed.
                     // If we can't parse the version, or if it's newer than that, we'll just use the new method and assume it will work.
-                    if (year <= 2026 && month <= 3 && day < 14)
+                    if (year < 2026 || (year == 2026 && (month < 3 || (month == 3 && day < 14))))
                     {
                         _doesVrcxSupportSteamShortcut = false;
                     }
@@ -369,7 +369,7 @@ public class AutoStartShortcut
             if (File.Exists(filePath))
             {
                 var versionText = File.ReadAllText(filePath).Trim();
-                if(!string.IsNullOrWhiteSpace(versionText))
+                if (!string.IsNullOrWhiteSpace(versionText))
                 {
                     version = versionText;
                     return true;
