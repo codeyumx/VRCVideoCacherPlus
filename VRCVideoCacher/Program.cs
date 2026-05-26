@@ -159,6 +159,12 @@ internal sealed class Program
 
         InitializeLogger();
 
+        TaskScheduler.UnobservedTaskException += (_, e) =>
+        {
+            if (e.Exception != null)
+                Logger.Warning(e.Exception, "Unobserved task exception");
+        };
+
 #if !DEBUG
         if (LaunchArgs.ErrorReporting)
         {
@@ -196,6 +202,8 @@ internal sealed class Program
                 catch
                 {
                 }
+
+                Log.CloseAndFlush();
             };
         }
 #endif
@@ -448,6 +456,7 @@ internal sealed class Program
         API.WebServer.Stop();
         FileTools.RestoreAllYtdl();
         Logger.Information("Exiting...");
+        Log.CloseAndFlush();
     }
 
     public static void NotifyCookiesUpdated()

@@ -5,7 +5,7 @@
 <hr>
 </div>
 
-**Language:** [English](./README.md) | [日本語](./README_ja-JP.md) | **Magyar** | [한국어](./README_ko-KR.md)
+**Language:** [English](./README.md) | [日本語](./README_ja-JP.md) | **Magyar** | [한국어](./README_ko-KR.md) | [Português do Brasil](./README_pt-BR.md)
 
 ### Letöltés
 

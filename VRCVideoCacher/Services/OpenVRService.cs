@@ -1,3 +1,7 @@
+using System.Runtime.InteropServices;
+using Avalonia;
+using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Threading;
 using Serilog;
 using Valve.VR;
 using VRCVideoCacher.Utils;
@@ -98,6 +102,11 @@ public class OpenVRService
                                 Logger.Warning("Failed to register startup manifest");
                             }
                         }
+
+                        if (LaunchArgs.CloseWithSteamVr)
+                        {
+                            await PollEventsUntilQuit();
+                        }
                         break;
                     // Only retry if vrserver just isn't running yet
                     case EVRInitError.Init_HmdNotFound or EVRInitError.Init_HmdNotFoundPresenceFailed or EVRInitError.Init_NoServerForBackgroundApp:
@@ -120,5 +129,46 @@ public class OpenVRService
                 }
             }
         });
+    }
+
+    private static async Task PollEventsUntilQuit()
+    {
+        var vrEvent = new VREvent_t();
+        var eventSize = (uint)Marshal.SizeOf<VREvent_t>();
+
+        bool quitApp = false;
+        while (!quitApp)
+        {
+            await Task.Delay(500);
+
+            if (OpenVR.System == null)
+            {
+                Logger.Warning("OpenVR system became unavailable, assuming SteamVR closed");
+                quitApp = true;
+            }
+            else
+            {
+                while (OpenVR.System.PollNextEvent(ref vrEvent, eventSize))
+                {
+                    if ((EVREventType)vrEvent.eventType == EVREventType.VREvent_Quit)
+                    {
+                        Logger.Information("Received VREvent_Quit, shutting down");
+                        quitApp = true;
+                    }
+                }
+            }
+        }
+
+        if (LaunchArgs.HasGui && Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime lifetime)
+        {
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                lifetime.Shutdown();
+            });
+        }
+        else
+        {
+            Environment.Exit(0);
+        }
     }
 }
