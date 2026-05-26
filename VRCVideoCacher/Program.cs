@@ -4,7 +4,6 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Threading;
 using Avalonia;
-using Sentry.Serilog;
 using Serilog;
 using Serilog.Templates;
 using Serilog.Templates.Themes;
@@ -30,7 +29,6 @@ internal sealed class Program
     public const string Creator_Haxy = "Haxy";
     public const string Creator_Hauskaz = "Hauskaz";
     public const string Creator_DubyaDude = "DubyaDude";
-    private const string SentryDsn = "https://233e3c027a6239500a4bb3ba81f99ddd@sentry.ellyvr.dev/19";
     public static ILogger Logger = Log.ForContext("SourceContext", "Core");
     public static readonly string CurrentProcessPath = Path.GetDirectoryName(Environment.ProcessPath) ?? string.Empty;
     public static readonly string DataPath = Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "VRCVideoCacher");
@@ -52,31 +50,6 @@ internal sealed class Program
             // Previous holder exited without releasing; we now own the mutex.
             return true;
         }
-    }
-
-    private static void ConfigureSentryOptions(SentrySerilogOptions o)
-    {
-        SentrySdk.SetTag("admin", AdminCheck.IsRunningAsAdmin().ToString());
-        SentrySdk.SetTag("noGui", LaunchArgs.HasGui.ToString());
-        SentrySdk.SetTag("globalPath", LaunchArgs.UseGlobalPath.ToString());
-        o.Dsn = SentryDsn;
-        o.AutoSessionTracking = true;
-        o.IsGlobalModeEnabled = true;
-        o.Release = Version;
-        var platform = OperatingSystem.IsLinux() ? "linux" : "windows";
-#if STEAMRELEASE
-        o.Environment = $"steam-{platform}";
-#else
-        o.Environment = platform;
-#endif
-        o.EnableLogs = true;
-    }
-
-    public static SentrySerilogOptions GetSentryOptions()
-    {
-        var options = new SentrySerilogOptions();
-        ConfigureSentryOptions(options);
-        return options;
     }
 
     [STAThread]
@@ -151,12 +124,6 @@ internal sealed class Program
         }
 
         Updater.Cleanup();
-
-        if (LaunchArgs.ErrorReporting)
-        {
-            SentrySdk.Init(GetSentryOptions());
-        }
-
         InitializeLogger();
 
         TaskScheduler.UnobservedTaskException += (_, e) =>
@@ -166,46 +133,27 @@ internal sealed class Program
         };
 
 #if !DEBUG
-        if (LaunchArgs.ErrorReporting)
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
         {
-            AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+            try
             {
-                try
-                {
-                    SentrySdk.ConfigureScope(scope =>
-                    {
-                        var configPath = Path.Join(DataPath, "Config.json");
-                        if (File.Exists(configPath))
-                            scope.AddAttachment(configPath);
-                    });
-                    if (e.ExceptionObject is Exception ex0)
-                        SentrySdk.CaptureException(ex0);
-                }
-                catch
-                {
-                }
+                var ex = e.ExceptionObject as Exception;
+                Logger.Error(ex, "Unhandled Exception");
+            }
+            catch
+            {
+            }
 
-                try
-                {
-                    var ex = e.ExceptionObject as Exception;
-                    Logger.Error(ex, "Unhandled Exception");
-                }
-                catch
-                {
-                }
+            try
+            {
+                Console.WriteLine("Unhandled Exception: " + e.ExceptionObject);
+            }
+            catch
+            {
+            }
 
-                try
-                {
-                    var ex = e.ExceptionObject as Exception;
-                    Console.WriteLine("Unhandled Exception: " + ex);
-                }
-                catch
-                {
-                }
-
-                Log.CloseAndFlush();
-            };
-        }
+            Log.CloseAndFlush();
+        };
 #endif
 
         if (!LaunchArgs.HasGui)
@@ -220,7 +168,17 @@ internal sealed class Program
             Logger.Warning("Application is running with administrator privileges. This is not recommended for security reasons.");
         }
 
-        // Start backend on background thread
+        OpenVRService.Start(CurrentProcessPath);
+
+        // Start the UI — blocks until Avalonia shuts down
+        BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+
+        // Force-exit so background threads (web server, download loop, OpenVR) don't keep the process alive
+        Environment.Exit(0);
+    }
+
+    public static void InitializeUIBackend()
+    {
         Task.Run(async () =>
         {
             try
@@ -232,14 +190,6 @@ internal sealed class Program
                 Log.Error(ex, "Backend error");
             }
         });
-
-        OpenVRService.Start(CurrentProcessPath);
-
-        // Start the UI — blocks until Avalonia shuts down
-        BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
-
-        // Force-exit so background threads (web server, download loop, OpenVR) don't keep the process alive
-        Environment.Exit(0);
     }
 
     private static void InitializeLogger()
@@ -253,11 +203,6 @@ internal sealed class Program
                 path: Path.Combine(LogsPath, "VRCVideoCacher.log"),
                 rollingInterval: RollingInterval.Day,
                 retainedFileCountLimit: 5);
-
-        if (LaunchArgs.ErrorReporting)
-        {
-            loggerConfiguration = loggerConfiguration.WriteTo.Sentry(ConfigureSentryOptions);
-        }
 
         if (LaunchArgs.HasGui)
         {
