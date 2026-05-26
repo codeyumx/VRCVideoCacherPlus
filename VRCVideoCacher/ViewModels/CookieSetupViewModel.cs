@@ -21,6 +21,8 @@ public partial class CookieSetupViewModel : ViewModelBase
     //  5 - Complete
 
     public event Action? RequestClose;
+    // Set by the View to show a file picker and return the selected executable path (or null).
+    public Func<Task<string?>>? PickBrowserExecutable { get; set; }
 
     [ObservableProperty]
     private int _currentStep = 1;
@@ -173,6 +175,27 @@ public partial class CookieSetupViewModel : ViewModelBase
     private void OpenYouTube()
     {
         OpenUrl("https://www.youtube.com");
+    }
+
+    [RelayCommand]
+    private async Task OpenYouTubeWith()
+    {
+        if (PickBrowserExecutable == null) return;
+        var exePath = await PickBrowserExecutable();
+        if (string.IsNullOrEmpty(exePath)) return;
+
+        try
+        {
+            Process.Start(new ProcessStartInfo { FileName = exePath, Arguments = "https://www.youtube.com", UseShellExecute = false });
+        }
+        catch (Exception ex)
+        {
+            var lifetime = Avalonia.Application.Current?.ApplicationLifetime
+                as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime;
+            var owner = lifetime?.MainWindow;
+            if (owner != null)
+                await new Views.PopupWindow($"Could not launch browser:\n{ex.Message}").ShowDialog(owner);
+        }
     }
 
     [RelayCommand]

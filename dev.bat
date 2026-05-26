@@ -14,5 +14,6 @@ rm -rf VRCVideoCacher/bin VRCVideoCacher/obj
 
 echo "Building Debug for Linux x64..."
 dotnet publish VRCVideoCacher/VRCVideoCacher.csproj -c Debug -o Build/dev
+chmod +x Build/dev/VRCVideoCacher
 
 echo "Done! Output: Build/dev/VRCVideoCacher"

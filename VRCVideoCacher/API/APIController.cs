@@ -25,33 +25,26 @@ public class ApiController : WebApiController
         Timeout = TimeSpan.FromSeconds(30),
     };
 
+    // Handle CORS preflight for the youtube-cookies endpoint.
+    // Chromium's "Private Network Access" (PNA) policy requires a public origin (youtube.com)
+    // to receive Access-Control-Allow-Private-Network: true before it can POST to localhost.
+    // Without this OPTIONS handler the preflight is rejected and the extension never sends
+    // cookies, regardless of which Chromium-based browser the user has the extension in.
+    [Route(HttpVerbs.Options, "/youtube-cookies")]
+    public Task ReceiveYoutubeCookiesOptions()
+    {
+        ApplyCorsHeaders();
+        HttpContext.Response.Headers["Access-Control-Allow-Methods"] = "POST, OPTIONS";
+        HttpContext.Response.Headers["Access-Control-Allow-Headers"] = "Content-Type";
+        HttpContext.Response.Headers["Access-Control-Max-Age"] = "86400";
+        HttpContext.Response.StatusCode = 204;
+        return Task.CompletedTask;
+    }
+
     [Route(HttpVerbs.Post, "/youtube-cookies")]
     public async Task ReceiveYoutubeCookies()
     {
-        // Permissive CORS for VRChat and Resonite video cacher
-        // Allows localhost (dev), major platforms, and common CDNs
-        var allowedOrigins = new[]
-        {
-            "http://localhost",           // Local development
-            "https://vrchat.com",        // VRChat main site
-            "https://api.vrchat.com",    // VRChat API
-            "https://www.resonite.com",  // Resonite main site
-            "https://resonite.io",       // Resonite alternative domain
-            "https://*.vrchatcdn.com",   // VRChat CDN (wildcard)
-            "https://*.cloudfront.net",  // Common CDNs used by both platforms
-            "https://*.akamaiedge.net",  // Akamai CDN for video delivery
-        };
-
-        var requestOrigin = HttpContext.Request.Headers["Origin"] ?? string.Empty;
-        if (!string.IsNullOrEmpty(requestOrigin))
-        {
-            var isAllowed = allowedOrigins.Any(o =>
-                o.StartsWith("https://*.", StringComparison.Ordinal)
-                    ? requestOrigin.EndsWith(o[9..], StringComparison.OrdinalIgnoreCase)
-                    : requestOrigin.Equals(o, StringComparison.OrdinalIgnoreCase));
-            if (isAllowed)
-                HttpContext.Response.Headers["Access-Control-Allow-Origin"] = requestOrigin;
-        }
+        ApplyCorsHeaders();
 
         using var reader = new StreamReader(HttpContext.OpenRequestStream(), Encoding.UTF8);
         var cookies = await reader.ReadToEndAsync();
@@ -73,6 +66,20 @@ public class ApiController : WebApiController
         Program.NotifyCookiesUpdated();
         if (!ConfigManager.Config.YtdlpUseCookies)
             Log.Warning("Config is NOT set to use cookies from browser extension.");
+    }
+
+    private void ApplyCorsHeaders()
+    {
+        var requestOrigin = HttpContext.Request.Headers["Origin"] ?? string.Empty;
+        // Always echo back the origin so any browser visiting YouTube can reach us.
+        // The endpoint only accepts cookies and has no sensitive side-effects on GET,
+        // so broad CORS is intentional here.
+        if (!string.IsNullOrEmpty(requestOrigin))
+            HttpContext.Response.Headers["Access-Control-Allow-Origin"] = requestOrigin;
+
+        // Required for Chromium's Private Network Access (PNA) policy: allows a
+        // public origin (youtube.com) to POST to a private address (localhost).
+        HttpContext.Response.Headers["Access-Control-Allow-Private-Network"] = "true";
     }
 
     private static string FilterCookies(string cookies)

@@ -29,11 +29,13 @@ dotnet publish VRCVideoCacher/VRCVideoCacher.csproj -c Release -r win-x64 -o ./B
 
 echo "Building for Github Linux x64..."
 dotnet publish VRCVideoCacher/VRCVideoCacher.csproj -c Release -r linux-x64 -o ./Build/linux-x64
+chmod +x ./Build/linux-x64/VRCVideoCacher
 
 echo "Building for Steam Windows x64..."
 dotnet publish VRCVideoCacher/VRCVideoCacher.csproj -c SteamRelease -r win-x64 -o ./Build/Steam/win-x64
 
 echo "Building for Steam Linux x64..."
 dotnet publish VRCVideoCacher/VRCVideoCacher.csproj -c SteamRelease -r linux-x64 -o ./Build/Steam/linux-x64
+chmod +x ./Build/Steam/linux-x64/VRCVideoCacher
 
 echo "Done!"

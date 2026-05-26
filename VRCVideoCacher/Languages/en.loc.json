@@ -131,7 +131,8 @@
   "CookieSetupStep2AccountWarning": "It is recommended to use a burner account.",
   "CookieSetupStep3Header": "Step 3: Visit YouTube",
   "CookieSetupStep3Desc": "Open YouTube in your browser and make sure you're signed in. The extension will automatically send your cookies to VRCVideoCacher.",
-  "OpenYouTube": "Open YouTube",
+  "OpenYouTube": "Open YouTube (default browser)",
+  "OpenYouTubeWith": "Open with...",
   "CookieSetupStep3Note": "Note: You can uninstall the extension after cookies are received. If you browse YouTube again while logged in, cookies may be invalidated. Consider deleting YouTube cookies from your browser after setup, or keep the extension installed.",
   "CookieSetupStep4Header": "Step 4: localhost.youtube.com (Optional)",
   "CookieSetupStep4Desc": "Adding a hosts entry for localhost.youtube.com allows VRCVideoCacher to serve cached videos using the YouTube domain, which improves compatibility with VRChat's video player.",
@@ -152,6 +153,10 @@
   "TrayOpenCacheFolder": "Open Cache Folder",
   "TrayExit": "Exit",
   "TrayMinimizeNotice": "VRCVideoCacher is still running in the background. Click the tray icon to reopen it.",
+
+  "VRCVideoCacherPlus": "VRCVideoCacherPlus",
+  "Updates": "Updates",
+  "AutoUpdateVRCVideoCacher": "Auto-update VRCVideoCacher",
 
   "CreatedBy": "Created By",
   "ReportAnIssue": "Report an Issue",

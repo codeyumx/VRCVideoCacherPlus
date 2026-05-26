@@ -140,11 +140,11 @@ public class ConfigModel
     // Caching
     public string CachedAssetPath = "";
     public float CacheMaxSizeInGb = 10f;
-    public bool CacheYouTube = false;
+    public bool CacheYouTube = true;
     public int CacheYouTubeMaxResolution = 1080;
     public int CacheYouTubeMaxLength = 120;
-    public bool CachePyPyDance = false;
-    public bool CacheVrDancing = false;
+    public bool CachePyPyDance = true;
+    public bool CacheVrDancing = true;
     public bool CacheHlsPlaylists = true;
     public int CacheHlsMaxLength = 30;
     public bool CacheOnly = false;
