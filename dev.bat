@@ -1,4 +1,5 @@
 :<<"::BATCH"
+@rem Polyglot script: runs on Windows (dev.bat) and Linux/macOS (bash dev.bat)
 @echo off
 if exist VRCVideoCacher\bin rmdir /s /q VRCVideoCacher\bin
 if exist VRCVideoCacher\obj rmdir /s /q VRCVideoCacher\obj

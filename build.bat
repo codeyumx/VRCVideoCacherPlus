@@ -1,4 +1,5 @@
 :<<"::BATCH"
+@rem Polyglot script: runs on Windows (build.bat) and Linux/macOS (bash build.bat)
 @echo off
 if exist Build rmdir /s /q Build
 if exist VRCVideoCacher\bin rmdir /s /q VRCVideoCacher\bin
