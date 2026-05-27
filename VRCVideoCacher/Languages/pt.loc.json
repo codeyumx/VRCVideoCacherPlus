@@ -6,7 +6,6 @@
   "History": "Histórico",
   "Logs": "Registros",
   "About": "Sobre",
-
   "Refresh": "Atualizar",
   "Save": "Salvar",
   "Reset": "Redefinir",
@@ -22,7 +21,6 @@
   "Done": "Concluir",
   "Language": "Idioma",
   "General": "Geral",
-
   "ToggleHostTooltip": "Alternar entre domínio do YouTube e localhost para cachê.",
   "ServerStatus": "Status do servidor",
   "Cache": "Cachê",
@@ -40,7 +38,6 @@
   "Expired": "Expirado",
   "Unknown": "Desconhecido",
   "ServerRunning": "Servidor em execução",
-
   "ServerSettings": "Preferências de servidor",
   "WebServerUrl": "URL de Web Servidor",
   "DownloadSettings": "Preferências de download",
@@ -78,12 +75,10 @@
   "SettingsReset": "Preferências redefinidas para os últimos valores salvos.",
   "SettingsUnsavedChanges": "Você tem mudanças não salvas.",
   "RedirectVRDancing": "Redirecionar VRDancing Europeu para Norte-Americano",
-
   "OpenFolder": "Abrir pasta",
   "DeleteAllCache": "Esvaziar o cachê",
   "SearchVideosWatermark": "Procurar vídeos...",
   "VideosCountFormat": "{0} de {1} vídeos",
-
   "DownloadQueue": "Fila de download",
   "ClearQueue": "Limpar fila",
   "CurrentDownload": "Download atual",
@@ -106,7 +101,6 @@
   "SkipReasonBotCheck": "Verificação de bot do YouTube — instale a extensão do navegador: github.com/clienthax/VRCVideoCacherBrowserExtension e use uma conta alternativa do YouTube",
   "SkipReasonVideoUnavailable": "Vídeo indisponível",
   "SkipReasonPrivateVideo": "O vídeo é privado",
-
   "LogViewer": "Visualizador de registros",
   "ExportLogs": "Exportar registros",
   "ClearLogs": "Limpar registros",
@@ -116,9 +110,7 @@
   "Warning": "Aviso",
   "Error": "Erro",
   "AutoScroll": "Rolar página automaticamente",
-
   "EntriesCountFormat": "{0} itens",
-
   "CookieSetupTitle": "Configuração da extensão de cookies do YouTube",
   "CookieSetupSubtitle": "Corrigir erros de deteção do Bot do YouTube",
   "CookieSetupStep1Header": "Passo 1: Selecionar seu navegador",
@@ -143,23 +135,26 @@
   "CookieSetupCompleteDesc": "Cookies do YouTube recebidos. Você não deverá mais ver erros de detecção de bots do YouTube.",
   "CookiesReceived": "Cookies recebidos!",
   "WaitingForCookies": "Esperando pelos cookies...",
+  "CookiesDisabledWarning": "\"Usar cookies do YouTube\" está atualmente desativado. Por favor, vá para as Configurações e ative-o primeiro.",
   "HostsActive": "localhost.youtube.com está ativo",
   "NotConfigured": "Não configurado",
   "RemoveEntry": "Remover entrada",
   "AddHostsEntry": "Adicionar entrada em Hosts",
   "OpenChromeWebStore": "Abrir Chrome Web Store",
   "OpenFirefoxAddons": "Abrir Add-ons do Firefox",
-
   "DontShowThisAgain": "Não mostrar novamente",
   "TrayShow": "Mostrar",
   "TrayOpenCacheFolder": "Abrir pasta de cachê",
   "TrayExit": "Encerrar",
   "TrayMinimizeNotice": "VRCVideoCacher ainda está sendo executado em segundo plano. Clique no ícone da bandeja para reabri-lo.",
-
   "VRCVideoCacherPlus": "VRCVideoCacherPlus",
-
   "CreatedBy": "Criado por",
   "ReportAnIssue": "Reportar um problema",
   "OpenIssueOnGitHub": "Abrir uma solicitação no GitHub",
-  "JoinOurDiscord": "Entre em nosso Discord para reportar um problema"
+  "JoinOurDiscord": "Entre em nosso Discord para reportar um problema",
+  "RedownloadUtils": "Redownload Utils",
+  "RedownloadingUtils": "Redownloading utils...",
+  "RedownloadComplete": "Utils redownloaded successfully!",
+  "RedownloadFailed": "Redownload failed. Check logs for details.",
+  "OpenUtilsFolder": "Open Utils Folder"
 }

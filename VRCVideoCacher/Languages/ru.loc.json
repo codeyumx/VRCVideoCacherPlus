@@ -6,7 +6,6 @@
   "History": "История",
   "Logs": "Логи",
   "About": "О программе",
-
   "Refresh": "Обновить",
   "Save": "Сохранить",
   "Reset": "Сбросить",
@@ -22,7 +21,6 @@
   "Done": "Готово",
   "Language": "Язык программы",
   "General": "Общие",
-
   "ToggleHostTooltip": "Переключить локальный домен Ютуба(YouTube) для использования кэша",
   "ServerStatus": "Статус сервера",
   "Cache": "Кэш",
@@ -40,7 +38,6 @@
   "Expired": "Истек",
   "Unknown": "Неизвестен",
   "ServerRunning": "Сервер работает",
-
   "ServerSettings": "Настройки сервера",
   "WebServerUrl": "URL-Веб сервера",
   "DownloadSettings": "Настройки загрузки",
@@ -78,12 +75,10 @@
   "SettingsReset": "Настройки сброшенны до последнего сохранения",
   "SettingsUnsavedChanges": "У вас есть несохраненные изменения!",
   "RedirectVRDancing": "Перенаправить EU VRDancing на NA",
-
   "OpenFolder": "Открыть папку..",
   "DeleteAllCache": "Удалить весь кэш",
   "SearchVideosWatermark": "Поиск видео...",
   "VideosCountFormat": "{0} из {1} видео",
-
   "DownloadQueue": "Очередь Загрузки",
   "ClearQueue": "Очистить Очередь",
   "CurrentDownload": "Текущяя Загрузка",
@@ -106,7 +101,6 @@
   "SkipReasonBotCheck": "Проверка YouTube на бота — установите расширение: github.com/clienthax/VRCVideoCacherBrowserExtension и используйте альтернативный аккаунт YouTube",
   "SkipReasonVideoUnavailable": "Видео недоступно",
   "SkipReasonPrivateVideo": "Видео является приватным",
-
   "LogViewer": "Просмотр логов",
   "ExportLogs": "Экспортировать логи",
   "ClearLogs": "Очистить логи",
@@ -116,9 +110,7 @@
   "Warning": "Предупреждение",
   "Error": "Ошибка!",
   "AutoScroll": "Авто-прокручивание",
-
   "EntriesCountFormat": "{0} Записей",
-
   "CookieSetupTitle": "Настройка расширения YouTube Cookie",
   "CookieSetupSubtitle": "Исправление ошибок обнаружение ботов на YouTube",
   "CookieSetupStep1Header": "Шаг 1-ый: выберите свой браузер",
@@ -143,23 +135,26 @@
   "CookieSetupCompleteDesc": "YouTube cookies получены. Ошибка обнаружения ботов больше не должны появляться.",
   "CookiesReceived": "Cookies получены!",
   "WaitingForCookies": "Ожидание cookie...",
+  "CookiesDisabledWarning": "«Использовать YouTube Cookie» в данный момент отключено. Пожалуйста, перейдите в Настройки и сначала включите его.",
   "HostsActive": "localhost.youtube.com Активна",
   "NotConfigured": "Не настроено",
   "RemoveEntry": "Удалить запись.",
   "AddHostsEntry": "Добавить запись в hosts",
   "OpenChromeWebStore": "Открыть Chrome Web Store (Chrome Веб магазин)",
   "OpenFirefoxAddons": "Открыть Firefox Add-ons (FireFox Аддоны)",
-
   "DontShowThisAgain": "Не показывать это снова.",
   "TrayShow": "Показать",
   "TrayOpenCacheFolder": "Открыть папку с кэшом",
   "TrayExit": "Выход.",
   "TrayMinimizeNotice": "VRCVideoCacher всё ещё работает в фоновом режиме. Нажмите на значок в трее, чтобы открыть снова.",
-
   "VRCVideoCacherPlus": "VRCVideoCacherPlus",
-
   "CreatedBy": "Авторы",
   "ReportAnIssue": "Сообщить о проблеме..",
   "OpenIssueOnGitHub": "Открыть задачу на GitHub",
-  "JoinOurDiscord": "Присоединиться к нашему Discord серверу, чтобы сообщить о вашей проблеме"
+  "JoinOurDiscord": "Присоединиться к нашему Discord серверу, чтобы сообщить о вашей проблеме",
+  "RedownloadUtils": "Redownload Utils",
+  "RedownloadingUtils": "Redownloading utils...",
+  "RedownloadComplete": "Utils redownloaded successfully!",
+  "RedownloadFailed": "Redownload failed. Check logs for details.",
+  "OpenUtilsFolder": "Open Utils Folder"
 }

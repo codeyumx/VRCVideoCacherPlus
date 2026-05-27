@@ -6,6 +6,8 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Jeek.Avalonia.Localization;
 using VRCVideoCacher.API;
+using VRCVideoCacher.Models;
+using VRCVideoCacher.YTDL;
 
 namespace VRCVideoCacher.ViewModels;
 
@@ -361,5 +363,50 @@ public partial class SettingsViewModel : ViewModelBase
     private void RemoveBlockedUrl(BlockedUrlEntry url)
     {
         BlockedUrls.Remove(url);
+    }
+
+    [RelayCommand]
+    private void OpenUtilsFolder()
+    {
+        if (OperatingSystem.IsWindows())
+            System.Diagnostics.Process.Start("explorer.exe", Program.UtilsPath);
+        else if (OperatingSystem.IsLinux())
+            System.Diagnostics.Process.Start("xdg-open", Program.UtilsPath);
+    }
+
+    [ObservableProperty]
+    private bool _isRedownloading;
+
+    [RelayCommand]
+    private async Task RedownloadUtils()
+    {
+        IsRedownloading = true;
+        StatusMessage = Localizer.Get("RedownloadingUtils");
+        StatusMessageColor = "#FFB74D";
+        try
+        {
+            Versions.CurrentVersion.Ytdlp = string.Empty;
+            Versions.CurrentVersion.Deno = string.Empty;
+            Versions.CurrentVersion.Ffmpeg = string.Empty;
+            Versions.Save();
+
+            await Task.WhenAll(
+                YtdlManager.TryDownloadYtdlp(),
+                YtdlManager.TryDownloadDeno(),
+                YtdlManager.TryDownloadFfmpeg()
+            );
+
+            StatusMessage = Localizer.Get("RedownloadComplete");
+            StatusMessageColor = "#81C784";
+        }
+        catch (Exception)
+        {
+            StatusMessage = Localizer.Get("RedownloadFailed");
+            StatusMessageColor = "#EF5350";
+        }
+        finally
+        {
+            IsRedownloading = false;
+        }
     }
 }

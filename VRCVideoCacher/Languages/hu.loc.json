@@ -6,7 +6,6 @@
   "History": "Előzmények",
   "Logs": "Naplók",
   "About": "Rólunk",
-
   "Refresh": "Frissítés",
   "Save": "Mentés",
   "Reset": "Visszaállítás",
@@ -22,7 +21,6 @@
   "Done": "Kész",
   "Language": "Nyelv",
   "General": "Általános",
-
   "ToggleHostTooltip": "A YouTube domain használatának bekapcsolása a localhost gyorsítótár számára",
   "ServerStatus": "Szerver Állapota",
   "Cache": "Gyorsítótár",
@@ -40,7 +38,6 @@
   "Expired": "Lejárt",
   "Unknown": "Ismeretlen",
   "ServerRunning": "Szerver Fut",
-
   "ServerSettings": "Szerver Beállítások",
   "WebServerUrl": "Web Szerver URL",
   "DownloadSettings": "Beállítások Letöltése",
@@ -77,12 +74,10 @@
   "SettingsReset": "Beállítások visszaállnak az utoljára mentett értékekre.",
   "SettingsUnsavedChanges": "Vannak mentetlen változások.",
   "RedirectVRDancing": "EU VRDancing átirányítása NA-ra",
-
   "OpenFolder": "Mappa Megnyitás",
   "DeleteAllCache": "Összes gyorsítótár Törlése",
   "SearchVideosWatermark": "Videók Keresése...",
   "VideosCountFormat": "{0} az {1} videóból",
-
   "DownloadQueue": "Letöltési Sor",
   "ClearQueue": "Sor Törlése",
   "CurrentDownload": "Aktuális Letöltés",
@@ -105,7 +100,6 @@
   "SkipReasonBotCheck": "YouTube bot-ellenőrzés — telepítse a böngészőbővítményt: github.com/clienthax/VRCVideoCacherBrowserExtension és használjon alternatív YouTube fiókot",
   "SkipReasonVideoUnavailable": "A videó nem elérhető",
   "SkipReasonPrivateVideo": "A videó privát",
-
   "LogViewer": "Napló Néző",
   "ExportLogs": "Napló Exportálás",
   "ClearLogs": "Naplók Törlése",
@@ -115,9 +109,7 @@
   "Warning": "Figyelem",
   "Error": "Hiba",
   "AutoScroll": "Automatikus Görgetés",
-
   "EntriesCountFormat": "{0} bejegyzés",
-
   "CookieSetupTitle": "YouTube Süti Bővítmény Beállítása",
   "CookieSetupSubtitle": "Javítsd ki a YouTube bot észlelési hibáit",
   "CookieSetupStep1Header": "1. Lépés: Válaszd ki a böngésződ",
@@ -142,25 +134,28 @@
   "CookieSetupCompleteDesc": "YouTube sütik beérkeztek. A bot-felismerési hibák többé nem jelennek meg.",
   "CookiesReceived": "Sütik megérkeztek!",
   "WaitingForCookies": "Várakozás a sütikre.",
+  "CookiesDisabledWarning": "A \"YouTube Sütik Használata\" jelenleg ki van kapcsolva. Kérjük, lépj a Beállításokba, és engedélyezd először.",
   "HostsActive": "localhost.youtube.com aktív",
   "NotConfigured": "Nincs konfigurálva",
   "RemoveEntry": "Bejegyzés Eltávolítás",
   "AddHostsEntry": "Hosztok Hozzáadása",
   "OpenChromeWebStore": "Chrome Web Áruház Megnyítás",
   "OpenFirefoxAddons": "Firefox Addonok Megnyítás",
-
   "DontShowThisAgain": "Ne mutasd ezt újra",
   "TrayShow": "Megjelenítés",
   "TrayOpenCacheFolder": "Gyorsítótár Mappa Megnyitása",
   "TrayExit": "Kilépés",
   "TrayMinimizeNotice": "A VRCVideoCacher még mindig fut a háttérben. Kattintson a tálcaikonra az újranyitáshoz.",
-
   "VRCVideoCacherPlus": "VRCVideoCacherPlus",
   "Updates": "Frissítések",
   "AutoUpdateVRCVideoCacher": "VRCVideoCacher automatikus frissítése",
-
   "CreatedBy": "Készítette",
   "ReportAnIssue": "Hiba Jelentése",
   "OpenIssueOnGitHub": "Nyisd meg a probléma részt a GitHubon",
-  "JoinOurDiscord": "Csatlakozz a Discordunkhoz, hogy jelentsd a problémákat"
+  "JoinOurDiscord": "Csatlakozz a Discordunkhoz, hogy jelentsd a problémákat",
+  "RedownloadUtils": "Redownload Utils",
+  "RedownloadingUtils": "Redownloading utils...",
+  "RedownloadComplete": "Utils redownloaded successfully!",
+  "RedownloadFailed": "Redownload failed. Check logs for details.",
+  "OpenUtilsFolder": "Open Utils Folder"
 }

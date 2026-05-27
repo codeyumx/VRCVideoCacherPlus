@@ -7,6 +7,8 @@ public partial class PopupWindow : Window
 {
     public bool Confirmed { get; private set; }
 
+    private string? _folderPath;
+
     public PopupWindow() : this(string.Empty)
     {
     }
@@ -15,6 +17,14 @@ public partial class PopupWindow : Window
     {
         InitializeComponent();
         this.FindControl<TextBlock>("ErrorTextBlock")!.Text = error;
+    }
+
+    public void SetFolderHint(string hintLabel, string folderPath)
+    {
+        _folderPath = folderPath;
+        this.FindControl<TextBlock>("FolderHintLabel")!.Text = hintLabel;
+        this.FindControl<TextBlock>("FolderPathText")!.Text = folderPath;
+        this.FindControl<Border>("FolderHintBorder")!.IsVisible = true;
     }
 
     public static PopupWindow CreateConfirm(string message, string confirmLabel = "Yes", string cancelLabel = "No")
@@ -26,6 +36,15 @@ public partial class PopupWindow : Window
         cancel.Content = cancelLabel;
         cancel.IsVisible = true;
         return w;
+    }
+
+    private void FolderPathButton_Click(object? sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrEmpty(_folderPath)) return;
+        if (OperatingSystem.IsWindows())
+            System.Diagnostics.Process.Start("explorer.exe", _folderPath);
+        else if (OperatingSystem.IsLinux())
+            System.Diagnostics.Process.Start("xdg-open", _folderPath);
     }
 
     private void OkButton_Click(object? sender, RoutedEventArgs e)

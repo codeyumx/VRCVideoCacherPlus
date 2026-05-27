@@ -141,6 +141,7 @@
   "CookieSetupCompleteDesc": "YouTube cookies have been received. You should no longer see bot detection errors.",
   "CookiesReceived": "Cookies received!",
   "WaitingForCookies": "Waiting for cookies...",
+  "CookiesDisabledWarning": "\"Use YouTube Cookies\" is currently disabled. Please go to Settings and enable it first.",
   "HostsActive": "localhost.youtube.com is active",
   "NotConfigured": "Not configured",
   "RemoveEntry": "Remove Entry",
@@ -161,5 +162,10 @@
   "CreatedBy": "Created By",
   "ReportAnIssue": "Report an Issue",
   "OpenIssueOnGitHub": "Open an issue on GitHub",
-  "JoinOurDiscord": "Join our Discord to report an issue"
+  "JoinOurDiscord": "Join our Discord to report an issue",
+  "RedownloadUtils": "Redownload Utils",
+  "OpenUtilsFolder": "Open Utils Folder",
+  "RedownloadingUtils": "Redownloading utils...",
+  "RedownloadComplete": "Utils redownloaded successfully!",
+  "RedownloadFailed": "Redownload failed. Check logs for details."
 }

@@ -202,6 +202,12 @@ public partial class DashboardViewModel : ViewModelBase
     {
         if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            if (!ConfigManager.Config.YtdlpUseCookies)
+            {
+                await new PopupWindow(Localizer.Get("CookiesDisabledWarning")).ShowDialog(desktop.MainWindow!);
+                return;
+            }
+
             var viewModel = new CookieSetupViewModel();
             var window = new CookieSetupWindow
             {

@@ -9,7 +9,31 @@
     <StackPanel Margin="20">
         <TextBlock x:Name="ErrorTextBlock"
                    TextWrapping="Wrap"
-                   Margin="0,0,0,20"/>
+                   Margin="0,0,0,12"/>
+        <Border x:Name="FolderHintBorder"
+                IsVisible="False"
+                Background="#1e1e1e"
+                CornerRadius="6"
+                Padding="10,8"
+                Margin="0,0,0,16">
+            <StackPanel Spacing="4">
+                <TextBlock x:Name="FolderHintLabel"
+                           Foreground="#aaaaaa"
+                           FontSize="12"/>
+                <Button x:Name="FolderPathButton"
+                        HorizontalAlignment="Left"
+                        Click="FolderPathButton_Click"
+                        Padding="0"
+                        Background="Transparent"
+                        BorderThickness="0">
+                    <TextBlock x:Name="FolderPathText"
+                               Foreground="#64B5F6"
+                               TextDecorations="Underline"
+                               FontSize="12"
+                               TextWrapping="Wrap"/>
+                </Button>
+            </StackPanel>
+        </Border>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
             <Button x:Name="CancelButton"
                     Content="Cancel"

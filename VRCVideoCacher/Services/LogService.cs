@@ -78,6 +78,10 @@ public class UiLogSink : ILogEventSink
                 {
                     Title = $"Error from {source}"
                 };
+                if (source.Contains("YtdlManager"))
+                    _currentPopup.SetFolderHint(
+                        "You can manually place deno.exe / yt-dlp.exe / ffmpeg.exe here:",
+                        Program.UtilsPath);
                 _ = _currentPopup.ShowDialog(App.MainWindow!);
             });
         }

@@ -15,6 +15,11 @@ public class YtdlManager
     {
         DefaultRequestHeaders = { { "User-Agent", "VRCVideoCacher" } }
     };
+    private static readonly HttpClient DownloadHttpClient = new()
+    {
+        DefaultRequestHeaders = { { "User-Agent", "VRCVideoCacher" } },
+        Timeout = Timeout.InfiniteTimeSpan
+    };
     public static readonly string CookiesPath;
 
     public static readonly string YtdlPath =
@@ -128,7 +133,13 @@ public class YtdlManager
 
             var currentYtdlVersion = Versions.CurrentVersion.Ytdlp;
             if (!File.Exists(YtdlPath))
+            {
                 currentYtdlVersion = "Not Installed";
+            }
+            else
+            {
+                currentYtdlVersion = await GetYtdlpVersionFromBinary() ?? string.Empty;
+            }
 
             var latestVersion = json.tag_name;
             Log.Information("YT-DLP Current: {Installed} Latest: {Latest}", currentYtdlVersion, latestVersion);
@@ -149,7 +160,91 @@ public class YtdlManager
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {
             Log.Warning(ex, "YT-DLP update failed due to a network error.");
+            Log.Information("You can manually place yt-dlp.exe (or yt-dlp on Linux) in: {UtilsPath}", Program.UtilsPath);
         }
+    }
+
+    private static async Task<string?> GetYtdlpVersionFromBinary()
+    {
+        try
+        {
+            using var process = new System.Diagnostics.Process();
+            process.StartInfo = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = YtdlPath,
+                Arguments = "--version",
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            process.Start();
+            var output = await process.StandardOutput.ReadToEndAsync();
+            await process.WaitForExitAsync();
+            return output.Trim();
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to detect yt-dlp version from binary.");
+        }
+        return null;
+    }
+
+    private static async Task<string?> GetFfmpegVersionFromBinary()
+    {
+        try
+        {
+            using var process = new System.Diagnostics.Process();
+            process.StartInfo = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = FfmpegPath,
+                Arguments = "-version",
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            process.Start();
+            var output = await process.StandardOutput.ReadToEndAsync();
+            await process.WaitForExitAsync();
+            // Output: "ffmpeg version 7.1.1-full_build-www.gyan.dev ..."
+            var firstLine = output.Split('\n')[0].Trim();
+            var parts = firstLine.Split(' ');
+            if (parts.Length >= 3 && parts[0] == "ffmpeg" && parts[1] == "version")
+                return parts[2].Split('-')[0]; // strip "-full_build-..." suffix
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to detect FFmpeg version from binary.");
+        }
+        return null;
+    }
+
+    private static async Task<string?> GetDenoVersionFromBinary()
+    {
+        try
+        {
+            using var process = new System.Diagnostics.Process();
+            process.StartInfo = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = DenoPath,
+                Arguments = "--version",
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            process.Start();
+            var output = await process.StandardOutput.ReadToEndAsync();
+            await process.WaitForExitAsync();
+            // Output: "deno 2.8.0\n..."
+            var firstLine = output.Split('\n')[0].Trim();
+            var parts = firstLine.Split(' ');
+            if (parts.Length >= 2 && parts[0] == "deno")
+                return $"v{parts[1]}";
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to detect Deno version from binary.");
+        }
+        return null;
     }
 
     public static async Task TryDownloadDeno()
@@ -164,6 +259,7 @@ public class YtdlManager
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {
             Log.Warning(ex, "Deno update failed due to a network error.");
+            Log.Information("You can manually place deno.exe (or deno on Linux) in: {UtilsPath}", Program.UtilsPath);
         }
     }
 
@@ -185,7 +281,13 @@ public class YtdlManager
 
         var currentDenoVersion = Versions.CurrentVersion.Deno;
         if (!File.Exists(DenoPath))
+        {
             currentDenoVersion = "Not Installed";
+        }
+        else
+        {
+            currentDenoVersion = await GetDenoVersionFromBinary() ?? string.Empty;
+        }
 
         var latestVersion = json.tag_name;
         Log.Information("Deno Current: {Installed} Latest: {Latest}", currentDenoVersion, latestVersion);
@@ -237,7 +339,7 @@ public class YtdlManager
         Log.Information("Downloading Deno...");
         var url = assets.First().browser_download_url;
 
-        using var response = await HttpClient.GetAsync(url);
+        using var response = await DownloadHttpClient.GetAsync(url);
         if (!response.IsSuccessStatusCode)
         {
             Log.Information("Failed to download deno from github attempting fallback download.");
@@ -284,7 +386,7 @@ public class YtdlManager
         }
         var latestVersion = (await response.Content.ReadAsStringAsync()).Trim();
         var url = $"{DenoFallBackDownloadURL}{latestVersion}/{assetName}";
-        using var downloadResponse = await HttpClient.GetAsync(url);
+        using var downloadResponse = await DownloadHttpClient.GetAsync(url);
         if (!downloadResponse.IsSuccessStatusCode)
         {
             Log.Error("Failed to download Deno from fallback URL: {ResponseStatusCode}", downloadResponse.StatusCode);
@@ -335,6 +437,7 @@ public class YtdlManager
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {
             Log.Warning(ex, "FFmpeg update failed due to a network error.");
+            Log.Information("You can manually place ffmpeg.exe (or ffmpeg on Linux) in: {UtilsPath}", Program.UtilsPath);
         }
     }
 
@@ -356,7 +459,13 @@ public class YtdlManager
 
         var currentffmpegVersion = Versions.CurrentVersion.Ffmpeg;
         if (!File.Exists(FfmpegPath))
+        {
             currentffmpegVersion = "Not Installed";
+        }
+        else
+        {
+            currentffmpegVersion = await GetFfmpegVersionFromBinary() ?? string.Empty;
+        }
 
         var latestVersion = OperatingSystem.IsWindows() ? json.tag_name : json.name;
         Log.Information("FFmpeg Current: {Installed} Latest: {Latest}", currentffmpegVersion, latestVersion);
@@ -407,7 +516,7 @@ public class YtdlManager
         }
         Log.Information("Downloading FFmpeg...");
 
-        using var response = await HttpClient.GetAsync(url);
+        using var response = await DownloadHttpClient.GetAsync(url);
         await using var responseStream = await response.Content.ReadAsStreamAsync();
         var reader = await ReaderFactory.OpenAsyncReader(responseStream);
         var success = false;
@@ -479,7 +588,7 @@ public class YtdlManager
             if (assetVersion.name != assetName)
                 continue;
 
-            await using var stream = await HttpClient.GetStreamAsync(assetVersion.browser_download_url);
+            await using var stream = await DownloadHttpClient.GetStreamAsync(assetVersion.browser_download_url);
             if (string.IsNullOrEmpty(Program.UtilsPath))
                 throw new Exception("Failed to get YT-DLP path");
 

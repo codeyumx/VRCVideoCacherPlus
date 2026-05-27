@@ -6,7 +6,6 @@
   "History": "历史记录",
   "Logs": "日志",
   "About": "关于",
-
   "Refresh": "刷新",
   "Save": "保存",
   "Reset": "重置",
@@ -22,7 +21,6 @@
   "Done": "完成",
   "Language": "语言",
   "General": "常规",
-
   "ToggleHostTooltip": "切换是否使用 YouTube 域名提供本地缓存",
   "ServerStatus": "服务器状态",
   "Cache": "缓存",
@@ -40,7 +38,6 @@
   "Expired": "已过期",
   "Unknown": "未知",
   "ServerRunning": "服务器运行中",
-
   "ServerSettings": "服务器设置",
   "WebServerUrl": "Web 服务器地址",
   "DownloadSettings": "下载设置",
@@ -76,12 +73,10 @@
   "SettingsReset": "设置已重置为上次保存的值。",
   "SettingsUnsavedChanges": "有未保存的设置更改。",
   "RedirectVRDancing": "将 EU VRDancing 重定向至 NA",
-
   "OpenFolder": "打开文件夹",
   "DeleteAllCache": "删除全部缓存",
   "SearchVideosWatermark": "搜索视频...",
   "VideosCountFormat": "共 {1} 个视频，显示 {0} 个",
-
   "DownloadQueue": "下载队列",
   "ClearQueue": "清空队列",
   "CurrentDownload": "当前下载",
@@ -104,7 +99,6 @@
   "SkipReasonBotCheck": "YouTube 机器人验证 — 请安装浏览器扩展：github.com/clienthax/VRCVideoCacherBrowserExtension 并使用其他 YouTube 账户",
   "SkipReasonVideoUnavailable": "视频不可用",
   "SkipReasonPrivateVideo": "视频为私有",
-
   "LogViewer": "日志查看器",
   "ExportLogs": "导出日志",
   "ClearLogs": "清除日志",
@@ -114,9 +108,7 @@
   "Warning": "警告",
   "Error": "错误",
   "AutoScroll": "自动滚动",
-
   "EntriesCountFormat": "共 {0} 条记录",
-
   "CookieSetupTitle": "YouTube Cookie 扩展设置",
   "CookieSetupSubtitle": "修复 YouTube 机器人检测错误",
   "CookieSetupStep1Header": "第 1 步：选择浏览器",
@@ -141,25 +133,28 @@
   "CookieSetupCompleteDesc": "已成功接收 YouTube Cookie，不再出现机器人检测错误。",
   "CookiesReceived": "已接收 Cookie！",
   "WaitingForCookies": "等待 Cookie...",
+  "CookiesDisabledWarning": "\"使用 YouTube Cookie\" 当前已禁用。请前往设置并先启用此选项。",
   "HostsActive": "localhost.youtube.com 已激活",
   "NotConfigured": "未配置",
   "RemoveEntry": "删除条目",
   "AddHostsEntry": "添加 Hosts 条目",
   "OpenChromeWebStore": "打开 Chrome 网上应用店",
   "OpenFirefoxAddons": "打开 Firefox 附加组件",
-
   "DontShowThisAgain": "不再显示",
   "TrayShow": "显示",
   "TrayOpenCacheFolder": "打开缓存文件夹",
   "TrayExit": "退出",
   "TrayMinimizeNotice": "VRCVideoCacher 仍在后台运行。点击托盘图标重新打开。",
-
   "VRCVideoCacherPlus": "VRCVideoCacherPlus",
   "Updates": "更新",
   "AutoUpdateVRCVideoCacher": "自动更新 VRCVideoCacher",
-
   "CreatedBy": "由以下人员创建",
   "ReportAnIssue": "报告问题",
   "OpenIssueOnGitHub": "在 GitHub 上打开问题",
-  "JoinOurDiscord": "加入我们的 Discord 以报告问题"
+  "JoinOurDiscord": "加入我们的 Discord 以报告问题",
+  "RedownloadUtils": "Redownload Utils",
+  "RedownloadingUtils": "Redownloading utils...",
+  "RedownloadComplete": "Utils redownloaded successfully!",
+  "RedownloadFailed": "Redownload failed. Check logs for details.",
+  "OpenUtilsFolder": "Open Utils Folder"
 }
