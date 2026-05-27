@@ -360,9 +360,9 @@ public class YtdlManager
                 await using var outputStream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None);
                 await using var entryStream = await reader.OpenEntryStreamAsync();
                 await entryStream.CopyToAsync(outputStream);
-                FileTools.MarkFileExecutable(path);
                 Versions.CurrentVersion.Deno = json.tag_name;
                 Versions.Save();
+                FileTools.MarkFileExecutable(path);
                 Log.Information("Deno downloaded and extracted.");
                 return;
             }
@@ -407,9 +407,9 @@ public class YtdlManager
                 await using var outputStream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None);
                 await using var entryStream = await reader.OpenEntryStreamAsync();
                 await entryStream.CopyToAsync(outputStream);
-                FileTools.MarkFileExecutable(path);
                 Versions.CurrentVersion.Deno = latestVersion;
                 Versions.Save();
+                FileTools.MarkFileExecutable(path);
                 Log.Information("Deno downloaded and extracted.");
                 return;
             }
