@@ -18,7 +18,7 @@ public class YtdlManager
     private static readonly HttpClient DownloadHttpClient = new()
     {
         DefaultRequestHeaders = { { "User-Agent", "VRCVideoCacher" } },
-        Timeout = Timeout.InfiniteTimeSpan
+        Timeout = TimeSpan.FromMinutes(10)
     };
     public static readonly string CookiesPath;
 
