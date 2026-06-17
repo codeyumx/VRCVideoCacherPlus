@@ -14,6 +14,19 @@ public class ApiController : WebApiController
 {
     private static int YoutubePrefetchMaxRetries => VvcConfigService.CurrentConfig.RetryCount;
 
+    // Defaults true on process start, so the first app launch asks the extension to push
+    // fresh cookies. Cleared once valid cookies are received (see ReceiveYoutubeCookies).
+    private static volatile bool _cookieRefreshRequested = true;
+
+    // We support two extensions: the original EllyVR/upstream one (unchanged) and our new
+    // one (still in development). App-driven refresh is a NEW-extension-only feature — the
+    // new extension identifies itself with this header. The old extension never sends it, so
+    // its behaviour is completely unaffected: it just POSTs cookies on YouTube visits as before.
+    private const string NewExtensionHeader = "X-VRCVideoCacher-Ext";
+    private const string NewExtensionId = "VRCVideoCacherPlus";
+    private bool IsNewExtension =>
+        HttpContext.Request.Headers[NewExtensionHeader] == NewExtensionId;
+
     private static readonly Serilog.ILogger Log = Program.Logger.ForContext<ApiController>();
     private static readonly HttpClient HttpClient = new(new SocketsHttpHandler
     {
@@ -35,10 +48,20 @@ public class ApiController : WebApiController
     {
         ApplyCorsHeaders();
         HttpContext.Response.Headers["Access-Control-Allow-Methods"] = "POST, OPTIONS";
-        HttpContext.Response.Headers["Access-Control-Allow-Headers"] = "Content-Type";
+        HttpContext.Response.Headers["Access-Control-Allow-Headers"] = $"Content-Type, {NewExtensionHeader}";
         HttpContext.Response.Headers["Access-Control-Max-Age"] = "86400";
         HttpContext.Response.StatusCode = 204;
         return Task.CompletedTask;
+    }
+
+    // New extension polls this; "1" means the app wants fresh cookies pushed (e.g. just started).
+    // Only the new extension is answered "1" — anything without the header gets "0".
+    [Route(HttpVerbs.Get, "/youtube-cookies/refresh-needed")]
+    public async Task CookieRefreshNeeded()
+    {
+        ApplyCorsHeaders();
+        var needed = _cookieRefreshRequested && IsNewExtension;
+        await HttpContext.SendStringAsync(needed ? "1" : "0", "text/plain", Encoding.UTF8);
     }
 
     [Route(HttpVerbs.Post, "/youtube-cookies")]
@@ -58,6 +81,10 @@ public class ApiController : WebApiController
         }
 
         await File.WriteAllTextAsync(YtdlManager.CookiesPath, cookies);
+        // Only the new extension participates in the refresh-flag lifecycle; the old
+        // extension's POST is handled identically to before (it never touches this flag).
+        if (IsNewExtension)
+            _cookieRefreshRequested = false;
 
         HttpContext.Response.StatusCode = 200;
         await HttpContext.SendStringAsync("Cookies received.", "text/plain", Encoding.UTF8);

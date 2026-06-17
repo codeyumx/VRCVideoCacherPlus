@@ -1,10 +1,12 @@
 using System.Diagnostics;
+using System.IO;
 using Avalonia.Media;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Jeek.Avalonia.Localization;
 using VRCVideoCacher.Utils;
+using VRCVideoCacher.YTDL;
 
 namespace VRCVideoCacher.ViewModels;
 
@@ -32,6 +34,12 @@ public partial class CookieSetupViewModel : ViewModelBase
 
     [ObservableProperty]
     private bool _cookiesReceived;
+
+    [ObservableProperty]
+    private string _manualCookies = string.Empty;
+
+    [ObservableProperty]
+    private string _manualCookiesError = string.Empty;
 
     [ObservableProperty]
     private bool _hostState;
@@ -196,6 +204,35 @@ public partial class CookieSetupViewModel : ViewModelBase
             if (owner != null)
                 await new Views.PopupWindow($"Could not launch browser:\n{ex.Message}").ShowDialog(owner);
         }
+    }
+
+    // Lets a user who copied cookies from the extension paste them in directly.
+    // Two distinct failures: wrong format (bad copy-paste) vs. well-formed but dead cookies.
+    [RelayCommand]
+    private async Task SaveManualCookies()
+    {
+        var cookies = ManualCookies.Trim();
+        if (!Program.IsCookiesValid(cookies))
+        {
+            // Missing youtube.com / LOGIN_INFO — not the Netscape export the extension produces.
+            ManualCookiesError = Localizer.Get("ManualCookiesWrongFormat");
+            return;
+        }
+
+        File.WriteAllText(YtdlManager.CookiesPath, cookies);
+        Program.NotifyCookiesUpdated();
+
+        // Well-formed: now check they actually work against YouTube.
+        var live = await Program.ValidateCookiesAsync();
+        if (live == false)
+        {
+            ManualCookiesError = Localizer.Get("ManualCookiesExpired");
+            return;
+        }
+
+        // true = valid, null = couldn't verify (offline) — either way they're saved.
+        ManualCookiesError = string.Empty;
+        ManualCookies = string.Empty;
     }
 
     [RelayCommand]
