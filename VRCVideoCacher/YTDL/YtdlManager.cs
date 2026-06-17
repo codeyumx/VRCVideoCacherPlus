@@ -136,6 +136,10 @@ public class YtdlManager
             {
                 currentYtdlVersion = "Not Installed";
             }
+            else if (!await CheckIfProcessStarts(YtdlPath))
+            {
+                currentYtdlVersion = "Not Working";
+            }
             else
             {
                 currentYtdlVersion = await GetYtdlpVersionFromBinary() ?? string.Empty;
@@ -283,6 +287,10 @@ public class YtdlManager
         if (!File.Exists(DenoPath))
         {
             currentDenoVersion = "Not Installed";
+        }
+        else if (!await CheckIfProcessStarts(DenoPath))
+        {
+            currentDenoVersion = "Not Working";
         }
         else
         {
@@ -462,6 +470,10 @@ public class YtdlManager
         {
             currentffmpegVersion = "Not Installed";
         }
+        else if (!await CheckIfProcessStarts(FfmpegPath, "-version"))
+        {
+            currentffmpegVersion = "Not Working";
+        }
         else
         {
             currentffmpegVersion = await GetFfmpegVersionFromBinary() ?? string.Empty;
@@ -606,5 +618,38 @@ public class YtdlManager
             return;
         }
         throw new Exception("Failed to download YT-DLP");
+    }
+
+    private static async Task<bool> CheckIfProcessStarts(string path, string arg = "--version")
+    {
+        var processName = Path.GetFileNameWithoutExtension(path);
+        try
+        {
+            using var process = new System.Diagnostics.Process();
+            process.StartInfo = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = path,
+                Arguments = arg,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            process.Start();
+            var output = await process.StandardOutput.ReadToEndAsync();
+            var error = await process.StandardError.ReadToEndAsync();
+            await process.WaitForExitAsync();
+            if (process.ExitCode != 0)
+            {
+                Log.Error("Error starting {ProcessName}: {Output} {Error}", processName, output, error);
+                return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Exception while starting {ProcessName}: {Message}", processName, ex.Message);
+            return false;
+        }
+        return true;
     }
 }
