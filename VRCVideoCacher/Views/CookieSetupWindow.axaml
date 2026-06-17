@@ -107,7 +107,7 @@
                         <StackPanel Spacing="6">
                             <TextBox Text="{Binding ManualCookies}" AcceptsReturn="True" TextWrapping="NoWrap"
                                      MinHeight="80" MaxHeight="160" FontFamily="monospace"
-                                     Watermark="# Netscape HTTP Cookie File&#x0a;.youtube.com&#x09;TRUE&#x09;/&#x09;..."/>
+                                     PlaceholderText="# Netscape HTTP Cookie File&#x0a;.youtube.com&#x09;TRUE&#x09;/&#x09;..."/>
                             <TextBlock Text="{Binding ManualCookiesError}" Foreground="#E57373" FontSize="11"
                                        IsVisible="{Binding ManualCookiesError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                             <Button Command="{Binding SaveManualCookiesCommand}" HorizontalAlignment="Left"
