@@ -1,0 +1,24 @@
+{
+  "manifest_version": 2,
+  "name": "VRCVideoCacher Cookies Exporter",
+  "version": "1.0.0",
+  "description": "Sends your YouTube cookies to VRCVideoCacher running on localhost.",
+  "permissions": [
+    "cookies",
+    "tabs",
+    "storage",
+    "alarms",
+    "https://*.youtube.com/",
+    "http://localhost:9696/"
+  ],
+  "background": {
+    "scripts": ["cookies.js", "background.js"]
+  },
+  "browser_action": {
+    "default_title": "VRCVideoCacher Cookies Exporter",
+    "default_popup": "popup.html"
+  },
+  "browser_specific_settings": {
+    "gecko": { "id": "vrcvideocacher-cookies@local" }
+  }
+}

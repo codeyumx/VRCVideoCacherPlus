@@ -1,0 +1,281 @@
+using System.Diagnostics.CodeAnalysis;
+using System.Runtime.InteropServices;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Markup.Xaml;
+using Avalonia.Threading;
+using Jeek.Avalonia.Localization;
+using VRCVideoCacher.Languages;
+using VRCVideoCacher.Utils;
+using VRCVideoCacher.ViewModels;
+using VRCVideoCacher.Views;
+
+namespace VRCVideoCacher;
+
+public partial class App : Application
+{
+    private TrayIcon? _trayIcon;
+    public static MainWindow? MainWindow;
+
+    public override void Initialize()
+    {
+        AvaloniaXamlLoader.Load(this);
+    }
+
+    private static async void OnMainWindowOpened(object? sender, EventArgs e)
+    {
+        if (MainWindow == null)
+            return;
+
+        MainWindow.Opened -= OnMainWindowOpened;
+
+        if (!ConfigManager.Config.StartMinimized)
+            return;
+
+        // Let Avalonia finish the initial open/layout/render work first.
+        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Render);
+
+        // Then minimize/hide on the next UI turn.
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            if (ConfigManager.Config.CloseToTray)
+                MainWindow.Hide();
+            else
+                MainWindow.WindowState = WindowState.Minimized;
+        }, DispatcherPriority.Background);
+    }
+
+    [UnconditionalSuppressMessage("Trimming", "IL2026:Members annotated with 'RequiresUnreferencedCodeAttribute' require dynamic access otherwise can break functionality when trimming application code", Justification = "DataValidators is safe to access at startup")]
+    public override void OnFrameworkInitializationCompleted()
+    {
+        InitializeLocalization();
+
+        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            var mainVm = new MainWindowViewModel();
+            MainWindow = new MainWindow
+            {
+                DataContext = mainVm
+            };
+
+            desktop.MainWindow = MainWindow;
+            desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
+            // Check for updates and show banner if available
+            _ = CheckForUpdatesAsync(mainVm);
+
+            // Check if a previous session had a DNS connection failure
+            mainVm.CheckDnsFailure();
+
+            // Set up tray icon
+            SetupTrayIcon(desktop);
+
+            // Handle window closing - minimize to tray instead, but allow OS/programmatic closes
+            MainWindow.Closing += (_, e) =>
+            {
+                if (!ConfigManager.Config.CloseToTray || _isExiting || e.IsProgrammatic)
+                    return;
+
+                e.Cancel = true;
+                HideToTray();
+            };
+
+            // Minimize at startup if needed
+            MainWindow.Opened += OnMainWindowOpened;
+
+            // Allow the app to exit cleanly on OS shutdown/logoff
+            desktop.ShutdownRequested += (_, _) =>
+            {
+                _isExiting = true;
+                _trayIcon?.Dispose();
+                _trayIcon = null;
+            };
+
+            if (AdminCheck.ShouldShowAdminWarning())
+            {
+                MainWindow.Show();
+                var adminWindow = new PopupWindow(AdminCheck.AdminWarningMessage);
+                _ = adminWindow.ShowDialog(MainWindow);
+            }
+        }
+
+        base.OnFrameworkInitializationCompleted();
+    }
+
+    private void InitializeLocalization()
+    {
+        var localizer = new EmbeddedJsonLocalizer();
+        Localizer.SetLocalizer(localizer);
+
+        var configLang = ConfigManager.Config.Language;
+        var lang = string.IsNullOrEmpty(configLang) ? "en" : configLang;
+        Localizer.Language = lang;
+    }
+
+    private static async Task CheckForUpdatesAsync(MainWindowViewModel vm)
+    {
+        var update = await Updater.CheckForUpdates();
+        if (update != null)
+        {
+            await Dispatcher.UIThread.InvokeAsync(() => vm.ShowUpdate(update));
+        }
+    }
+
+    private bool _isExiting;
+    private IClassicDesktopStyleApplicationLifetime? _desktop;
+    private NativeMenuItem? _showItem;
+    private NativeMenuItem? _openCacheItem;
+    private NativeMenuItem? _exitItem;
+
+    // Win32 message constants for close interception
+    private const uint WmClose = 0x0010;
+    private const uint WmSysCommand = 0x0112;
+    private const int ScClose = 0xF060;
+
+    private IntPtr Win32WndProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        // User clicked the title-bar X button (generates SC_CLOSE before WM_CLOSE).
+        // Marking as handled suppresses the subsequent WM_CLOSE, so the Closing
+        // event never fires for a normal user-initiated close on Windows.
+        if (ConfigManager.Config.CloseToTray &&
+            msg == WmSysCommand &&
+            (wParam.ToInt32() & 0xFFF0) == ScClose)
+        {
+            HideToTray();
+            handled = true;
+            return IntPtr.Zero;
+        }
+
+        // Raw WM_CLOSE arriving here means it came from an external source
+        // (taskkill, Task Manager) — a user close via SC_CLOSE would have been
+        // caught above and never reached this point.
+        if (msg == WmClose && !_isExiting)
+        {
+            _isExiting = true;
+            _trayIcon?.Dispose();
+            _trayIcon = null;
+            _desktop?.Shutdown();
+            handled = true;
+        }
+
+        return IntPtr.Zero;
+    }
+
+    private void SetupTrayIcon(IClassicDesktopStyleApplicationLifetime desktop)
+    {
+        _desktop = desktop;
+
+        // On Windows, hook WndProc to distinguish a user clicking X (SC_CLOSE)
+        // from an external kill signal (raw WM_CLOSE from taskkill/Task Manager).
+        if (OperatingSystem.IsWindows())
+            Win32Properties.AddWndProcHookCallback(MainWindow!, Win32WndProc);
+
+        // On Linux, SIGTERM bypasses the Closing event entirely.  Intercept it
+        // and route through desktop.Shutdown() so the tray icon is disposed and
+        // Avalonia state is cleaned up properly before the process exits.
+        if (OperatingSystem.IsLinux())
+        {
+            PosixSignalRegistration.Create(PosixSignal.SIGTERM, ctx =>
+            {
+                ctx.Cancel = true; // suppress default immediate-kill behaviour
+                Dispatcher.UIThread.Post(() =>
+                {
+                    _isExiting = true;
+                    _trayIcon?.Dispose();
+                    _trayIcon = null;
+                    _desktop?.Shutdown();
+                });
+            });
+
+            //Pressing X on window does not remove the tray nor stop the console process
+            MainWindow!.Closing += (_, _) =>
+            {
+                if (ConfigManager.Config.CloseToTray || _isExiting)
+                    return;
+
+                _isExiting = true;
+                _trayIcon?.Dispose();
+                _trayIcon = null;
+                _desktop?.Shutdown();
+            };
+        }
+
+        _showItem = new NativeMenuItem(Localizer.Get("TrayShow"));
+        _showItem.Click += (_, _) => ShowMainWindow();
+
+        _openCacheItem = new NativeMenuItem(Localizer.Get("TrayOpenCacheFolder"));
+        _openCacheItem.Click += (_, _) => OpenCacheFolder();
+
+        _exitItem = new NativeMenuItem(Localizer.Get("TrayExit"));
+        _exitItem.Click += (_, _) =>
+        {
+            _isExiting = true;
+            desktop.Shutdown();
+        };
+
+        Localizer.LanguageChanged += (_, _) =>
+        {
+            if (_showItem != null) _showItem.Header = Localizer.Get("TrayShow");
+            if (_openCacheItem != null) _openCacheItem.Header = Localizer.Get("TrayOpenCacheFolder");
+            if (_exitItem != null) _exitItem.Header = Localizer.Get("TrayExit");
+        };
+
+        var menu = new NativeMenu
+        {
+            _showItem,
+            new NativeMenuItemSeparator(),
+            _openCacheItem,
+            new NativeMenuItemSeparator(),
+            _exitItem
+        };
+
+        _trayIcon = new TrayIcon
+        {
+            ToolTipText = "VRCVideoCacherPlus",
+            Icon = new WindowIcon(Avalonia.Platform.AssetLoader.Open(new Uri("avares://VRCVideoCacher/Assets/icon.ico"))),
+            Menu = menu,
+            IsVisible = true
+        };
+
+        _trayIcon.Clicked += (_, _) => ShowMainWindow();
+    }
+
+    private async void HideToTray()
+    {
+        if (!ConfigManager.Config.HasShownTrayNotice && MainWindow != null)
+        {
+            ConfigManager.Config.HasShownTrayNotice = true;
+            ConfigManager.TrySaveConfig();
+
+            var notice = new PopupWindow(
+                Localizer.Get("TrayMinimizeNotice"));
+            await notice.ShowDialog(MainWindow);
+        }
+
+        MainWindow?.Hide();
+    }
+
+    private void ShowMainWindow()
+    {
+        if (MainWindow != null)
+        {
+            MainWindow.Show();
+            MainWindow.WindowState = WindowState.Normal;
+            MainWindow.Activate();
+        }
+    }
+
+    private void OpenCacheFolder()
+    {
+        var cachePath = CacheManager.CachePath;
+        if (OperatingSystem.IsWindows())
+        {
+            System.Diagnostics.Process.Start("explorer.exe", cachePath);
+        }
+        else if (OperatingSystem.IsLinux())
+        {
+            System.Diagnostics.Process.Start("xdg-open", cachePath);
+        }
+    }
+}

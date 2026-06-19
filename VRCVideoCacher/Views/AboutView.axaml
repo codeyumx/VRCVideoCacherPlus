@@ -1,0 +1,81 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mi="using:Material.Icons.Avalonia"
+             xmlns:l="using:Jeek.Avalonia.Localization"
+             xmlns:vm="clr-namespace:VRCVideoCacher.ViewModels"
+             x:Class="VRCVideoCacher.Views.AboutView"
+             x:DataType="vm:AboutViewModel">
+
+    <ScrollViewer>
+        <StackPanel Spacing="20" Margin="10">
+
+            <!-- Header -->
+            <TextBlock Text="{l:Localize About}" FontSize="24" FontWeight="Bold"/>
+
+            <!-- Plus Fork -->
+            <Border Background="#2d2d2d" CornerRadius="8" Padding="20">
+                <StackPanel Spacing="15">
+                    <TextBlock FontSize="16">
+                        <Run Text="{l:Localize VRCVideoCacherPlus}" FontWeight="SemiBold"/>
+                        <Run Text=" "/>
+                        <Run Text="{Binding Version}"/>
+                    </TextBlock>
+
+                    <TextBlock Text="{Binding PlusAuthor}" Foreground="#AAAAAA"/>
+
+                    <StackPanel Orientation="Horizontal" Spacing="15">
+                        <Button Click="OnGitHubClick" ToolTip.Tip="GitHub">
+                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                <mi:MaterialIcon Kind="Github" Width="24" Height="24"/>
+                                <TextBlock Text="GitHub" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Upstream VRCVideoCacher -->
+            <Border Background="#2d2d2d" CornerRadius="8" Padding="20">
+                <StackPanel Spacing="15">
+                    <TextBlock Text="VRCVideoCacher" FontWeight="SemiBold" FontSize="16"/>
+
+                    <StackPanel Spacing="5">
+                        <TextBlock Text="{l:Localize CreatedBy}" Foreground="#AAAAAA"/>
+                        <TextBlock Text="{Binding CreatedBy}" Foreground="#AAAAAA"/>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Spacing="15">
+                        <Button Click="OnDiscordClick" ToolTip.Tip="Discord">
+                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                <mi:MaterialIcon Kind="Forum" Width="24" Height="24"/>
+                                <TextBlock Text="Discord" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Report an Issue -->
+            <Border Background="#2d2d2d" CornerRadius="8" Padding="20">
+                <StackPanel Spacing="15">
+                    <TextBlock Text="{l:Localize ReportAnIssue}" FontWeight="SemiBold" FontSize="16"/>
+
+                    <StackPanel Orientation="Horizontal" Spacing="15">
+                        <Button ToolTip.Tip="{l:Localize OpenIssueOnGitHub}" Click="OnGitHubIssueClick">
+                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                <mi:MaterialIcon Kind="Github" Width="24" Height="24"/>
+                                <TextBlock Text="{l:Localize OpenIssueOnGitHub}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button ToolTip.Tip="{l:Localize JoinOurDiscord}" Click="OnDiscordIssueClick">
+                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                <mi:MaterialIcon Kind="Forum" Width="24" Height="24"/>
+                                <TextBlock Text="{l:Localize JoinOurDiscord}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

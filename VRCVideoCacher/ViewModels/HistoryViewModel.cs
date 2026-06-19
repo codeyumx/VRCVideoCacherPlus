@@ -1,0 +1,299 @@
+using System.Collections.ObjectModel;
+using Avalonia.Input.Platform;
+using Avalonia.Media;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using Jeek.Avalonia.Localization;
+using VRCVideoCacher.Database;
+using VRCVideoCacher.Database.Models;
+using VRCVideoCacher.Models;
+using VRCVideoCacher.Services;
+using VRCVideoCacher.YTDL;
+
+namespace VRCVideoCacher.ViewModels;
+
+public partial class HistoryItemViewModel : ViewModelBase
+{
+    public DateTime Timestamp { get; init; }
+    public string Url { get; init; } = string.Empty;
+    public string? Id { get; init; }
+    public UrlType Type { get; init; }
+    public string? Author { get; init; }
+    public bool HasAuthor => !string.IsNullOrEmpty(Author);
+
+    private string? _title;
+    private string? _thumbnailUrl;
+
+    public string DisplayTitle
+    {
+        get
+        {
+            if (!string.IsNullOrEmpty(_title)) return _title;
+            return Url.Length > 60 ? Url[..57] + "..." : Url;
+        }
+    }
+
+    // Surface the human-readable id for VRDancing rows (the numerical code in the URL)
+    // instead of the URL hash; for YouTube show the 11-char id, otherwise fall through
+    // to the stored Id.
+    public string? DisplayId => Type == UrlType.VRDancing && !string.IsNullOrEmpty(Url)
+        ? ExtractVRDancingCode(Url)
+        : Id;
+
+    public bool HasDisplayId => !string.IsNullOrEmpty(DisplayId);
+
+    private static string ExtractVRDancingCode(string url)
+    {
+        var trimmed = url.TrimEnd('/');
+        var idx = trimmed.LastIndexOf('/');
+        return idx >= 0 && idx < trimmed.Length - 1 ? trimmed[(idx + 1)..] : trimmed;
+    }
+
+    public string TypeBadge => Type switch
+    {
+        UrlType.YouTube => "YouTube",
+        UrlType.PyPyDance => "PyPyDance",
+        UrlType.VRDancing => "VRDancing",
+        UrlType.Hls => "HLS",
+        _ => "Other"
+    };
+
+    public IBrush TypeBadgeColor => Type switch
+    {
+        UrlType.YouTube => new SolidColorBrush(Color.Parse("#CC0000")),
+        UrlType.PyPyDance => new SolidColorBrush(Color.Parse("#4A90D9")),
+        UrlType.VRDancing => new SolidColorBrush(Color.Parse("#7B68EE")),
+        UrlType.Hls => new SolidColorBrush(Color.Parse("#2E8B57")),
+        _ => new SolidColorBrush(Color.Parse("#555555"))
+    };
+
+    public string? ThumbnailUrl => _thumbnailUrl;
+
+    [ObservableProperty]
+    private bool _isCached;
+
+    [ObservableProperty]
+    private bool _isInQueue;
+
+    public HistoryItemViewModel(History history, VideoInfoCache? meta)
+    {
+        Timestamp = history.Timestamp.ToLocalTime();
+        Url = history.Url;
+        Id = history.Id;
+        Type = history.Type;
+        _title = meta?.Title;
+        Author = meta?.Author;
+        UpdateStatus();
+    }
+
+    public void UpdateStatus()
+    {
+        if (Id == null) return;
+
+        // Check if video is cached
+        var cachedAssets = CacheManager.GetCachedAssets();
+        IsCached = cachedAssets.Keys.Any(k => Path.GetFileNameWithoutExtension(k) == Id);
+
+        // Check if video is in download queue
+        var queue = VideoDownloader.GetQueueSnapshot();
+        var current = VideoDownloader.GetCurrentDownload();
+        var paused = VideoDownloader.GetPausedDownload();
+        IsInQueue = queue.Any(q => q.VideoId == Id)
+                    || current?.VideoId == Id
+                    || paused?.VideoId == Id;
+    }
+
+    public void SetMetadata(string? title, string? thumbnailUrl)
+    {
+        if (!string.IsNullOrEmpty(title))
+        {
+            _title = title;
+            OnPropertyChanged(nameof(DisplayTitle));
+        }
+        if (!string.IsNullOrEmpty(thumbnailUrl))
+        {
+            _thumbnailUrl = thumbnailUrl;
+            OnPropertyChanged(nameof(ThumbnailUrl));
+        }
+    }
+
+    [ObservableProperty]
+    private bool _isSavingToCache;
+
+    public bool CanSaveToCache => !IsCached && !IsInQueue && !IsSavingToCache;
+
+    partial void OnIsCachedChanged(bool value) => OnPropertyChanged(nameof(CanSaveToCache));
+    partial void OnIsInQueueChanged(bool value) => OnPropertyChanged(nameof(CanSaveToCache));
+    partial void OnIsSavingToCacheChanged(bool value) => OnPropertyChanged(nameof(CanSaveToCache));
+
+    [RelayCommand]
+    private async Task SaveToCache()
+    {
+        if (string.IsNullOrEmpty(Url)) return;
+
+        IsSavingToCache = true;
+        try
+        {
+            var videoInfo = await VideoId.GetVideoId(Url, true);
+            if (videoInfo != null)
+            {
+                VideoDownloader.QueueDownload(videoInfo);
+                UpdateStatus();
+            }
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Error(ex, "Failed to save {Url} to cache.", Url);
+        }
+        finally
+        {
+            IsSavingToCache = false;
+        }
+    }
+
+    public async Task<(string? DisplayTitle, string? ThumbnailUrl)> LoadMetadataAsync()
+    {
+        if (Id != null)
+        {
+            // Load from DB
+            var videoInfo = await YouTubeMetadataService.GetVideoMetadataAsync(Id);
+
+            if (!string.IsNullOrEmpty(videoInfo?.Title))
+            {
+                _title = videoInfo.Title;
+                OnPropertyChanged(nameof(DisplayTitle));
+            }
+
+            // Load thumbnail
+            var thumbnailPath = ThumbnailManager.GetThumbnail(Id);
+            if (Id.Length == 11 && string.IsNullOrEmpty(thumbnailPath))
+                thumbnailPath = await YouTubeMetadataService.GetThumbnail(Id);
+
+            if (!string.IsNullOrEmpty(thumbnailPath))
+            {
+                _thumbnailUrl = thumbnailPath;
+                OnPropertyChanged(nameof(ThumbnailUrl));
+            }
+        }
+
+        return (DisplayTitle, ThumbnailUrl);
+    }
+
+    [RelayCommand]
+    private void OpenUrl()
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = Url,
+                UseShellExecute = true
+            });
+        }
+        catch { /* Ignore errors */ }
+    }
+
+    [RelayCommand]
+    private async Task CopyUrl()
+    {
+        if (Avalonia.Application.Current?.ApplicationLifetime is
+            Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            var clipboard = desktop.MainWindow?.Clipboard;
+            if (clipboard != null)
+                await clipboard.SetTextAsync(Url);
+        }
+    }
+}
+
+public partial class HistoryViewModel : ViewModelBase
+{
+    [ObservableProperty]
+    private string _statusText = string.Empty;
+
+    public ObservableCollection<HistoryItemViewModel> HistoryItems { get; } = [];
+
+    public HistoryViewModel()
+    {
+        DatabaseManager.OnPlayHistoryAdded += () => Avalonia.Threading.Dispatcher.UIThread.Post(Refresh);
+
+        // LoadMetadataAsync updates the cache, which fires this event — _isRefreshing guard prevents re-entry.
+        DatabaseManager.OnVideoInfoCacheUpdated += () => Avalonia.Threading.Dispatcher.UIThread.Post(Refresh);
+
+        // Update status icons when queue or cache changes
+        VideoDownloader.OnQueueChanged += UpdateItemStatuses;
+        CacheManager.OnCacheChanged += (_, _) => UpdateItemStatuses();
+
+        Refresh();
+    }
+
+    private void UpdateItemStatuses()
+    {
+        Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            foreach (var item in HistoryItems)
+                item.UpdateStatus();
+        });
+    }
+
+    private bool _isRefreshing;
+
+    [RelayCommand]
+    private void Refresh()
+    {
+        // Prevent infinite loop
+        if (_isRefreshing)
+        {
+            return;
+        }
+        _isRefreshing = true;
+
+        var historyCache = DatabaseManager.GetVideoHistoryAsCache(distinctOnly: true);
+
+        HistoryItems.Clear();
+        foreach (var item in historyCache.OrderByDescending(h => h.Timestamp))
+        {
+            HistoryItems.Add(item);
+        }
+        StatusText = string.Format(Localizer.Get("EntriesCountFormat"), HistoryItems.Count);
+
+        _ = Task.Run(async () =>
+        {
+            // Must always clear _isRefreshing — any unhandled exception here would otherwise
+            // wedge Refresh() permanently, making the history UI stop updating after a few videos.
+            try
+            {
+                foreach (var groupedItems in historyCache.GroupBy(h => h.Id))
+                {
+                    (string? DisplayTitle, string? ThumbnailUrl)? metadata = null;
+                    foreach (var item in groupedItems)
+                    {
+                        try
+                        {
+                            if (metadata == null)
+                            {
+                                metadata = await item.LoadMetadataAsync();
+                            }
+                            else
+                            {
+                                item.SetMetadata(metadata.Value.DisplayTitle, metadata.Value.ThumbnailUrl);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Serilog.Log.Warning(ex, "Failed to load metadata for history item {Id}", item.Id);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Serilog.Log.Error(ex, "History metadata refresh failed");
+            }
+            finally
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => _isRefreshing = false);
+            }
+        });
+    }
+}

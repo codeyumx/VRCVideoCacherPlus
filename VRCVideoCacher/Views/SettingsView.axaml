@@ -1,0 +1,245 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:VRCVideoCacher.ViewModels"
+             xmlns:mi="using:Material.Icons.Avalonia"
+             xmlns:l="using:Jeek.Avalonia.Localization"
+             x:Class="VRCVideoCacher.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel">
+
+    <Grid RowDefinitions="Auto, *, Auto">
+        <!-- Header -->
+        <Grid Grid.Row="0" ColumnDefinitions="*, Auto, Auto, Auto" Margin="10">
+            <TextBlock Text="{l:Localize Settings}" FontSize="24" FontWeight="Bold"/>
+            
+            <!-- Status Message -->
+            <TextBlock Grid.Column="1" Text="{Binding StatusMessage}" Margin="15,0" VerticalAlignment="Center"
+                       IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                       Foreground="{Binding StatusMessageColor}"/>
+            
+            <Button Grid.Column="2" Command="{Binding ResetToDefaultsCommand}" Margin="0,0,10,0">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <mi:MaterialIcon Kind="Undo" Width="16" Height="16"/>
+                    <TextBlock Text="{l:Localize Reset}"/>
+                </StackPanel>
+            </Button>
+            
+            <Button Grid.Column="3" Command="{Binding SaveSettingsCommand}" Classes="accent">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <mi:MaterialIcon Kind="ContentSave" Width="16" Height="16"/>
+                    <TextBlock Text="{l:Localize Save}"/>
+                </StackPanel>
+            </Button>
+
+
+        </Grid>
+        
+        <ScrollViewer Grid.Row="1">
+            <StackPanel Spacing="20" Margin="10">
+                <!-- General Settings -->
+                <Border Background="#2d2d2d" CornerRadius="8" Padding="20">
+                    <StackPanel Spacing="15">
+                        <TextBlock Text="{l:Localize General}" FontWeight="SemiBold" FontSize="16"/>
+
+                        <StackPanel Spacing="5">
+                            <TextBlock Text="{l:Localize Language}"/>
+                            <ComboBox ItemsSource="{Binding AvailableLanguageOptions}"
+                                      SelectedItem="{Binding SelectedLanguageOption}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding DisplayName}"/>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                        </StackPanel>
+                        
+                        <CheckBox IsChecked="{Binding CloseToTray}" Content="{l:Localize CloseToTray}"/>
+
+                        <CheckBox IsChecked="{Binding StartMinimized}" Content="{l:Localize StartMinimized}"/>
+
+                        <CheckBox IsChecked="{Binding StartWithSteamVr}" Content="{l:Localize StartWithSteamVr}"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Server Settings -->
+                <Border Background="#2d2d2d" CornerRadius="8" Padding="20">
+                    <StackPanel Spacing="15">
+                        <TextBlock Text="{l:Localize ServerSettings}" FontWeight="SemiBold" FontSize="16"/>
+
+                        <StackPanel Spacing="5">
+                            <TextBlock Text="{l:Localize WebServerUrl}"/>
+                            <TextBox Text="{Binding WebServerUrl}" PlaceholderText="http://localhost:9696"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Download Settings -->
+                <Border Background="#2d2d2d" CornerRadius="8" Padding="20">
+                    <StackPanel Spacing="15">
+                        <TextBlock Text="{l:Localize DownloadSettings}" FontWeight="SemiBold" FontSize="16"/>
+
+                        <CheckBox IsChecked="{Binding YtdlUseCookies}" Content="{l:Localize UseYouTubeCookies}"/>
+                        <CheckBox IsChecked="{Binding YtdlAutoUpdate}" Content="{l:Localize AutoUpdateUtils}"/>
+
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Command="{Binding RedownloadUtilsCommand}"
+                                    IsEnabled="{Binding !IsRedownloading}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <mi:MaterialIcon Kind="Download" Width="16" Height="16"/>
+                                    <TextBlock Text="{l:Localize RedownloadUtils}"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding OpenUtilsFolderCommand}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <mi:MaterialIcon Kind="FolderOpen" Width="16" Height="16"/>
+                                    <TextBlock Text="{l:Localize OpenUtilsFolder}"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+
+                        <StackPanel Spacing="5">
+                            <TextBlock Text="{l:Localize AdditionalYtdlpArgs}"/>
+                            <TextBox Text="{Binding YtdlAdditionalArgs}" PlaceholderText="Optional arguments"/>
+                        </StackPanel>
+
+                        <StackPanel Spacing="5">
+                            <TextBlock Text="{l:Localize PreferredDubLanguage}"/>
+                            <TextBox Text="{Binding YtdlDubLanguage}" PlaceholderText="Leave empty for original"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Cache Settings -->
+                <Border Background="#2d2d2d" CornerRadius="8" Padding="20">
+                    <StackPanel Spacing="15">
+                        <TextBlock Text="{l:Localize CacheSettings}" FontWeight="SemiBold" FontSize="16"/>
+
+                        <StackPanel Spacing="5">
+                            <TextBlock Text="{l:Localize CachePathLabel}"/>
+                            <TextBox Text="{Binding CachedAssetPath}" PlaceholderText="CachedAssets"/>
+                        </StackPanel>
+
+                        <StackPanel Spacing="5">
+                            <TextBlock Text="{l:Localize MaxCacheSizeLabel}"/>
+                            <NumericUpDown Value="{Binding CacheMaxSizeInGb}" Minimum="0" Maximum="10000" Increment="1" FormatString="0.#"/>
+                        </StackPanel>
+
+                        <CheckBox IsChecked="{Binding CacheYouTube}" Content="{l:Localize CacheYouTubeVideos}"/>
+
+                        <StackPanel Spacing="5" Margin="30,0,0,0" IsVisible="{Binding CacheYouTube}">
+                            <StackPanel Spacing="5">
+                                <TextBlock Text="{l:Localize MaxYouTubeResolution}"/>
+                                <ComboBox ItemsSource="{Binding ResolutionOptions}" SelectedItem="{Binding CacheYouTubeMaxResolution}"/>
+                            </StackPanel>
+
+                            <CheckBox IsChecked="{Binding CacheYouTubePreferVp9}"
+                                      Content="{l:Localize PreferVp9ForCache}"
+                                      ToolTip.Tip="{l:Localize PreferVp9ForCacheTooltip}"/>
+
+                            <StackPanel Spacing="5">
+                                <TextBlock Text="{l:Localize MaxVideoLength}"/>
+                                <NumericUpDown Value="{Binding CacheYouTubeMaxLength}" Minimum="1" Increment="10"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <CheckBox IsChecked="{Binding CachePyPyDance}" Content="{l:Localize CachePyPyDanceVideos}"/>
+                        <CheckBox IsChecked="{Binding CacheVRDancing}" Content="{l:Localize CacheVRDancingVideos}"/>
+                        <CheckBox IsChecked="{Binding CacheHlsPlaylists}" Content="{l:Localize CacheHlsPlaylists}"/>
+                        <StackPanel Spacing="5" Margin="30,0,0,0" IsVisible="{Binding CacheHlsPlaylists}">
+                            <TextBlock Text="{l:Localize MaxVideoLength}"/>
+                            <NumericUpDown Value="{Binding CacheHlsMaxLength}" Minimum="0" Increment="5"/>
+                        </StackPanel>
+                        <CheckBox IsChecked="{Binding CacheOnly}" Content="{l:Localize OnlyServeCachedVideos}"/>
+
+                        <StackPanel Spacing="5">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <ToggleSwitch IsChecked="{Binding IsDelayEnabled}"
+                                              OnContent="{l:Localize CacheDownloadIdleSeconds}"
+                                              OffContent="{l:Localize CacheDownloadIdleSeconds}"
+                                              ToolTip.Tip="{l:Localize CacheDownloadIdleSecondsTooltip}"/>
+                            </StackPanel>
+                            <NumericUpDown Value="{Binding CacheDownloadIdleSeconds}"
+                                           Minimum="5" Maximum="3600" Increment="30"
+                                           PlaceholderText="30"
+                                           IsVisible="{Binding IsDelayEnabled}"
+                                           ToolTip.Tip="{l:Localize CacheDownloadIdleSecondsTooltip}"/>
+                        </StackPanel>
+
+                        <StackPanel Spacing="5">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <ToggleSwitch IsChecked="{Binding IsRateLimitEnabled}"
+                                              OnContent="{l:Localize CacheDownloadRateLimit}"
+                                              OffContent="{l:Localize CacheDownloadRateLimit}"
+                                              ToolTip.Tip="{l:Localize CacheDownloadRateLimitTooltip}"/>
+                            </StackPanel>
+                            <NumericUpDown Value="{Binding CacheDownloadRateLimitMBs}"
+                                           Minimum="1" Maximum="1000" Increment="1"
+                                           PlaceholderText="5"
+                                           IsVisible="{Binding IsRateLimitEnabled}"
+                                           ToolTip.Tip="{l:Localize CacheDownloadRateLimitTooltip}"/>
+                        </StackPanel>
+                        <CheckBox IsChecked="{Binding RedirectVRDancing}" Content="{l:Localize RedirectVRDancing}"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Game Patching -->
+                <Border Background="#2d2d2d" CornerRadius="8" Padding="20">
+                    <StackPanel Spacing="15">
+                        <TextBlock Text="{l:Localize GamePatching}" FontWeight="SemiBold" FontSize="16"/>
+
+                        <CheckBox IsChecked="{Binding PatchVRC}" Content="{l:Localize PatchVRChat}"/>
+                        <CheckBox IsChecked="{Binding PatchResonite}" Content="{l:Localize PatchResonite}"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Updates -->
+                <Border Background="#2d2d2d" CornerRadius="8" Padding="20">
+                    <StackPanel Spacing="15">
+                        <TextBlock Text="{l:Localize Updates}" FontWeight="SemiBold" FontSize="16"/>
+
+                        <CheckBox IsChecked="{Binding AutoUpdate}" Content="{l:Localize AutoUpdateVRCVideoCacher}"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Blocked URLs -->
+                <Border Background="#2d2d2d" CornerRadius="8" Padding="20">
+                    <StackPanel Spacing="15">
+                        <Grid ColumnDefinitions="*, Auto">
+                            <TextBlock Text="{l:Localize BlockedUrls}" FontWeight="SemiBold" FontSize="16"/>
+                            <Button Grid.Column="1" Command="{Binding AddBlockedUrlCommand}">
+                                <StackPanel Orientation="Horizontal" Spacing="5">
+                                    <mi:MaterialIcon Kind="Plus" Width="16" Height="16"/>
+                                    <TextBlock Text="{l:Localize Add}"/>
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+
+                        <ItemsControl ItemsSource="{Binding BlockedUrls}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid ColumnDefinitions="*, Auto" Margin="0,5">
+                                        <TextBox Grid.Column="0" Text="{Binding Url, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                        <Button Grid.Column="1" Margin="5,0,0,0"
+                                                Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).RemoveBlockedUrlCommand}"
+                                                CommandParameter="{Binding}">
+                                            <mi:MaterialIcon Kind="Delete" Width="16" Height="16"/>
+                                        </Button>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <StackPanel Spacing="5" Margin="0,20,0,0">
+                            <TextBlock Text="{l:Localize BlockedUrlRedirect}" FontWeight="SemiBold" FontSize="16"/>
+                            <TextBox Text="{Binding BlockRedirect}" PlaceholderText="Redirect URL"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+
+    <UserControl.Styles>
+        <Style Selector="Button.accent">
+            <Setter Property="Background" Value="#1DB954"/>
+        </Style>
+    </UserControl.Styles>
+</UserControl>

@@ -1,0 +1,216 @@
+using System.Collections.Concurrent;
+using Serilog;
+using VRCVideoCacher.Database;
+using VRCVideoCacher.Models;
+using VRCVideoCacher.Services;
+using VRCVideoCacher.YTDL;
+
+namespace VRCVideoCacher;
+
+public enum CacheChangeType
+{
+    Added,
+    Removed,
+    Cleared
+}
+
+public class CacheManager
+{
+    private static readonly ILogger Log = Program.Logger.ForContext<CacheManager>();
+    private static readonly ConcurrentDictionary<string, VideoCache> CachedAssets = new();
+    public static readonly string CachePath;
+
+    // Events for UI
+    public static event Action<string, CacheChangeType>? OnCacheChanged;
+
+    static CacheManager()
+    {
+        if (string.IsNullOrEmpty(ConfigManager.Config.CachedAssetPath))
+            CachePath = Path.Join(GetSystemCacheFolder(), "CachedAssets");
+        else if (Path.IsPathRooted(ConfigManager.Config.CachedAssetPath))
+            CachePath = ConfigManager.Config.CachedAssetPath;
+        else
+            CachePath = Path.Join(Program.CurrentProcessPath, ConfigManager.Config.CachedAssetPath);
+
+        Log.Debug("Using cache path {CachePath}", CachePath);
+        BuildCache();
+    }
+
+    private static string GetSystemCacheFolder()
+    {
+        if (OperatingSystem.IsWindows())
+            return Program.DataPath;
+
+        var cachePath = Environment.GetEnvironmentVariable("XDG_CACHE_HOME");
+        if (string.IsNullOrEmpty(cachePath))
+            cachePath = Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".cache");
+
+        return Path.Join(cachePath, "VRCVideoCacher");
+    }
+
+    public static void Init()
+    {
+        TryFlushCache();
+    }
+
+    private static void BuildCache()
+    {
+        CachedAssets.Clear();
+        Directory.CreateDirectory(CachePath);
+        var files = Directory.GetFiles(CachePath);
+        foreach (var path in files)
+        {
+            var file = Path.GetFileName(path);
+
+            // Skip the downloader's per-videoId scratch files; the downloader sweeps these.
+            if (file.StartsWith("_tempVideo.", StringComparison.Ordinal))
+                continue;
+
+            // Self-heal: if a previous session committed a tiny error body or otherwise
+            // corrupt file into the cache, drop it so we re-download instead of serving
+            // 166-byte garbage to VRChat forever.
+            if (!VideoFileValidator.IsLikelyValidVideo(path))
+            {
+                try
+                {
+                    File.Delete(path);
+                    Log.Warning("Removed invalid cache entry on startup: {File}", file);
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning("Failed to remove invalid cache entry {File}: {Err}", file, ex.Message);
+                }
+                continue;
+            }
+
+            AddToCache(file);
+        }
+    }
+
+    public static void TryFlushCache()
+    {
+        if (ConfigManager.Config.CacheMaxSizeInGb <= 0f)
+            return;
+
+        var maxCacheSize = (long)(ConfigManager.Config.CacheMaxSizeInGb * 1024f * 1024f * 1024f);
+        var cacheSize = GetCacheSize();
+        if (cacheSize < maxCacheSize)
+            return;
+
+        var recentPlayHistory = DatabaseManager.GetPlayHistory();
+
+        // LRU eviction — LastModified is updated on every cache hit, so it acts as "last accessed"
+        var lru = CachedAssets
+            .OrderBy(kvp => kvp.Value.LastModified)
+            .ToList();
+
+        foreach (var kvp in lru)
+        {
+            if (cacheSize < maxCacheSize)
+                break;
+
+            var videoId = Path.GetFileNameWithoutExtension(kvp.Value.FileName);
+            var filePath = Path.Join(CachePath, kvp.Value.FileName);
+            if (File.Exists(filePath))
+            {
+                File.Delete(filePath);
+                cacheSize -= kvp.Value.Size;
+
+                // delete thumbnail if not in recent history
+                if (recentPlayHistory.All(h => h.Id != videoId))
+                {
+                    var thumbnailPath = ThumbnailManager.GetThumbnailPath(videoId);
+                    if (File.Exists(thumbnailPath))
+                        File.Delete(thumbnailPath);
+                }
+            }
+            CachedAssets.TryRemove(kvp.Key, out _);
+        }
+    }
+
+    public static void AddToCache(string fileName)
+    {
+        var filePath = Path.Join(CachePath, fileName);
+        if (!File.Exists(filePath))
+            return;
+
+        var fileInfo = new FileInfo(filePath);
+        var videoCache = new VideoCache
+        {
+            FileName = fileName,
+            Size = fileInfo.Length,
+            LastModified = fileInfo.LastWriteTimeUtc
+        };
+
+        var existingCache = CachedAssets.GetOrAdd(videoCache.FileName, videoCache);
+        existingCache.Size = fileInfo.Length;
+        existingCache.LastModified = fileInfo.LastWriteTimeUtc;
+
+        OnCacheChanged?.Invoke(fileName, CacheChangeType.Added);
+        TryFlushCache();
+    }
+
+    private static long GetCacheSize()
+    {
+        var totalSize = 0L;
+        foreach (var cache in CachedAssets)
+        {
+            totalSize += cache.Value.Size;
+        }
+
+        return totalSize;
+    }
+
+    // Public accessors for UI
+    public static IReadOnlyDictionary<string, VideoCache> GetCachedAssets()
+        => CachedAssets.ToDictionary(k => k.Key, v => v.Value);
+
+    public static long GetTotalCacheSize() => GetCacheSize();
+
+    public static int GetCachedVideoCount() => CachedAssets.Count;
+
+    public static void DeleteCacheItem(string fileName)
+    {
+        var filePath = Path.Join(CachePath, fileName);
+        if (!File.Exists(filePath))
+            return;
+
+        File.Delete(filePath);
+        CachedAssets.TryRemove(fileName, out _);
+        OnCacheChanged?.Invoke(fileName, CacheChangeType.Removed);
+        Log.Information("Deleted cached video: {FileName}", fileName);
+    }
+
+    public static void ClearCache()
+    {
+        var recentPlayHistory = DatabaseManager.GetPlayHistory();
+        var files = CachedAssets.Keys.ToList();
+        foreach (var fileName in files)
+        {
+            var filePath = Path.Join(CachePath, fileName);
+            if (!File.Exists(filePath))
+                continue;
+
+            try
+            {
+                File.Delete(filePath);
+
+                // delete thumbnail if not in recent history
+                var videoId = Path.GetFileNameWithoutExtension(fileName);
+                if (recentPlayHistory.All(h => h.Id != videoId))
+                {
+                    var thumbnailPath = ThumbnailManager.GetThumbnailPath(videoId);
+                    if (File.Exists(thumbnailPath))
+                        File.Delete(thumbnailPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Failed to delete {FileName}: {Error}", fileName, ex.ToString());
+            }
+        }
+        CachedAssets.Clear();
+        OnCacheChanged?.Invoke(string.Empty, CacheChangeType.Cleared);
+        Log.Information("Cache cleared");
+    }
+}
