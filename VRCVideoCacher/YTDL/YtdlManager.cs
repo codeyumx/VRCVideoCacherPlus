@@ -96,7 +96,6 @@ public class YtdlManager
         while (true)
         {
             await Task.Delay(interval);
-            await VvcConfigService.GetConfig();
             try
             {
                 await TryDownloadYtdlp();

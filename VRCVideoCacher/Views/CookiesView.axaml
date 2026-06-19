@@ -1,0 +1,89 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:VRCVideoCacher.ViewModels"
+             xmlns:mi="using:Material.Icons.Avalonia"
+             xmlns:l="using:Jeek.Avalonia.Localization"
+             x:Class="VRCVideoCacher.Views.CookiesView"
+             x:DataType="vm:CookiesViewModel">
+
+    <Grid RowDefinitions="Auto, *">
+        <!-- Header -->
+        <TextBlock Grid.Row="0" Text="{l:Localize YouTubeCookies}" FontSize="24" FontWeight="Bold" Margin="10"/>
+
+        <ScrollViewer Grid.Row="1">
+            <StackPanel Spacing="20" Margin="10">
+
+                <!-- Status -->
+                <Border Background="#2d2d2d" CornerRadius="8" Padding="20">
+                    <StackPanel Spacing="15">
+                        <Border Background="#1a1a1a" CornerRadius="6" Padding="16">
+                            <StackPanel Orientation="Horizontal" Spacing="14">
+                                <mi:MaterialIcon Kind="{Binding StatusIcon}" Width="36" Height="36"
+                                                 Foreground="{Binding StatusColor}"/>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding StatusText}" FontSize="16" FontWeight="SemiBold"
+                                               Foreground="{Binding StatusColor}"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <CheckBox IsChecked="{Binding UseCookies}" Content="{l:Localize UseYouTubeCookies}"
+                                      VerticalAlignment="Center"/>
+                            <Button Command="{Binding VerifyCommand}" IsEnabled="{Binding !IsVerifying}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <mi:MaterialIcon Kind="Refresh" Width="16" Height="16"/>
+                                    <TextBlock Text="{l:Localize CookiesVerifyNow}"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding ClearCookiesCommand}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <mi:MaterialIcon Kind="Delete" Width="16" Height="16"/>
+                                    <TextBlock Text="{l:Localize ClearCookies}"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+
+                        <CheckBox IsChecked="{Binding UseBetaExtension}" Content="{l:Localize UseBetaExtension}"
+                                  ToolTip.Tip="{l:Localize UseBetaExtensionTooltip}"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Refreshing cookies -->
+                <Border Background="#2d2d2d" CornerRadius="8" Padding="20"
+                        IsEnabled="{Binding UseCookies}">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="{l:Localize CookiesRefreshHeader}" FontWeight="SemiBold" FontSize="16"/>
+
+                        <!-- Legacy (default): cookies arrive when the user visits YouTube with the extension -->
+                        <TextBlock Text="{l:Localize CookiesHelpLegacy}" Foreground="#cccccc" TextWrapping="Wrap"
+                                   IsVisible="{Binding !UseBetaExtension}"/>
+                        <!-- Beta: app-triggered instant refresh -->
+                        <TextBlock Text="{l:Localize CookiesHelpBeta}" Foreground="#cccccc" TextWrapping="Wrap"
+                                   IsVisible="{Binding UseBetaExtension}"/>
+
+                        <!-- Beta only: ask the extension to push fresh cookies instantly -->
+                        <Button Command="{Binding RequestRefreshCommand}" HorizontalAlignment="Left"
+                                IsVisible="{Binding UseBetaExtension}"
+                                ToolTip.Tip="{l:Localize CookiesRequestRefreshTooltip}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <mi:MaterialIcon Kind="CloudDownload" Width="16" Height="16"/>
+                                <TextBlock Text="{l:Localize CookiesRequestRefresh}"/>
+                            </StackPanel>
+                        </Button>
+
+                        <!-- Manual copy/paste fallback (works with either extension) -->
+                        <TextBlock Text="{l:Localize PasteCookiesManually}" FontWeight="SemiBold" Margin="0,8,0,0"/>
+                        <TextBox Text="{Binding ManualCookies}" AcceptsReturn="True" TextWrapping="NoWrap"
+                                 MinHeight="100" MaxHeight="200" FontFamily="monospace"
+                                 PlaceholderText="# Netscape HTTP Cookie File&#x0a;.youtube.com&#x09;TRUE&#x09;/&#x09;..."/>
+                        <TextBlock Text="{Binding ManualCookiesError}" Foreground="#E57373" FontSize="12"
+                                   IsVisible="{Binding ManualCookiesError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                        <Button Command="{Binding SaveManualCookiesCommand}" HorizontalAlignment="Left"
+                                Content="{l:Localize SaveCookies}"/>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

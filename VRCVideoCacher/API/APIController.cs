@@ -12,11 +12,26 @@ namespace VRCVideoCacher.API;
 
 public class ApiController : WebApiController
 {
-    private static int YoutubePrefetchMaxRetries => VvcConfigService.CurrentConfig.RetryCount;
+    // ponytail: fixed local default; this fork takes no remote config from an upstream server.
+    private const int YoutubePrefetchMaxRetries = 7;
 
     // Defaults true on process start, so the first app launch asks the extension to push
     // fresh cookies. Cleared once valid cookies are received (see ReceiveYoutubeCookies).
     private static volatile bool _cookieRefreshRequested = true;
+
+    // Signal the long-poll endpoint waits on, so a UI refresh request wakes the extension
+    // immediately instead of waiting for its next poll. Swapped out atomically each fire.
+    private static volatile TaskCompletionSource _refreshSignal =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    // Lets the UI (Cookies panel) ask the new extension to push fresh cookies right now.
+    public static void RequestCookieRefresh()
+    {
+        _cookieRefreshRequested = true;
+        var pending = Interlocked.Exchange(ref _refreshSignal,
+            new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously));
+        pending.TrySetResult();
+    }
 
     // We support two extensions: the original EllyVR/upstream one (unchanged) and our new
     // one (still in development). App-driven refresh is a NEW-extension-only feature — the
@@ -38,7 +53,8 @@ public class ApiController : WebApiController
         Timeout = TimeSpan.FromSeconds(30),
     };
 
-    // Handle CORS preflight for the youtube-cookies endpoint.
+    // [OLD + NEW EXTENSION] CORS preflight for the youtube-cookies POST. Used by BOTH the
+    // old/upstream (EllyVR) extension and the new one — do not gate this behind IsNewExtension.
     // Chromium's "Private Network Access" (PNA) policy requires a public origin (youtube.com)
     // to receive Access-Control-Allow-Private-Network: true before it can POST to localhost.
     // Without this OPTIONS handler the preflight is rejected and the extension never sends
@@ -54,8 +70,9 @@ public class ApiController : WebApiController
         return Task.CompletedTask;
     }
 
-    // New extension polls this; "1" means the app wants fresh cookies pushed (e.g. just started).
-    // Only the new extension is answered "1" — anything without the header gets "0".
+    // [NEW EXTENSION ONLY] New extension polls this; "1" means the app wants fresh cookies
+    // pushed (e.g. just started). Only the new extension is answered "1" — anything without
+    // the header (including the old extension) gets "0", so the old extension is unaffected.
     [Route(HttpVerbs.Get, "/youtube-cookies/refresh-needed")]
     public async Task CookieRefreshNeeded()
     {
@@ -64,6 +81,39 @@ public class ApiController : WebApiController
         await HttpContext.SendStringAsync(needed ? "1" : "0", "text/plain", Encoding.UTF8);
     }
 
+    // [NEW EXTENSION ONLY] Long-poll: the new extension holds this open; it returns "1" the
+    // instant the app requests a refresh, or "0" after a timeout so the connection is
+    // periodically renewed. This is what makes the UI "Request fresh cookies" button act
+    // immediately. The old extension never calls this and gets "0" if it somehow does.
+    [Route(HttpVerbs.Get, "/youtube-cookies/refresh-wait")]
+    public async Task CookieRefreshWait()
+    {
+        ApplyCorsHeaders();
+        if (!IsNewExtension)
+        {
+            await HttpContext.SendStringAsync("0", "text/plain", Encoding.UTF8);
+            return;
+        }
+
+        if (!_cookieRefreshRequested)
+        {
+            var signal = _refreshSignal;
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(25));
+            var fired = await Task.WhenAny(signal.Task, Task.Delay(Timeout.Infinite, timeout.Token));
+            // signal.Task completing means a refresh was requested; otherwise the delay won.
+            if (fired != signal.Task)
+            {
+                await HttpContext.SendStringAsync("0", "text/plain", Encoding.UTF8);
+                return;
+            }
+        }
+
+        await HttpContext.SendStringAsync("1", "text/plain", Encoding.UTF8);
+    }
+
+    // [OLD + NEW EXTENSION] The core cookie-receive endpoint. The old/upstream extension POSTs
+    // here with no special header (its behaviour must stay identical); the new extension POSTs
+    // the same way plus the X-VRCVideoCacher-Ext header to opt into the refresh-flag lifecycle.
     [Route(HttpVerbs.Post, "/youtube-cookies")]
     public async Task ReceiveYoutubeCookies()
     {

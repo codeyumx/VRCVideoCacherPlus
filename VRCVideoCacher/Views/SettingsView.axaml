@@ -77,7 +77,6 @@
                     <StackPanel Spacing="15">
                         <TextBlock Text="{l:Localize DownloadSettings}" FontWeight="SemiBold" FontSize="16"/>
 
-                        <CheckBox IsChecked="{Binding YtdlUseCookies}" Content="{l:Localize UseYouTubeCookies}"/>
                         <CheckBox IsChecked="{Binding YtdlAutoUpdate}" Content="{l:Localize AutoUpdateUtils}"/>
 
                         <StackPanel Orientation="Horizontal" Spacing="8">

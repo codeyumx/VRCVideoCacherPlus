@@ -34,9 +34,6 @@ public partial class SettingsViewModel : ViewModelBase
 
     // Download Settings
     [ObservableProperty]
-    private bool _ytdlUseCookies;
-
-    [ObservableProperty]
     private bool _ytdlAutoUpdate;
 
     [ObservableProperty]
@@ -172,7 +169,6 @@ public partial class SettingsViewModel : ViewModelBase
         var config = ConfigManager.Config;
 
         WebServerUrl = config.YtdlpWebServerUrl;
-        YtdlUseCookies = config.YtdlpUseCookies;
         YtdlAutoUpdate = config.YtdlpAutoUpdate;
         YtdlAdditionalArgs = config.YtdlpAdditionalArgs;
         YtdlDubLanguage = config.YtdlpDubLanguage;
@@ -257,7 +253,6 @@ public partial class SettingsViewModel : ViewModelBase
     }
 
     partial void OnWebServerUrlChanged(string value) => SetHasChanges();
-    partial void OnYtdlUseCookiesChanged(bool value) => SetHasChanges();
     partial void OnYtdlAutoUpdateChanged(bool value) => SetHasChanges();
     partial void OnYtdlAdditionalArgsChanged(string value) => SetHasChanges();
     partial void OnYtdlDubLanguageChanged(string value) => SetHasChanges();
@@ -296,7 +291,6 @@ public partial class SettingsViewModel : ViewModelBase
             WebServer.Init();
         }
 
-        config.YtdlpUseCookies = YtdlUseCookies;
         config.YtdlpAutoUpdate = YtdlAutoUpdate;
         config.YtdlpAdditionalArgs = YtdlAdditionalArgs;
         config.YtdlpDubLanguage = YtdlDubLanguage;

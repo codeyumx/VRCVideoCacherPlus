@@ -119,6 +119,16 @@
                         </StackPanel>
                     </Button>
 
+                    <Button Command="{Binding NavigateToCookiesCommand}"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Left"
+                            Classes="nav-button">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <mi:MaterialIcon Kind="Cookie" Width="20" Height="20"/>
+                            <TextBlock Text="{l:Localize YouTubeCookies}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
                     <Button Command="{Binding NavigateToLogViewerCommand}"
                             HorizontalAlignment="Stretch"
                             HorizontalContentAlignment="Left"
@@ -149,6 +159,9 @@
                     </DataTemplate>
                     <DataTemplate DataType="{x:Type vm:SettingsViewModel}">
                         <views:SettingsView/>
+                    </DataTemplate>
+                    <DataTemplate DataType="{x:Type vm:CookiesViewModel}">
+                        <views:CookiesView/>
                     </DataTemplate>
                     <DataTemplate DataType="{x:Type vm:CacheBrowserViewModel}">
                         <views:CacheBrowserView/>

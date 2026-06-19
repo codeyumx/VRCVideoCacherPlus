@@ -42,13 +42,7 @@ public partial class DashboardViewModel : ViewModelBase
     private bool _hostState;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasMotd))]
-    private string? _motd;
-
-    [ObservableProperty]
     private bool _cookiesFileExists = false;
-
-    public bool HasMotd => !string.IsNullOrWhiteSpace(Motd);
 
     public DashboardViewModel()
     {
@@ -58,8 +52,6 @@ public partial class DashboardViewModel : ViewModelBase
 
         // Initial data load
         RefreshData();
-
-        Motd = VvcConfigService.CurrentConfig.Motd;
 
         // Subscribe to language changes to refresh localized strings
         Localizer.LanguageChanged += (_, _) => Dispatcher.UIThread.InvokeAsync(RefreshLocalizedStrings);
@@ -71,7 +63,6 @@ public partial class DashboardViewModel : ViewModelBase
         VideoDownloader.OnQueueChanged += OnQueueChanged;
         ConfigManager.OnConfigChanged += OnConfigChanged;
         Program.OnCookiesUpdated += OnCookiesUpdated;
-        VvcConfigService.OnApiConfigChanged += OnApiConfigChanged;
     }
 
     private void RefreshLocalizedStrings()
@@ -87,11 +78,6 @@ public partial class DashboardViewModel : ViewModelBase
     private void OnCookiesUpdated()
     {
         _ = ValidateCookiesAsync();
-    }
-
-    private void OnApiConfigChanged()
-    {
-        Motd = VvcConfigService.CurrentConfig.Motd;
     }
 
     private void OnCacheChanged(string fileName, CacheChangeType changeType)

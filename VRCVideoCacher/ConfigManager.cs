@@ -132,6 +132,10 @@ public class ConfigModel
     // yt-dlp
     public string YtdlpWebServerUrl = "http://localhost:9696";
     public bool YtdlpUseCookies = true;
+    // Opt-in to the new Beta browser extension, which supports app-triggered instant cookie
+    // refresh. Off by default: most users run the legacy extension, which only pushes cookies
+    // when they visit YouTube. Gates the Beta-only UI in the Cookies panel.
+    public bool UseBetaExtension = false;
     public bool YtdlpAutoUpdate = true;
     public bool AutoUpdateVrcVideoCacher = true;
     public string YtdlpAdditionalArgs = string.Empty;

@@ -36,6 +36,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public DashboardViewModel Dashboard { get; }
     public SettingsViewModel Settings { get; }
+    public CookiesViewModel Cookies { get; }
     public CacheBrowserViewModel CacheBrowser { get; }
     public DownloadQueueViewModel DownloadQueue { get; }
     public LogViewerViewModel LogViewer { get; }
@@ -46,6 +47,7 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         Dashboard = new DashboardViewModel();
         Settings = new SettingsViewModel();
+        Cookies = new CookiesViewModel();
         CacheBrowser = new CacheBrowserViewModel();
         DownloadQueue = new DownloadQueueViewModel();
         LogViewer = new LogViewerViewModel();
@@ -100,6 +102,9 @@ public partial class MainWindowViewModel : ViewModelBase
 
     [RelayCommand]
     private void NavigateToDownloadQueue() => CurrentView = DownloadQueue;
+
+    [RelayCommand]
+    private void NavigateToCookies() => CurrentView = Cookies;
 
     [RelayCommand]
     private void NavigateToLogViewer() => CurrentView = LogViewer;
