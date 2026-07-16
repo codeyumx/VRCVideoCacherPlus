@@ -63,7 +63,7 @@ public class UiLogSink : ILogEventSink
 
     public void Emit(LogEvent logEvent)
     {
-        if (logEvent.Level >= LogEventLevel.Error)
+        if (ConfigManager.Config is { ErrorPopups: true } && logEvent.Level >= LogEventLevel.Error)
         {
             Dispatcher.UIThread.Post(() =>
             {

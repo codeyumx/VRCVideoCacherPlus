@@ -163,11 +163,6 @@ internal sealed class Program
             return;
         }
 
-        if (AdminCheck.IsRunningAsAdmin())
-        {
-            Logger.Warning("Application is running with administrator privileges. This is not recommended for security reasons.");
-        }
-
         OpenVRService.Start(CurrentProcessPath);
 
         // Start the UI — blocks until Avalonia shuts down
@@ -217,12 +212,7 @@ internal sealed class Program
 
     private static async Task InitVrcVideoCacher()
     {
-        try { Console.Title = $"VRCVideoCacherPlus v{Version}{AdminCheck.GetAdminTitleWarning()}"; } catch { /* GUI mode, no console */ }
-
-        if (AdminCheck.ShouldShowAdminWarning())
-        {
-            Logger.Error(AdminCheck.AdminWarningMessage);
-        }
+        try { Console.Title = $"VRCVideoCacherPlus v{Version}"; } catch { /* GUI mode, no console */ }
 
         Directory.CreateDirectory(UtilsPath);
 #if !STEAMRELEASE

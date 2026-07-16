@@ -132,6 +132,9 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty]
     private bool _hasChanges;
 
+    [ObservableProperty]
+    private bool _errorPopups;
+
     // Language selection
     public IReadOnlyList<LanguageOption> AvailableLanguageOptions =>
         Localizer.Languages
@@ -193,6 +196,7 @@ public partial class SettingsViewModel : ViewModelBase
         CloseToTray = config.CloseToTray;
         StartMinimized = config.StartMinimized;
         StartWithSteamVr = config.StartWithSteamVr;
+        ErrorPopups = config.ErrorPopups;
         RedirectVRDancing = config.RedirectVRDancing;
         AutoUpdate = config.AutoUpdateVrcVideoCacher;
         BlockedUrls.Clear();
@@ -278,6 +282,7 @@ public partial class SettingsViewModel : ViewModelBase
     partial void OnRedirectVRDancingChanged(bool value) => SetHasChanges();
     partial void OnAutoUpdateChanged(bool value) => SetHasChanges();
     partial void OnStartWithSteamVrChanged(bool value) => SetHasChanges();
+    partial void OnErrorPopupsChanged(bool value) => SetHasChanges();
     partial void OnBlockRedirectChanged(string value) => SetHasChanges();
 
     [RelayCommand]
@@ -313,6 +318,7 @@ public partial class SettingsViewModel : ViewModelBase
         config.CloseToTray = CloseToTray;
         config.StartMinimized = StartMinimized;
         config.StartWithSteamVr = StartWithSteamVr;
+        config.ErrorPopups = ErrorPopups;
         config.BlockedUrls = BlockedUrls
             .Select(item => item.Url)
             .ToArray();
