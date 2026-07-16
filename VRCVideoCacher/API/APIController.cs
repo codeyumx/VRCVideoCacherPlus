@@ -314,6 +314,10 @@ public class ApiController : WebApiController
         Log.Information("Responding with URL: {URL}", response);
         await HttpContext.SendStringAsync(response, "text/plain", Encoding.UTF8);
 
+        // Don't attempt to cache if its a livestream
+        if (videoInfo.VideoId.Equals("live"))
+            return;
+
         // Record activity immediately with whatever duration we already have cached,
         // so download deferral and queueing are never blocked by a slow yt-dlp call.
         var cachedDuration = DatabaseManager.GetVideoInfoCache(videoInfo.VideoId)?.Duration;

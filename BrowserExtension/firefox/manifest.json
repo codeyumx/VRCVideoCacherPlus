@@ -9,7 +9,8 @@
     "storage",
     "alarms",
     "https://*.youtube.com/",
-    "http://localhost:9696/"
+    "http://localhost:9696/*",
+    "http://127.0.0.1:9696/*"
   ],
   "background": {
     "scripts": ["cookies.js", "background.js"]

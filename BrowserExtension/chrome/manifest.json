@@ -6,7 +6,8 @@
   "permissions": ["cookies", "storage", "alarms"],
   "host_permissions": [
     "https://*.youtube.com/",
-    "http://localhost:9696/"
+    "http://localhost:9696/*",
+    "http://127.0.0.1:9696/*"
   ],
   "background": {
     "service_worker": "background.js"

@@ -24,6 +24,8 @@ public class YouTubeHandler : ISiteHandler
             videoId = match.Groups[1].Value;
         else if (uri.AbsolutePath.StartsWith("/shorts/"))
             videoId = uri.AbsolutePath.Split('/')[^1];
+        else if (uri.AbsolutePath.TrimEnd('/').EndsWith("/live"))
+            videoId = "live";
         else if (BareIdRegex.IsMatch(uri.AbsolutePath))
             videoId = uri.AbsolutePath.TrimStart('/');
 

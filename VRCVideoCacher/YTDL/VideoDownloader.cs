@@ -524,7 +524,6 @@ public class VideoDownloader
     {
         if (_pauseRequested) return (false, null);
 
-        Log.Information("Downloading Video: {URL}", videoInfo.VideoUrl);
         var url = videoInfo.VideoUrl;
         var tempMp4 = TempMp4For(videoInfo.VideoId);
 

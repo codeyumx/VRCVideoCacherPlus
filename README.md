@@ -11,7 +11,24 @@
 - [Chrome Extension](https://chromewebstore.google.com/detail/vrcvideocacher-cookies-ex/kfgelknbegappcajiflgfbjbdpbpokge)
 - [Firefox Extension](https://addons.mozilla.org/en-US/firefox/addon/vrcvideocachercookiesexporter)
 
-The VRCVideoCacherPlus extensions are in alpha and untested — skip them unless you're testing. To try them, manually install the unpacked extension in Chrome or Firefox.
+The VRCVideoCacherPlus extensions ([BrowserExtension/](BrowserExtension/)) are in early testing and should send cookies. You can choose: manual send & copy, automatic sharing, and/or app-triggered cookie refresh. They're not on the extension stores yet, so install them unpacked. Unpacked extensions don't update automatically: after pulling a new version, reload the extension yourself.
+
+<details>
+<summary>How to install the unpacked extension (Chrome / Firefox)</summary>
+
+Download or clone this repo so you have the `BrowserExtension/` folder locally.
+
+**Chrome (and Chromium-based browsers like Edge, Brave):**
+1. Open `chrome://extensions`
+2. Enable **Developer mode** (top right)
+3. Click **Load unpacked** and select the `BrowserExtension/chrome/` folder OR drag and drop the `BrowserExtension/chrome/` into the extensions window
+
+**Firefox:**
+1. Open `about:debugging#/runtime/this-firefox`
+2. Click **Load Temporary Add-on…** and select `BrowserExtension/firefox/manifest.json`
+3. Note: temporary add-ons are removed when Firefox closes and must be re-loaded each time. For a persistent install, use [Firefox Developer Edition or Nightly](https://www.mozilla.org/firefox/channel/desktop/) with `xpinstall.signatures.required` set to `false` in `about:config`, zip the `BrowserExtension/firefox/` folder contents, and install the zip via `about:addons`
+
+</details>
 
 ---
 

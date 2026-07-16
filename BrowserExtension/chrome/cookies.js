@@ -2,7 +2,7 @@
 // the popup (<script>). Use `ext` so promises work in Chrome (chrome.*) and
 // Firefox (browser.* — Firefox's chrome.* is callback-only).
 const ext = globalThis.browser ?? globalThis.chrome;
-const ENDPOINT = "http://localhost:9696/youtube-cookies";
+const ENDPOINT = "http://127.0.0.1:9696/api/youtube-cookies";
 // Identifies this (new) extension to the app, so its new-only features (app-start refresh)
 // never trigger for the old EllyVR/upstream extension, which doesn't send this header.
 const EXT_HEADER = { "X-VRCVideoCacher-Ext": "VRCVideoCacherPlus" };

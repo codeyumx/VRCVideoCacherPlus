@@ -1,5 +1,6 @@
 ﻿using System.Collections.Immutable;
 using System.Globalization;
+using System.Runtime.Versioning;
 using Serilog;
 using ValveKeyValue;
 
@@ -110,7 +111,7 @@ public class FileTools
         return null;
     }
 
-    // Linux only
+    [SupportedOSPlatform("linux")]
     private static string? GetCompatPath(string appid)
     {
         if (!OperatingSystem.IsLinux())
