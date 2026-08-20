@@ -351,10 +351,7 @@ public class ApiController : WebApiController
 
         // check if file is cached again to handle race condition
         (isCached, _, _) = GetCachedFile(videoInfo.VideoId, avPro);
-        if (!isCached && (
-                (videoInfo.UrlType == UrlType.YouTube && ConfigManager.Config.CacheYouTube) ||
-                (videoInfo.UrlType == UrlType.PyPyDance && ConfigManager.Config.CachePyPyDance) ||
-                (videoInfo.UrlType == UrlType.VRDancing && ConfigManager.Config.CacheVrDancing)))
+        if (!isCached && (evalResult.Action == RuleAction.Cache || evalResult.Action == RuleAction.Rewrite))
         {
             VideoDownloader.QueueDownload(videoInfo);
         }
