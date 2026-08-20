@@ -3,6 +3,7 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Jeek.Avalonia.Localization;
+using VRCVideoCacher.Models;
 using VRCVideoCacher.Services;
 using VRCVideoCacher.Utils;
 using VRCVideoCacher.Views;
@@ -43,6 +44,15 @@ public partial class DashboardViewModel : ViewModelBase
 
     [ObservableProperty]
     private bool _cookiesFileExists = false;
+
+    [ObservableProperty]
+    private string _ytdlpStatus = "Up-To-Date";
+
+    [ObservableProperty]
+    private string _denoStatus = "Up-To-Date";
+
+    [ObservableProperty]
+    private string _ffmpegStatus = "Up-To-Date";
 
     public DashboardViewModel()
     {
@@ -123,6 +133,7 @@ public partial class DashboardViewModel : ViewModelBase
     private void RefreshData()
     {
         RefreshCacheStats();
+        RefreshUtilStatuses();
         DownloadQueueCount = VideoDownloader.GetQueueCount();
 
         var currentDownload = VideoDownloader.GetCurrentDownload();
@@ -131,6 +142,70 @@ public partial class DashboardViewModel : ViewModelBase
             : Localizer.Get("None");
 
         _ = ValidateCookiesAsync();
+    }
+
+    public void RefreshUtilStatuses()
+    {
+        // 1. yt-dlp Status
+        if (!File.Exists(YtdlManager.YtdlPath))
+        {
+            var sysYtdlp = FileTools.LocateFile(OperatingSystem.IsWindows() ? "yt-dlp.exe" : "yt-dlp");
+            YtdlpStatus = sysYtdlp != null ? "Shim" : "Missing";
+        }
+        else
+        {
+            try
+            {
+                var bytes = File.ReadAllBytes(YtdlManager.YtdlPath);
+                var hash = Program.ComputeBinaryContentHash(bytes);
+                if (hash == Program.YtdlpHash)
+                {
+                    YtdlpStatus = "Shim";
+                }
+                else if (Versions.CurrentVersion.Ytdlp == "Outdated")
+                {
+                    YtdlpStatus = "Outdated";
+                }
+                else
+                {
+                    YtdlpStatus = "Up-To-Date";
+                }
+            }
+            catch
+            {
+                YtdlpStatus = "Up-To-Date";
+            }
+        }
+
+        // 2. Deno Status
+        if (!File.Exists(YtdlManager.DenoPath))
+        {
+            var systemDeno = FileTools.LocateFile(OperatingSystem.IsWindows() ? "deno.exe" : "deno");
+            DenoStatus = systemDeno != null ? "Shim" : "Missing";
+        }
+        else if (Versions.CurrentVersion.Deno == "Outdated")
+        {
+            DenoStatus = "Outdated";
+        }
+        else
+        {
+            DenoStatus = "Up-To-Date";
+        }
+
+        // 3. FFmpeg Status
+        if (!File.Exists(YtdlManager.FfmpegPath))
+        {
+            var systemFfmpeg = FileTools.LocateFile(OperatingSystem.IsWindows() ? "ffmpeg.exe" : "ffmpeg");
+            FfmpegStatus = systemFfmpeg != null ? "Shim" : "Missing";
+        }
+        else if (Versions.CurrentVersion.Ffmpeg == "Outdated")
+        {
+            FfmpegStatus = "Outdated";
+        }
+        else
+        {
+            FfmpegStatus = "Up-To-Date";
+        }
     }
 
     [RelayCommand]
