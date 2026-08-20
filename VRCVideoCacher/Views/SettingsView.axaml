@@ -124,26 +124,15 @@
                             <NumericUpDown Value="{Binding CacheMaxSizeInGb}" Minimum="0" Maximum="10000" Increment="1" FormatString="0.#"/>
                         </StackPanel>
 
-                        <CheckBox IsChecked="{Binding CacheYouTube}" Content="{l:Localize CacheYouTubeVideos}"/>
-
-                        <StackPanel Spacing="5" Margin="30,0,0,0" IsVisible="{Binding CacheYouTube}">
-                            <StackPanel Spacing="5">
-                                <TextBlock Text="{l:Localize MaxYouTubeResolution}"/>
-                                <ComboBox ItemsSource="{Binding ResolutionOptions}" SelectedItem="{Binding CacheYouTubeMaxResolution}"/>
+                        <!-- Note pointing to Rules Tab -->
+                        <Border Background="#252525" CornerRadius="6" Padding="12" Margin="0,5">
+                            <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                <mi:MaterialIcon Kind="Tune" Width="20" Height="20" Foreground="#4FC3F7"/>
+                                <TextBlock Text="Domain caching, resolution caps, redirects, and URL rewrites are managed via the Rules tab."
+                                           FontSize="13" Foreground="#CCCCCC" VerticalAlignment="Center" TextWrapping="Wrap"/>
                             </StackPanel>
+                        </Border>
 
-                            <CheckBox IsChecked="{Binding CacheYouTubePreferVp9}"
-                                      Content="{l:Localize PreferVp9ForCache}"
-                                      ToolTip.Tip="{l:Localize PreferVp9ForCacheTooltip}"/>
-
-                            <StackPanel Spacing="5">
-                                <TextBlock Text="{l:Localize MaxVideoLength}"/>
-                                <NumericUpDown Value="{Binding CacheYouTubeMaxLength}" Minimum="1" Increment="10"/>
-                            </StackPanel>
-                        </StackPanel>
-
-                        <CheckBox IsChecked="{Binding CachePyPyDance}" Content="{l:Localize CachePyPyDanceVideos}"/>
-                        <CheckBox IsChecked="{Binding CacheVRDancing}" Content="{l:Localize CacheVRDancingVideos}"/>
                         <CheckBox IsChecked="{Binding CacheHlsPlaylists}" Content="{l:Localize CacheHlsPlaylists}"/>
                         <StackPanel Spacing="5" Margin="30,0,0,0" IsVisible="{Binding CacheHlsPlaylists}">
                             <TextBlock Text="{l:Localize MaxVideoLength}"/>
@@ -178,7 +167,6 @@
                                            IsVisible="{Binding IsRateLimitEnabled}"
                                            ToolTip.Tip="{l:Localize CacheDownloadRateLimitTooltip}"/>
                         </StackPanel>
-                        <CheckBox IsChecked="{Binding RedirectVRDancing}" Content="{l:Localize RedirectVRDancing}"/>
                     </StackPanel>
                 </Border>
 
