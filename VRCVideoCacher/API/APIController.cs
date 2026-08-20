@@ -197,42 +197,36 @@ public class ApiController : WebApiController
             return;
         }
 
-        if (requestUrl.StartsWith("https://eu2.vrdancing.club/weekend/") && ConfigManager.Config.RedirectVRDancing)
+        // Evaluate URL against Rules Engine
+        var evalResult = RuleEngine.EvaluateUrl(requestUrl);
+        if (evalResult.MatchedRule != null)
         {
-            await HttpContext.SendStringAsync(requestUrl.Replace("eu2", "na2"), "text/plain", Encoding.UTF8);
-            return;
-        }
+            Log.Information("Rule matched '{RuleName}' -> Action: {Action}, FinalURL: '{FinalUrl}'",
+                evalResult.MatchedRule.Name, evalResult.Action, evalResult.FinalUrl);
 
-        if (ConfigManager.Config.BlockedUrls.Any(blockedUrl => requestUrl.StartsWith(blockedUrl)))
-        {
-            Log.Warning("URL Is Blocked: {URL}", requestUrl);
-            requestUrl = ConfigManager.Config.BlockRedirect;
-        }
+            switch (evalResult.Action)
+            {
+                case RuleAction.Block:
+                    Log.Warning("URL blocked by rule '{RuleName}': {URL}", evalResult.MatchedRule.Name, requestUrl);
+                    await HttpContext.SendStringAsync(string.Empty, "text/plain", Encoding.UTF8);
+                    return;
 
-        if (requestUrl.StartsWith("https://mightygymcdn.nyc3.cdn.digitaloceanspaces.com"))
-        {
-            Log.Information("URL Is Mighty Gym: Bypassing.");
-            await HttpContext.SendStringAsync(string.Empty, "text/plain", Encoding.UTF8);
-            return;
-        }
+                case RuleAction.Direct:
+                    Log.Information("URL set to Direct (bypass caching) by rule '{RuleName}': {URL}", evalResult.MatchedRule.Name, evalResult.FinalUrl);
+                    await HttpContext.SendStringAsync(string.Empty, "text/plain", Encoding.UTF8);
+                    return;
 
-        // pls no villager
-        if (requestUrl.StartsWith("https://anime.illumination.media"))
-            avPro = true;
-        else if (requestUrl.Contains(".imvrcdn.com") ||
-                 (requestUrl.Contains(".illumination.media") && !requestUrl.StartsWith("https://yt.illumination.media")))
-        {
-            Log.Information("URL Is Illumination media: Bypassing.");
-            await HttpContext.SendStringAsync(string.Empty, "text/plain", Encoding.UTF8);
-            return;
-        }
+                case RuleAction.Redirect:
+                    Log.Information("URL redirected by rule '{RuleName}' to: {RedirectUrl}", evalResult.MatchedRule.Name, evalResult.RedirectUrl);
+                    await HttpContext.SendStringAsync(evalResult.RedirectUrl, "text/plain", Encoding.UTF8);
+                    return;
 
-        // bypass vfi - cinema
-        if (requestUrl.StartsWith("https://virtualfilm.institute"))
-        {
-            Log.Information("URL Is VFI - Cinema: Bypassing.");
-            await HttpContext.SendStringAsync(string.Empty, "text/plain", Encoding.UTF8);
-            return;
+                case RuleAction.Cache:
+                case RuleAction.Rewrite:
+                default:
+                    requestUrl = evalResult.FinalUrl;
+                    break;
+            }
         }
 
         var videoInfo = await VideoId.GetVideoId(requestUrl, avPro);
