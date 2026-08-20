@@ -79,6 +79,16 @@
                         </StackPanel>
                     </Button>
 
+                    <Button Command="{Binding NavigateToRulesCommand}"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Left"
+                            Classes="nav-button">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <mi:MaterialIcon Kind="Tune" Width="20" Height="20"/>
+                            <TextBlock Text="Rules" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
                     <Button Command="{Binding NavigateToHistoryCommand}"
                             HorizontalAlignment="Stretch"
                             HorizontalContentAlignment="Left"
@@ -156,6 +166,9 @@
                 <ContentControl.DataTemplates>
                     <DataTemplate DataType="{x:Type vm:DashboardViewModel}">
                         <views:DashboardView/>
+                    </DataTemplate>
+                    <DataTemplate DataType="{x:Type vm:RulesViewModel}">
+                        <views:RulesView/>
                     </DataTemplate>
                     <DataTemplate DataType="{x:Type vm:SettingsViewModel}">
                         <views:SettingsView/>
