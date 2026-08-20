@@ -351,7 +351,7 @@ public class ApiController : WebApiController
 
         // check if file is cached again to handle race condition
         (isCached, _, _) = GetCachedFile(videoInfo.VideoId, avPro);
-        if (!isCached && (evalResult.Action == RuleAction.Cache || evalResult.Action == RuleAction.Rewrite))
+        if (!isCached && evalResult.Action == RuleAction.Cache)
         {
             VideoDownloader.QueueDownload(videoInfo);
         }
