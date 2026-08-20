@@ -2,6 +2,7 @@ using System.Globalization;
 using Jeek.Avalonia.Localization;
 using Newtonsoft.Json;
 using Serilog;
+using VRCVideoCacher.Models;
 using VRCVideoCacher.Utils;
 
 // ReSharper disable FieldCanBeMadeReadOnly.Global
@@ -152,6 +153,8 @@ public class ConfigModel
     public bool CacheHlsPlaylists = true;
     public int CacheHlsMaxLength = 30;
     public bool CacheOnly = false;
+    // Rules Engine
+    public List<UriRule> UriRules = GetDefaultRules();
     // Cache Rules
     public string[] BlockedUrls = ["https://na2.vrdancing.club/sampleurl.mp4"];
     public string BlockRedirect = "https://www.youtube.com/watch?v=byv2bKekeWQ";
@@ -179,4 +182,64 @@ public class ConfigModel
 
     // UI state
     public bool HasShownTrayNotice = false;
+
+    public static List<UriRule> GetDefaultRules()
+    {
+        return
+        [
+            new UriRule
+            {
+                Name = "VRDancing EU to NA Redirect",
+                Pattern = @"^https?:\/\/eu2\.vrdancing\.club\/weekend\/(.*)$",
+                Action = RuleAction.Redirect,
+                RedirectTarget = "https://na2.vrdancing.club/weekend/$1",
+                Enabled = false
+            },
+            new UriRule
+            {
+                Name = "YouTube Music Redirect",
+                Pattern = @"^https?:\/\/music\.youtube\.com\/(?:watch|playlist)?\?(?:.*?&)?v=([^&]+).*$",
+                Action = RuleAction.Redirect,
+                RedirectTarget = "https://youtube.com/watch?v=$1",
+                Enabled = false
+            },
+            new UriRule
+            {
+                Name = "Block Rickrolls",
+                Pattern = @"^https?://(?:www\.)?youtube\.com/watch\?v=(?:dQw4w9WgXcQ|jzmz6K8K4L0|XfELJU1mRMg)",
+                Action = RuleAction.Block,
+                Enabled = true
+            },
+            new UriRule
+            {
+                Name = "YouTube",
+                Pattern = @"^https?:\/\/(?:[a-zA-Z0-9-]+\.)*(?:youtube\.com|youtu\.be|youtube-nocookie\.com)(?:[\/?#]|$)",
+                Action = RuleAction.Cache,
+                MaxResolution = 1080,
+                MaxDurationMinutes = 120,
+                Enabled = true
+            },
+            new UriRule
+            {
+                Name = "PyPyDance",
+                Pattern = @"^https?:\/\/(?:[a-zA-Z0-9-]+\.)*pypydance\.com(?:[\/?#]|$)",
+                Action = RuleAction.Cache,
+                Enabled = true
+            },
+            new UriRule
+            {
+                Name = "VRDancing",
+                Pattern = @"^https?:\/\/(?:[a-zA-Z0-9-]+\.)*vrdancing\.club(?:[\/?#]|$)",
+                Action = RuleAction.Cache,
+                Enabled = true
+            },
+            new UriRule
+            {
+                Name = "Everything else",
+                Pattern = @".*",
+                Action = RuleAction.Direct,
+                Enabled = true
+            }
+        ];
+    }
 }
