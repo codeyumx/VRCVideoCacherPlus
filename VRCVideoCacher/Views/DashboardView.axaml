@@ -89,7 +89,7 @@
                     <StackPanel Spacing="8">
                         <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,0,0,5">
                             <mi:MaterialIcon Kind="Tools" Width="24" Height="24" Foreground="#4FC3F7"/>
-                            <TextBlock Text="Tools" FontWeight="SemiBold" FontSize="14"/>
+                            <TextBlock Text="{l:Localize Tools}" FontWeight="SemiBold" FontSize="14"/>
                         </StackPanel>
 
                         <Grid ColumnDefinitions="*, Auto">
@@ -114,14 +114,14 @@
                     <StackPanel Spacing="10">
                         <StackPanel Orientation="Horizontal" Spacing="10">
                             <mi:MaterialIcon Kind="Video" Width="24" Height="24" Foreground="#81C784"/>
-                            <TextBlock Text="Video Players" FontWeight="SemiBold" FontSize="14"/>
+                            <TextBlock Text="{l:Localize VideoPlayers}" FontWeight="SemiBold" FontSize="14"/>
                         </StackPanel>
 
                         <Button Command="{Binding ToggleVideoPlayersCommand}"
                                 HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,5,0,0">
                             <Panel>
-                                <TextBlock Text="Disable" IsVisible="{Binding VideoPlayersEnabled}" FontWeight="Bold"/>
-                                <TextBlock Text="Enable" IsVisible="{Binding !VideoPlayersEnabled}" FontWeight="Bold"/>
+                                <TextBlock Text="{l:Localize Disable}" IsVisible="{Binding VideoPlayersEnabled}" FontWeight="Bold"/>
+                                <TextBlock Text="{l:Localize Enable}" IsVisible="{Binding !VideoPlayersEnabled}" FontWeight="Bold"/>
                             </Panel>
                         </Button>
                     </StackPanel>

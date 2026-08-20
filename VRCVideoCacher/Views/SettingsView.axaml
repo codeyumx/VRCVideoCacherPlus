@@ -128,7 +128,7 @@
                         <Border Background="#252525" CornerRadius="6" Padding="12" Margin="0,5">
                             <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                                 <mi:MaterialIcon Kind="Tune" Width="20" Height="20" Foreground="#4FC3F7"/>
-                                <TextBlock Text="Domain caching, resolution caps, redirects, and URL rewrites are managed via the Rules tab."
+                                <TextBlock Text="{l:Localize RulesManagedViaRulesTabNote}"
                                            FontSize="13" Foreground="#CCCCCC" VerticalAlignment="Center" TextWrapping="Wrap"/>
                             </StackPanel>
                         </Border>

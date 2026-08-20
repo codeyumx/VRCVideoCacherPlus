@@ -135,5 +135,15 @@
   "CreatedBy": "Created By",
   "ReportAnIssue": "Report an Issue",
   "OpenIssueOnGitHub": "Open an issue on GitHub",
-  "JoinOurDiscord": "Join our Discord to report an issue"
+  "JoinOurDiscord": "Join our Discord to report an issue",
+
+  "Tools": "Tools",
+  "VideoPlayers": "Video Players",
+  "Disable": "Disable",
+  "Enable": "Enable",
+  "RulesManagedViaRulesTabNote": "Domain caching, resolution caps, redirects, and URL rewrites are managed via the Rules tab.",
+  "TestUrlPlaceholder": "Test URL...",
+  "UnsavedRulesTitle": "Unsaved Rules Changes",
+  "UnsavedRulesMessage": "You have unsaved changes in your rules. Do you want to save or discard your changes before leaving?",
+  "Discard": "Discard"
 }

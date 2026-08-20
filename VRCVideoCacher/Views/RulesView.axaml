@@ -17,7 +17,7 @@
                        Foreground="{Binding StatusMessageColor}"/>
 
             <!-- Test URL Field -->
-            <TextBox Grid.Column="2" Text="{Binding TestUrl, Mode=TwoWay}" PlaceholderText="Test URL" Width="240" Margin="0,0,10,0"/>
+            <TextBox Grid.Column="2" Text="{Binding TestUrl, Mode=TwoWay}" PlaceholderText="{l:Localize TestUrlPlaceholder}" Width="240" Margin="0,0,10,0"/>
 
             <!-- Reset Button -->
             <Button Grid.Column="3" Command="{Binding ResetDefaultRulesCommand}" Margin="0,0,10,0">

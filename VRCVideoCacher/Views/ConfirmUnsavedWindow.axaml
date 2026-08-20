@@ -15,17 +15,17 @@
         <!-- Header -->
         <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10" Margin="0,0,0,10">
             <mi:MaterialIcon Kind="AlertCircleOutline" Width="24" Height="24" Foreground="#FFB74D"/>
-            <TextBlock Text="Unsaved Rules Changes" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
+            <TextBlock Text="{l:Localize UnsavedRulesTitle}" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
         </StackPanel>
 
         <!-- Message -->
-        <TextBlock Grid.Row="1" Text="You have unsaved changes in your rules. Do you want to save or discard your changes before leaving?"
+        <TextBlock Grid.Row="1" Text="{l:Localize UnsavedRulesMessage}"
                    TextWrapping="Wrap" Foreground="#CCCCCC" VerticalAlignment="Center"/>
 
         <!-- Action Buttons -->
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10" Margin="0,15,0,0">
             <Button Command="{Binding CancelCommand}" Content="{l:Localize Cancel}"/>
-            <Button Command="{Binding DiscardCommand}" Content="Discard" Classes="danger"/>
+            <Button Command="{Binding DiscardCommand}" Content="{l:Localize Discard}" Classes="danger"/>
             <Button Command="{Binding SaveCommand}" Content="{l:Localize Save}" Classes="accent"/>
         </StackPanel>
     </Grid>
