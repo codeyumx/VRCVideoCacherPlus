@@ -65,14 +65,11 @@
 
                             <!-- Action Buttons -->
                             <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="5" VerticalAlignment="Center" Margin="10,0">
-                                <Button Command="{Binding OpenFileCommand}" ToolTip.Tip="Open File" Padding="8">
-                                    <mi:MaterialIcon Kind="FolderOpen" Width="18" Height="18"/>
+                                <Button Command="{Binding WatchVideoCommand}" ToolTip.Tip="Watch Video" Padding="8">
+                                    <mi:MaterialIcon Kind="Play" Width="18" Height="18" Foreground="#81C784"/>
                                 </Button>
                                 <Button Command="{Binding CopyPathCommand}" ToolTip.Tip="Copy File Path" Padding="8">
                                     <mi:MaterialIcon Kind="FileDocumentMultiple" Width="18" Height="18"/>
-                                </Button>
-                                <Button Command="{Binding WatchVideoCommand}" ToolTip.Tip="Watch Video" Padding="8">
-                                    <mi:MaterialIcon Kind="Play" Width="18" Height="18" Foreground="#81C784"/>
                                 </Button>
                                 <Button Command="{Binding OpenOnYouTubeCommand}" ToolTip.Tip="Open on YouTube" Padding="8"
                                         IsVisible="{Binding IsYouTube}">

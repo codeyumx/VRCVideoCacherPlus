@@ -104,22 +104,6 @@ public partial class CacheItemViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void OpenFile()
-    {
-        var filePath = Path.Join(CacheManager.CachePath, FileName);
-        if (!File.Exists(filePath)) return;
-        try
-        {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = filePath,
-                UseShellExecute = true
-            });
-        }
-        catch { /* Ignore errors */ }
-    }
-
-    [RelayCommand]
     private async Task CopyPath()
     {
         var filePath = Path.Join(CacheManager.CachePath, FileName);
