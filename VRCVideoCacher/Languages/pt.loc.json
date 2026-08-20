@@ -175,6 +175,8 @@
   "RedownloadingUtils": "Baixando ferramentas novamente...",
   "RedownloadComplete": "Ferramentas baixadas novamente com sucesso!",
   "RedownloadFailed": "Falha ao baixar novamente. Verifique os registros para detalhes.",
+  "PreCacheVideos": "Vídeos pré-carregados no cache",
+  "PreCacheVideosHint": "URLs de vídeo baixadas na inicialização se ainda não estiverem no cache. Você pode colar várias de uma vez, separadas por vírgulas, espaços ou novas linhas.",
 
   "Rules": "Regras",
   "AddRule": "Adicionar regra",

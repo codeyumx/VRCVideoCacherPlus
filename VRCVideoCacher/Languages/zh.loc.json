@@ -175,6 +175,8 @@
   "RedownloadingUtils": "正在重新下载工具...",
   "RedownloadComplete": "工具重新下载成功！",
   "RedownloadFailed": "重新下载失败。请查看日志以了解详情。",
+  "PreCacheVideos": "预缓存视频",
+  "PreCacheVideosHint": "启动时下载的视频 URL（如果尚未缓存）。您可以一次粘贴多个，用逗号、空格或换行符分隔。",
 
   "Rules": "规则",
   "AddRule": "添加规则",

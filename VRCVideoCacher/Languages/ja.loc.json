@@ -175,6 +175,8 @@
   "RedownloadingUtils": "ユーティリティを再ダウンロード中...",
   "RedownloadComplete": "ユーティリティの再ダウンロードが完了しました！",
   "RedownloadFailed": "再ダウンロードに失敗しました。詳細はログを確認してください。",
+  "PreCacheVideos": "事前キャッシュ動画",
+  "PreCacheVideosHint": "まだキャッシュされていない場合、起動時にダウンロードされる動画URL。カンマ、スペース、改行で区切って複数同時に貼り付けることができます。",
 
   "Rules": "ルール",
   "AddRule": "ルールを追加",

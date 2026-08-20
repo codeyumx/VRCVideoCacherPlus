@@ -175,6 +175,8 @@
   "RedownloadingUtils": "Redownloading utils...",
   "RedownloadComplete": "Utils redownloaded successfully!",
   "RedownloadFailed": "Redownload failed. Check logs for details.",
+  "PreCacheVideos": "Video pre-memorizzati nella cache",
+  "PreCacheVideosHint": "URL video scaricati all’avvio se non già memorizzati nella cache. Puoi incollarne diversi contemporaneamente, separati da virgole, spazi o nuove righe.",
 
   "Rules": "Regole",
   "AddRule": "Aggiungi regola",

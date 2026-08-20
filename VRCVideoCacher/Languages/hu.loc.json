@@ -175,6 +175,8 @@
   "RedownloadingUtils": "Segédprogramok újraletöltése...",
   "RedownloadComplete": "A segédprogramok újraletöltése sikeres volt!",
   "RedownloadFailed": "Az újraletöltés sikertelen. A részletekért ellenőrizd a naplókat.",
+  "PreCacheVideos": "Előre gyorsítótárazott videók",
+  "PreCacheVideosHint": "Indításkor letöltött videó URL-ek, ha még nincsenek gyorsítótárazva. Többet is beilleszthet egyszerre, vesszővel, szóközökkel vagy új sorokkal elválasztva.",
 
   "Rules": "Szabályok",
   "AddRule": "Szabály hozzáadása",

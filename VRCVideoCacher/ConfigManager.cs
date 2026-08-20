@@ -52,6 +52,71 @@ public class ConfigManager
             Log.Information("Config loaded successfully.");
         }
 
+        if (Config.UriRules == null || Config.UriRules.Count == 0)
+        {
+            Config.UriRules = ConfigModel.GetDefaultRules();
+        }
+        else
+        {
+            var defaultRules = ConfigModel.GetDefaultRules();
+            foreach (var defRule in defaultRules)
+            {
+                if (!Config.UriRules.Any(r => r.Name == defRule.Name || r.Pattern == defRule.Pattern))
+                {
+                    var lastIndex = Config.UriRules.FindIndex(r => r.Name == "Everything else");
+                    if (lastIndex >= 0)
+                        Config.UriRules.Insert(lastIndex, defRule);
+                    else
+                        Config.UriRules.Add(defRule);
+                }
+            }
+
+            Config.UriRules = Config.UriRules.DistinctBy(r => r.Name + "|" + r.Pattern).ToList();
+        }
+
+        // Migrate and sync legacy settings into Rules Engine
+        if (Config.UriRules != null)
+        {
+            var ytRule = Config.UriRules.FirstOrDefault(r => r.Name == "YouTube");
+            if (ytRule != null)
+            {
+                ytRule.MaxResolution = Config.CacheYouTubeMaxResolution;
+                ytRule.MaxDurationMinutes = Config.CacheYouTubeMaxLength;
+            }
+
+            var redirectRule = Config.UriRules.FirstOrDefault(r => r.Name == "VRDancing EU to NA Redirect");
+            if (redirectRule != null && Config.RedirectVRDancing)
+            {
+                redirectRule.Enabled = true;
+            }
+
+            if (Config.BlockedUrls != null)
+            {
+                foreach (var blockedUrl in Config.BlockedUrls)
+                {
+                    if (string.IsNullOrWhiteSpace(blockedUrl) || blockedUrl == "https://na2.vrdancing.club/sampleurl.mp4")
+                        continue;
+
+                    var escapedPattern = "^" + System.Text.RegularExpressions.Regex.Escape(blockedUrl) + "$";
+                    if (!Config.UriRules.Any(r => r.Pattern == escapedPattern))
+                    {
+                        var lastIndex = Config.UriRules.FindIndex(r => r.Name == "Everything else");
+                        var blockRule = new UriRule
+                        {
+                            Name = $"Block {blockedUrl}",
+                            Pattern = escapedPattern,
+                            Action = RuleAction.Block,
+                            Enabled = true
+                        };
+                        if (lastIndex >= 0)
+                            Config.UriRules.Insert(lastIndex, blockRule);
+                        else
+                            Config.UriRules.Add(blockRule);
+                    }
+                }
+            }
+        }
+
         if (Config.YtdlpWebServerUrl.EndsWith('/'))
             Config.YtdlpWebServerUrl = Config.YtdlpWebServerUrl.TrimEnd('/');
 
