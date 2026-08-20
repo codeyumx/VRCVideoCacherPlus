@@ -48,7 +48,7 @@
                         <TextBlock Text="{l:Localize CacheSettings}" FontWeight="SemiBold" Foreground="#81C784"/>
                         <Grid ColumnDefinitions="*, *">
                             <StackPanel Grid.Column="0" Spacing="5" Margin="0,0,10,0">
-                                <TextBlock Text="{l:Localize MaxYouTubeResolution}"/>
+                                <TextBlock Text="{l:Localize MaxResolution}"/>
                                 <ComboBox ItemsSource="{Binding ResolutionOptions}" SelectedItem="{Binding MaxResolution}" HorizontalAlignment="Stretch"/>
                             </StackPanel>
                             <StackPanel Grid.Column="1" Spacing="5" Margin="10,0,0,0">

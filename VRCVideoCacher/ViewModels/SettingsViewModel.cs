@@ -48,28 +48,13 @@ public partial class SettingsViewModel : ViewModelBase
     private string _cachedAssetPath = string.Empty;
 
     [ObservableProperty]
-    private bool _cacheYouTube;
-
-    [ObservableProperty]
-    private int _cacheYouTubeMaxResolution;
-
-    [ObservableProperty]
     private bool _cacheYouTubePreferVp9;
 
     // Resolution options for the dropdown
     public int[] ResolutionOptions { get; } = [720, 1080, 1440, 2160];
 
     [ObservableProperty]
-    private int _cacheYouTubeMaxLength;
-
-    [ObservableProperty]
     private float _cacheMaxSizeInGb;
-
-    [ObservableProperty]
-    private bool _cachePyPyDance;
-
-    [ObservableProperty]
-    private bool _cacheVRDancing;
 
     [ObservableProperty]
     private bool _cacheHlsPlaylists;
@@ -182,12 +167,8 @@ public partial class SettingsViewModel : ViewModelBase
         YtdlAdditionalArgs = config.YtdlpAdditionalArgs;
         YtdlDubLanguage = config.YtdlpDubLanguage;
         CachedAssetPath = config.CachedAssetPath;
-        CacheYouTube = config.CacheYouTube;
-        CacheYouTubeMaxResolution = config.CacheYouTubeMaxResolution;
-        CacheYouTubeMaxLength = config.CacheYouTubeMaxLength;
+        CachedAssetPath = config.CachedAssetPath;
         CacheMaxSizeInGb = config.CacheMaxSizeInGb;
-        CachePyPyDance = config.CachePyPyDance;
-        CacheVRDancing = config.CacheVrDancing;
         CacheHlsPlaylists = config.CacheHlsPlaylists;
         CacheHlsMaxLength = config.CacheHlsMaxLength;
         CacheOnly = config.CacheOnly;
@@ -205,12 +186,6 @@ public partial class SettingsViewModel : ViewModelBase
         ErrorPopups = config.ErrorPopups;
         RedirectVRDancing = config.RedirectVRDancing;
         AutoUpdate = config.AutoUpdateVrcVideoCacher;
-        BlockedUrls.Clear();
-        foreach (var url in config.BlockedUrls)
-        {
-            BlockedUrls.Add(new UrlEntry(url));
-        }
-        BlockRedirect = config.BlockRedirect;
 
         PreCacheVideos.Clear();
         foreach (var url in config.PreCacheVideos)
@@ -273,13 +248,8 @@ public partial class SettingsViewModel : ViewModelBase
     partial void OnYtdlAdditionalArgsChanged(string value) => SetHasChanges();
     partial void OnYtdlDubLanguageChanged(string value) => SetHasChanges();
     partial void OnCachedAssetPathChanged(string value) => SetHasChanges();
-    partial void OnCacheYouTubeChanged(bool value) => SetHasChanges();
-    partial void OnCacheYouTubeMaxResolutionChanged(int value) => SetHasChanges();
     partial void OnCacheYouTubePreferVp9Changed(bool value) => SetHasChanges();
-    partial void OnCacheYouTubeMaxLengthChanged(int value) => SetHasChanges();
     partial void OnCacheMaxSizeInGbChanged(float value) => SetHasChanges();
-    partial void OnCachePyPyDanceChanged(bool value) => SetHasChanges();
-    partial void OnCacheVRDancingChanged(bool value) => SetHasChanges();
     partial void OnCacheHlsPlaylistsChanged(bool value) => SetHasChanges();
     partial void OnCacheHlsMaxLengthChanged(int value) => SetHasChanges();
     partial void OnCacheOnlyChanged(bool value) => SetHasChanges();
@@ -295,7 +265,6 @@ public partial class SettingsViewModel : ViewModelBase
     partial void OnAutoUpdateChanged(bool value) => SetHasChanges();
     partial void OnStartWithSteamVrChanged(bool value) => SetHasChanges();
     partial void OnErrorPopupsChanged(bool value) => SetHasChanges();
-    partial void OnBlockRedirectChanged(string value) => SetHasChanges();
 
     [RelayCommand]
     private void SaveSettings()
@@ -312,12 +281,7 @@ public partial class SettingsViewModel : ViewModelBase
         config.YtdlpAdditionalArgs = YtdlAdditionalArgs;
         config.YtdlpDubLanguage = YtdlDubLanguage;
         config.CachedAssetPath = CachedAssetPath;
-        config.CacheYouTube = CacheYouTube;
-        config.CacheYouTubeMaxResolution = CacheYouTubeMaxResolution;
-        config.CacheYouTubeMaxLength = CacheYouTubeMaxLength;
         config.CacheMaxSizeInGb = CacheMaxSizeInGb;
-        config.CachePyPyDance = CachePyPyDance;
-        config.CacheVrDancing = CacheVRDancing;
         config.CacheHlsPlaylists = CacheHlsPlaylists;
         config.CacheHlsMaxLength = CacheHlsMaxLength;
         config.CacheOnly = CacheOnly;
@@ -331,10 +295,6 @@ public partial class SettingsViewModel : ViewModelBase
         config.StartMinimized = StartMinimized;
         config.StartWithSteamVr = StartWithSteamVr;
         config.ErrorPopups = ErrorPopups;
-        config.BlockedUrls = BlockedUrls
-            .Select(item => item.Url)
-            .ToArray();
-        config.BlockRedirect = BlockRedirect;
         // One row may hold a whole pasted list; split it so each URL gets its own row.
         config.PreCacheVideos = VideoPreCache.SplitUrls(PreCacheVideos.Select(item => item.Url));
         if (!config.PreCacheVideos.SequenceEqual(PreCacheVideos.Select(item => item.Url)))

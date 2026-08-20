@@ -24,3 +24,7 @@ BrowserExtension/chrome.pem
 /Build/linux-x64/yt-dlp-stub.exe
 /Build/win-x64/VRCVideoCacher.pdb
 notepad.md
+output_linux_release/
+output_steam_linux/
+output_win_release/
+VRCVideoCacher-*-x64.zip

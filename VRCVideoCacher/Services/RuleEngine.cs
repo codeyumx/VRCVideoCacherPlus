@@ -22,7 +22,7 @@ public static class RuleEngine
     public static RuleEvaluationResult EvaluateUrl(string requestUrl)
     {
         var currentUrl = requestUrl.Trim();
-        var rules = ConfigManager.Config.UriRules;
+        var rules = PlusConfigManager.Config.UriRules;
 
         if (rules == null || rules.Count == 0)
         {

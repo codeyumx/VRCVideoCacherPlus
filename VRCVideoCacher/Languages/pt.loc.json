@@ -50,6 +50,7 @@
   "MaxCacheSizeLabel": "Tamanho máximo de cachê em GB (0 = ilimitado)",
   "CacheYouTubeVideos": "Salvar vídeos do YouTube em cachê",
   "MaxYouTubeResolution": "Resolução máxima do YouTube",
+  "MaxResolution": "Resolução máxima",
   "PreferVp9ForCache": "Priorizar VP9 para vídeos em cachê (MP4)",
   "PreferVp9ForCacheTooltip": "Economiza 20–50% de espaço de armazenamento para vídeos do YouTube em cachê sem perda de qualidade. Funciona em todas as plataformas, incluindo Quest. Seguro para a maioria dos usuários.",
   "MaxVideoLength": "Duração máxima do vídeo (minutos)",

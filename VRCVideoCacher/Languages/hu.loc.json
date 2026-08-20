@@ -50,6 +50,7 @@
   "MaxCacheSizeLabel": "Maximális Gyorsítótár Méret GB-ban (0 = korlátlan)",
   "CacheYouTubeVideos": "YouTube Videók Gyorsítótárazása",
   "MaxYouTubeResolution": "Maximális YouTube Felbontás",
+  "MaxResolution": "Maximális felbontás",
   "PreferVp9ForCache": "VP9 előnyben részesítése gyorsítótárazott videókhoz (MP4)",
   "PreferVp9ForCacheTooltip": "20–50%-kal csökkenti a gyorsítótárazott YouTube-videók tárhelyét minőségromlás nélkül. Minden platformon működik, beleértve a Questet is. A legtöbb felhasználónak biztonságosan engedélyezhető.",
   "MaxVideoLength": "Maximális Videó Hossza (perc)",

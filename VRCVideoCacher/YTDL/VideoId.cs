@@ -166,10 +166,13 @@ public class VideoId
             Log.Warning("Skipping video: video is a live stream");
             return (string.Empty, "SkipReasonLiveStream");
         }
-        if (data.Duration > ConfigManager.Config.CacheYouTubeMaxLength * 60)
+        var evalResult = Services.RuleEngine.EvaluateUrl(url);
+        int maxDurationMinutes = evalResult.MaxDurationMinutes ?? 120;
+
+        if (data.Duration > maxDurationMinutes * 60)
         {
-            Log.Warning("Skipping video: duration exceeds allowed duration ({VideoMin:F1}min > {MaxMin}min)", data.Duration / 60.0, ConfigManager.Config.CacheYouTubeMaxLength);
-            return (string.Empty, string.Format("SkipReasonTooLong|{0:F0}|{1}", data.Duration / 60.0, ConfigManager.Config.CacheYouTubeMaxLength));
+            Log.Warning("Skipping video: duration exceeds allowed duration ({VideoMin:F1}min > {MaxMin}min)", data.Duration / 60.0, maxDurationMinutes);
+            return (string.Empty, string.Format("SkipReasonTooLong|{0:F0}|{1}", data.Duration / 60.0, maxDurationMinutes));
         }
 
         return (data.Id, null);

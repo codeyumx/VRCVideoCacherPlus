@@ -50,6 +50,7 @@
   "MaxCacheSizeLabel": "Dimensione Max Cache in GB (0 = illimitata)",
   "CacheYouTubeVideos": "Cache Video YouTube",
   "MaxYouTubeResolution": "Risoluzione Max YouTube",
+  "MaxResolution": "Risoluzione massima",
   "PreferVp9ForCache": "Prefer VP9 for cached videos (MP4)",
   "PreferVp9ForCacheTooltip": "Saves 20–50% storage for cached YouTube videos with no quality loss. Works on all platforms including Quest. Safe to enable for most users.",
   "MaxVideoLength": "Lunghezza Max Video (minuti)",

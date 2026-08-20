@@ -50,6 +50,7 @@
   "MaxCacheSizeLabel": "最大缓存大小（GB）（0 = 无限制）",
   "CacheYouTubeVideos": "缓存 YouTube 视频",
   "MaxYouTubeResolution": "YouTube 最高分辨率",
+  "MaxResolution": "最大分辨率",
   "PreferVp9ForCache": "缓存视频优先使用 VP9 (MP4)",
   "PreferVp9ForCacheTooltip": "在不损失画质的情况下，为缓存的 YouTube 视频节省 20–50% 的存储空间。支持包括 Quest 在内的所有平台。大多数用户可以安全启用。",
   "MaxVideoLength": "最大视频时长（分钟）",

@@ -360,17 +360,19 @@ public class VideoDownloader
             }
         };
 
+        var evalResult = Services.RuleEngine.EvaluateUrl(videoInfo.VideoUrl);
+        var maxRes = evalResult.MaxResolution ?? 1080;
+
         if (videoInfo.DownloadFormat == DownloadFormat.Webm)
         {
             var audioArg = string.IsNullOrEmpty(ConfigManager.Config.YtdlpDubLanguage)
                 ? "+ba[acodec=opus][ext=webm]"
                 : $"+(ba[acodec=opus][ext=webm][language={ConfigManager.Config.YtdlpDubLanguage}]/ba[acodec=opus][ext=webm])";
             args.Add($"-o \"{tempWebm}\"");
-            args.Add($"-f \"bv*[height<={ConfigManager.Config.CacheYouTubeMaxResolution}][vcodec~='^av01'][ext=mp4][dynamic_range='SDR']{audioArg}/bv*[height<={ConfigManager.Config.CacheYouTubeMaxResolution}][vcodec~='vp9'][ext=webm][dynamic_range='SDR']{audioArg}\"");
+            args.Add($"-f \"bv*[height<={maxRes}][vcodec~='^av01'][ext=mp4][dynamic_range='SDR']{audioArg}/bv*[height<={maxRes}][vcodec~='vp9'][ext=webm][dynamic_range='SDR']{audioArg}\"");
         }
         else
         {
-            var maxRes = ConfigManager.Config.CacheYouTubeMaxResolution;
             var audioArgPotato = string.IsNullOrEmpty(ConfigManager.Config.YtdlpDubLanguage)
                 ? "+ba[ext=m4a]"
                 : $"+(ba[ext=m4a][language={ConfigManager.Config.YtdlpDubLanguage}]/ba[ext=m4a])";

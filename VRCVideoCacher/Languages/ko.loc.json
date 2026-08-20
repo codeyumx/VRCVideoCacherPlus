@@ -50,6 +50,7 @@
   "MaxCacheSizeLabel": "최대 캐시 크기 (단위: GB, 0 = 무제한)",
   "CacheYouTubeVideos": "YouTube 동영상 캐시",
   "MaxYouTubeResolution": "YouTube 최대 해상도",
+  "MaxResolution": "최대 해상도",
   "PreferVp9ForCache": "캐시 동영상에 VP9 우선 사용 (MP4)",
   "PreferVp9ForCacheTooltip": "화질 저하 없이 캐시된 YouTube 동영상 저장 공간을 20~50% 절약합니다. Quest를 포함한 모든 플랫폼에서 작동합니다. 대부분의 사용자에게 안전하게 활성화할 수 있습니다.",
   "MaxVideoLength": "최대 영상 길이 (분)",

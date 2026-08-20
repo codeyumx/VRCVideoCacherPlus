@@ -80,7 +80,7 @@ public partial class RulesViewModel : ViewModelBase
 
     public RulesViewModel()
     {
-        ConfigManager.OnConfigChanged += LoadFromConfig;
+        PlusConfigManager.OnConfigChanged += LoadFromConfig;
         LoadFromConfig();
     }
 
@@ -134,11 +134,11 @@ public partial class RulesViewModel : ViewModelBase
         _isLoading = true;
         Rules.Clear();
 
-        var configRules = ConfigManager.Config.UriRules;
+        var configRules = PlusConfigManager.Config.UriRules;
         if (configRules == null || configRules.Count == 0)
         {
-            configRules = ConfigModel.GetDefaultRules();
-            ConfigManager.Config.UriRules = configRules;
+            PlusConfigManager.EnsureDefaultRules();
+            configRules = PlusConfigManager.Config.UriRules;
         }
 
         foreach (var rule in configRules)
@@ -162,8 +162,8 @@ public partial class RulesViewModel : ViewModelBase
 
     public void SaveToConfig()
     {
-        ConfigManager.Config.UriRules = Rules.Select(r => r.Rule).ToList();
-        ConfigManager.TrySaveConfig();
+        PlusConfigManager.Config.UriRules = Rules.Select(r => r.Rule).ToList();
+        PlusConfigManager.TrySaveConfig();
         HasChanges = false;
         StatusMessage = Localizer.Get("SettingsSaved");
         StatusMessageColor = "#81C784";

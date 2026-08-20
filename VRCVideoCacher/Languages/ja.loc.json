@@ -50,6 +50,7 @@
   "MaxCacheSizeLabel": "キャッシュの最大サイズ (GB 単位、0 = 無制限)",
   "CacheYouTubeVideos": "YouTube の動画をキャッシュする",
   "MaxYouTubeResolution": "YouTube の最大解像度",
+  "MaxResolution": "最大解像度",
   "PreferVp9ForCache": "キャッシュ動画にVP9を優先する (MP4)",
   "PreferVp9ForCacheTooltip": "画質を落とさずにキャッシュされたYouTube動画のストレージを20〜50%節約できます。Questを含む全プラットフォームで動作します。ほとんどのユーザーは有効にして問題ありません。",
   "MaxVideoLength": "最大の動画の長さ (分単位)",

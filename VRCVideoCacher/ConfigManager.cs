@@ -52,71 +52,6 @@ public class ConfigManager
             Log.Information("Config loaded successfully.");
         }
 
-        if (Config.UriRules == null || Config.UriRules.Count == 0)
-        {
-            Config.UriRules = ConfigModel.GetDefaultRules();
-        }
-        else
-        {
-            var defaultRules = ConfigModel.GetDefaultRules();
-            foreach (var defRule in defaultRules)
-            {
-                if (!Config.UriRules.Any(r => r.Name == defRule.Name || r.Pattern == defRule.Pattern))
-                {
-                    var lastIndex = Config.UriRules.FindIndex(r => r.Name == "Everything else");
-                    if (lastIndex >= 0)
-                        Config.UriRules.Insert(lastIndex, defRule);
-                    else
-                        Config.UriRules.Add(defRule);
-                }
-            }
-
-            Config.UriRules = Config.UriRules.DistinctBy(r => r.Name + "|" + r.Pattern).ToList();
-        }
-
-        // Migrate and sync legacy settings into Rules Engine
-        if (Config.UriRules != null)
-        {
-            var ytRule = Config.UriRules.FirstOrDefault(r => r.Name == "YouTube");
-            if (ytRule != null)
-            {
-                ytRule.MaxResolution = Config.CacheYouTubeMaxResolution;
-                ytRule.MaxDurationMinutes = Config.CacheYouTubeMaxLength;
-            }
-
-            var redirectRule = Config.UriRules.FirstOrDefault(r => r.Name == "VRDancing EU to NA Redirect");
-            if (redirectRule != null && Config.RedirectVRDancing)
-            {
-                redirectRule.Enabled = true;
-            }
-
-            if (Config.BlockedUrls != null)
-            {
-                foreach (var blockedUrl in Config.BlockedUrls)
-                {
-                    if (string.IsNullOrWhiteSpace(blockedUrl) || blockedUrl == "https://na2.vrdancing.club/sampleurl.mp4")
-                        continue;
-
-                    var escapedPattern = "^" + System.Text.RegularExpressions.Regex.Escape(blockedUrl) + "$";
-                    if (!Config.UriRules.Any(r => r.Pattern == escapedPattern))
-                    {
-                        var lastIndex = Config.UriRules.FindIndex(r => r.Name == "Everything else");
-                        var blockRule = new UriRule
-                        {
-                            Name = $"Block {blockedUrl}",
-                            Pattern = escapedPattern,
-                            Action = RuleAction.Block,
-                            Enabled = true
-                        };
-                        if (lastIndex >= 0)
-                            Config.UriRules.Insert(lastIndex, blockRule);
-                        else
-                            Config.UriRules.Add(blockRule);
-                    }
-                }
-            }
-        }
-
         if (Config.YtdlpWebServerUrl.EndsWith('/'))
             Config.YtdlpWebServerUrl = Config.YtdlpWebServerUrl.TrimEnd('/');
 
@@ -126,6 +61,7 @@ public class ConfigManager
 
     public static void TrySaveConfig()
     {
+        PlusConfigManager.TrySaveConfig();
         var newConfig = JsonConvert.SerializeObject(Config, Formatting.Indented);
         var oldConfig = File.Exists(ConfigFilePath) ? File.ReadAllText(ConfigFilePath) : string.Empty;
         if (newConfig == oldConfig)
@@ -159,17 +95,6 @@ public class ConfigManager
         }
         else
         {
-            Config.CacheYouTube = GetUserConfirmation("Would you like to cache/download Youtube videos?", true);
-            if (Config.CacheYouTube)
-            {
-                var maxResolution = GetUserConfirmation("Would you like to cache/download Youtube videos in 4k?", true);
-                Config.CacheYouTubeMaxResolution = maxResolution ? 2160 : 1080;
-            }
-
-            var vrDancingPyPyChoice = GetUserConfirmation("Would you like to cache/download VRDancing & PyPyDance videos?", true);
-            Config.CacheVrDancing = vrDancingPyPyChoice;
-            Config.CachePyPyDance = vrDancingPyPyChoice;
-
             Config.PatchResonite = GetUserConfirmation("Would you like to enable Resonite support?", false);
         }
 
@@ -210,19 +135,9 @@ public class ConfigModel
     // Caching
     public string CachedAssetPath = "";
     public float CacheMaxSizeInGb = 10f;
-    public bool CacheYouTube = true;
-    public int CacheYouTubeMaxResolution = 1080;
-    public int CacheYouTubeMaxLength = 120;
-    public bool CachePyPyDance = true;
-    public bool CacheVrDancing = true;
     public bool CacheHlsPlaylists = true;
     public int CacheHlsMaxLength = 30;
     public bool CacheOnly = false;
-    // Rules Engine
-    public List<UriRule> UriRules = GetDefaultRules();
-    // Cache Rules
-    public string[] BlockedUrls = ["https://na2.vrdancing.club/sampleurl.mp4"];
-    public string BlockRedirect = "https://www.youtube.com/watch?v=byv2bKekeWQ";
     // URLs of JSON manifests listing direct file downloads to mirror into the cache.
     public string[] PreCacheUrls = [];
     // Video URLs (YouTube, VRDancing, ...) resolved through the normal download path
@@ -249,100 +164,5 @@ public class ConfigModel
     // UI state
     public bool HasShownTrayNotice = false;
 
-    public static List<UriRule> GetDefaultRules()
-    {
-        return
-        [
-            new UriRule
-            {
-                Name = "VRDancing EU to NA Redirect",
-                Pattern = @"^https?:\/\/eu2\.vrdancing\.club\/weekend\/(.*)$",
-                Action = RuleAction.Redirect,
-                RedirectTarget = "https://na2.vrdancing.club/weekend/$1",
-                Enabled = false
-            },
-            new UriRule
-            {
-                Name = "YouTube Music Redirect",
-                Pattern = @"^https?:\/\/music\.youtube\.com\/(?:watch|playlist)?\?(?:.*?&)?v=([^&]+).*$",
-                Action = RuleAction.Redirect,
-                RedirectTarget = "https://youtube.com/watch?v=$1",
-                Enabled = false
-            },
-            new UriRule
-            {
-                Name = "Dropbox Share Rewrite",
-                Pattern = @"^https?:\/\/(?:[a-zA-Z0-9-]+\.)*dropbox\.com\/(.*?)(?:\?dl=0)?$",
-                Action = RuleAction.Rewrite,
-                RedirectTarget = "https://www.dropbox.com/$1?dl=1",
-                Enabled = true
-            },
-            new UriRule
-            {
-                Name = "Google Drive File Rewrite",
-                Pattern = @"^https?:\/\/drive\.google\.com\/file\/d\/([^\/]+)(?:\/.*)?$",
-                Action = RuleAction.Rewrite,
-                RedirectTarget = "https://drive.google.com/uc?export=download&id=$1",
-                Enabled = true
-            },
-            new UriRule
-            {
-                Name = "MightyGym CDN Direct",
-                Pattern = @"^https?:\/\/(?:[a-zA-Z0-9-]+\.)*mightygymcdn\.nyc3\.cdn\.digitaloceanspaces\.com(?:[\/?#]|$)",
-                Action = RuleAction.Direct,
-                Enabled = true
-            },
-            new UriRule
-            {
-                Name = "Illumination Media Direct",
-                Pattern = @"^https?:\/\/(?:[a-zA-Z0-9-]+\.)*(?:imvrcdn\.com|illumination\.media)(?:[\/?#]|$)",
-                Action = RuleAction.Direct,
-                Enabled = true
-            },
-            new UriRule
-            {
-                Name = "Virtual Film Institute Direct",
-                Pattern = @"^https?:\/\/(?:[a-zA-Z0-9-]+\.)*virtualfilm\.institute(?:[\/?#]|$)",
-                Action = RuleAction.Direct,
-                Enabled = true
-            },
-            new UriRule
-            {
-                Name = "Block Rickrolls",
-                Pattern = @"^https?://(?:www\.)?youtube\.com/watch\?v=(?:dQw4w9WgXcQ|jzmz6K8K4L0|XfELJU1mRMg)",
-                Action = RuleAction.Block,
-                Enabled = true
-            },
-            new UriRule
-            {
-                Name = "YouTube",
-                Pattern = @"^https?:\/\/(?:[a-zA-Z0-9-]+\.)*(?:youtube\.com|youtu\.be|youtube-nocookie\.com)(?:[\/?#]|$)",
-                Action = RuleAction.Cache,
-                MaxResolution = 1080,
-                MaxDurationMinutes = 120,
-                Enabled = true
-            },
-            new UriRule
-            {
-                Name = "PyPyDance",
-                Pattern = @"^https?:\/\/(?:[a-zA-Z0-9-]+\.)*pypydance\.com(?:[\/?#]|$)",
-                Action = RuleAction.Cache,
-                Enabled = true
-            },
-            new UriRule
-            {
-                Name = "VRDancing",
-                Pattern = @"^https?:\/\/(?:[a-zA-Z0-9-]+\.)*vrdancing\.club(?:[\/?#]|$)",
-                Action = RuleAction.Cache,
-                Enabled = true
-            },
-            new UriRule
-            {
-                Name = "Everything else",
-                Pattern = @".*",
-                Action = RuleAction.Direct,
-                Enabled = true
-            }
-        ];
-    }
+    public static List<UriRule> GetDefaultRules() => PlusConfigManager.GetDefaultRules();
 }
