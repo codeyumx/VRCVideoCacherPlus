@@ -63,15 +63,18 @@ public class FileTools
         {
             throw new NotImplementedException("Unknown platform");
         }
-        var vrcPath = Path.Join(localLowPath, "VRChat/VRChat/Tools/yt-dlp.exe");
-        if (!File.Exists(vrcPath))
+        if (!string.IsNullOrEmpty(localLowPath))
         {
-            Log.Warning("YT-DLP not found at expected VRChat path: {Path}", vrcPath);
-        }
-        else
-        {
-            YtdlPathVrc = vrcPath;
-            BackupPathVrc = $"{vrcPath}.bkp";
+            var vrcPath = Path.Join(localLowPath, "VRChat/VRChat/Tools/yt-dlp.exe");
+            if (!File.Exists(vrcPath))
+            {
+                Log.Warning("YT-DLP not found at expected VRChat path: {Path}", vrcPath);
+            }
+            else
+            {
+                YtdlPathVrc = vrcPath;
+                BackupPathVrc = $"{vrcPath}.bkp";
+            }
         }
     }
 
@@ -226,31 +229,54 @@ public class FileTools
         {
             return false;
         }
-        if (File.Exists(ytdlPath))
+
+        try
         {
-            var hash = Program.ComputeBinaryContentHash(File.ReadAllBytes(ytdlPath));
-            if (hash == Program.YtdlpHash)
+            if (File.Exists(ytdlPath))
             {
-                Log.Information("YT-DLP is already patched.");
-                return true;
+                var hash = Program.ComputeBinaryContentHash(File.ReadAllBytes(ytdlPath));
+                if (hash == Program.YtdlpHash)
+                {
+                    Log.Information("YT-DLP is already patched.");
+                    return true;
+                }
+                if (File.Exists(backupPath))
+                {
+                    try
+                    {
+                        File.SetAttributes(backupPath, FileAttributes.Normal);
+                        File.Delete(backupPath);
+                    }
+                    catch
+                    {
+                        // ignore permission issue on backup
+                    }
+                }
+                File.Move(ytdlPath, backupPath);
+                Log.Information("Backed up YT-DLP.");
             }
-            if (File.Exists(backupPath))
+            using var stream = Program.GetYtDlpStub();
+            using var fileStream = File.Create(ytdlPath);
+            stream.CopyTo(fileStream);
+            fileStream.Close();
+            try
             {
-                File.SetAttributes(backupPath, FileAttributes.Normal);
-                File.Delete(backupPath);
+                var attr = File.GetAttributes(ytdlPath);
+                attr |= FileAttributes.ReadOnly;
+                File.SetAttributes(ytdlPath, attr);
             }
-            File.Move(ytdlPath, backupPath);
-            Log.Information("Backed up YT-DLP.");
+            catch
+            {
+                // ignore attribute set failure on locked files
+            }
+            Log.Information("Patched YT-DLP.");
+            return true;
         }
-        using var stream = Program.GetYtDlpStub();
-        using var fileStream = File.Create(ytdlPath);
-        stream.CopyTo(fileStream);
-        fileStream.Close();
-        var attr = File.GetAttributes(ytdlPath);
-        attr |= FileAttributes.ReadOnly;
-        File.SetAttributes(ytdlPath, attr);
-        Log.Information("Patched YT-DLP.");
-        return true;
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Unable to patch YT-DLP at {Path} (file or directory may be read-only/locked)", ytdlPath);
+            return false;
+        }
     }
 
     private static void RestoreYtdl(string? ytdlPath, string? backupPath)
@@ -260,16 +286,23 @@ public class FileTools
             !File.Exists(backupPath))
             return;
 
-        Log.Information("Restoring yt-dlp...");
-        if (File.Exists(ytdlPath))
+        try
         {
-            File.SetAttributes(ytdlPath, FileAttributes.Normal);
-            File.Delete(ytdlPath);
+            Log.Information("Restoring yt-dlp...");
+            if (File.Exists(ytdlPath))
+            {
+                File.SetAttributes(ytdlPath, FileAttributes.Normal);
+                File.Delete(ytdlPath);
+            }
+            File.Move(backupPath, ytdlPath);
+            var attr = File.GetAttributes(ytdlPath);
+            attr &= ~FileAttributes.ReadOnly;
+            File.SetAttributes(ytdlPath, attr);
+            Log.Information("Restored YT-DLP.");
         }
-        File.Move(backupPath, ytdlPath);
-        var attr = File.GetAttributes(ytdlPath);
-        attr &= ~FileAttributes.ReadOnly;
-        File.SetAttributes(ytdlPath, attr);
-        Log.Information("Restored YT-DLP.");
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to restore yt-dlp at {Path}", ytdlPath);
+        }
     }
 }
