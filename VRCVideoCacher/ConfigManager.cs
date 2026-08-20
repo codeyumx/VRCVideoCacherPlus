@@ -206,6 +206,27 @@ public class ConfigModel
             },
             new UriRule
             {
+                Name = "MightyGym CDN Direct",
+                Pattern = @"^https?:\/\/(?:[a-zA-Z0-9-]+\.)*mightygymcdn\.nyc3\.cdn\.digitaloceanspaces\.com(?:[\/?#]|$)",
+                Action = RuleAction.Direct,
+                Enabled = true
+            },
+            new UriRule
+            {
+                Name = "Illumination Media Direct",
+                Pattern = @"^https?:\/\/(?:[a-zA-Z0-9-]+\.)*(?:imvrcdn\.com|illumination\.media)(?:[\/?#]|$)",
+                Action = RuleAction.Direct,
+                Enabled = true
+            },
+            new UriRule
+            {
+                Name = "Virtual Film Institute Direct",
+                Pattern = @"^https?:\/\/(?:[a-zA-Z0-9-]+\.)*virtualfilm\.institute(?:[\/?#]|$)",
+                Action = RuleAction.Direct,
+                Enabled = true
+            },
+            new UriRule
+            {
                 Name = "Block Rickrolls",
                 Pattern = @"^https?://(?:www\.)?youtube\.com/watch\?v=(?:dQw4w9WgXcQ|jzmz6K8K4L0|XfELJU1mRMg)",
                 Action = RuleAction.Block,
