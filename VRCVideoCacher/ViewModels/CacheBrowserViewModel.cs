@@ -104,6 +104,36 @@ public partial class CacheItemViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private void OpenFile()
+    {
+        var filePath = Path.Join(CacheManager.CachePath, FileName);
+        if (!File.Exists(filePath)) return;
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = filePath,
+                UseShellExecute = true
+            });
+        }
+        catch { /* Ignore errors */ }
+    }
+
+    [RelayCommand]
+    private async Task CopyPath()
+    {
+        var filePath = Path.Join(CacheManager.CachePath, FileName);
+        if (Avalonia.Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            var clipboard = desktop.MainWindow?.Clipboard;
+            if (clipboard != null)
+            {
+                await clipboard.SetTextAsync(filePath);
+            }
+        }
+    }
+
+    [RelayCommand]
     private void WatchVideo()
     {
         var filePath = Path.Join(CacheManager.CachePath, FileName);
