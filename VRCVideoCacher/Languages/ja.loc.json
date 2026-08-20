@@ -140,5 +140,6 @@
   "TestUrlPlaceholder": "テストURL...",
   "UnsavedRulesTitle": "未保存のルール変更",
   "UnsavedRulesMessage": "保存されていないルールの変更があります。離れる前に変更を保存または破棄しますか？",
-  "Discard": "破棄"
+  "Discard": "破棄",
+  "RewriteTarget": "書き換え先のパターン / URL"
 }

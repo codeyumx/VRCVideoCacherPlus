@@ -139,5 +139,6 @@
   "TestUrlPlaceholder": "테스트 URL...",
   "UnsavedRulesTitle": "저장되지 않은 규칙 변경 사항",
   "UnsavedRulesMessage": "저장되지 않은 규칙 변경 사항이 있습니다. 나가기 전에 변경 사항을 저장하거나 취소하시겠습니까?",
-  "Discard": "취소"
+  "Discard": "취소",
+  "RewriteTarget": "대상 재작성 패턴 / URL"
 }

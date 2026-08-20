@@ -139,5 +139,6 @@
   "TestUrlPlaceholder": "测试 URL...",
   "UnsavedRulesTitle": "未保存的规则更改",
   "UnsavedRulesMessage": "您有未保存的规则更改。在离开之前，要保存还是放弃更改？",
-  "Discard": "放弃"
+  "Discard": "放弃",
+  "RewriteTarget": "目标重写模式 / URL"
 }

@@ -59,10 +59,10 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Redirect Options -->
+                <!-- Redirect / Rewrite Options -->
                 <Border Background="#2d2d2d" CornerRadius="8" Padding="15" IsVisible="{Binding IsRedirectAction}">
                     <StackPanel Spacing="10">
-                        <TextBlock Text="{l:Localize RedirectTarget}" FontWeight="SemiBold" Foreground="#64B5F6"/>
+                        <TextBlock Text="{Binding TargetUrlLabel}" FontWeight="SemiBold" Foreground="#64B5F6"/>
                         <TextBox Text="{Binding RedirectTarget}" PlaceholderText="https://youtube.com/watch?v=$1"/>
                         <TextBlock Text="Tokens: $0, $1, $2, {url}, {url.domain}, {url.path}, {url.query}, {url.query.v}, {url.fragment}"
                                    FontSize="11" Foreground="#B0BEC5" TextWrapping="Wrap"/>

@@ -50,6 +50,9 @@ public partial class EditRuleViewModel : ObservableObject
 
     public bool IsCacheAction => SelectedAction == RuleAction.Cache;
     public bool IsRedirectAction => SelectedAction == RuleAction.Redirect || SelectedAction == RuleAction.Rewrite;
+    public string TargetUrlLabel => SelectedAction == RuleAction.Rewrite
+        ? Jeek.Avalonia.Localization.Localizer.Get("RewriteTarget")
+        : Jeek.Avalonia.Localization.Localizer.Get("RedirectTarget");
 
     public UriRule RuleResult { get; private set; }
 
@@ -93,6 +96,7 @@ public partial class EditRuleViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(IsCacheAction));
         OnPropertyChanged(nameof(IsRedirectAction));
+        OnPropertyChanged(nameof(TargetUrlLabel));
     }
 
     private void ValidatePattern()

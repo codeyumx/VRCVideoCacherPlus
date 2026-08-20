@@ -140,5 +140,6 @@
   "TestUrlPlaceholder": "Teszt URL...",
   "UnsavedRulesTitle": "Mentetlen szabálymódosítások",
   "UnsavedRulesMessage": "Mentetlen szabálymódosításai vannak. Szeretné menteni vagy elvetni a módosításokat kilépés előtt?",
-  "Discard": "Elvetés"
+  "Discard": "Elvetés",
+  "RewriteTarget": "Átírási célminta / URL"
 }
