@@ -54,8 +54,12 @@ public partial class DashboardViewModel : ViewModelBase
     [ObservableProperty]
     private string _ffmpegStatus = "Up-To-Date";
 
+    [ObservableProperty]
+    private bool _videoPlayersEnabled = true;
+
     public DashboardViewModel()
     {
+        VideoPlayersEnabled = ConfigManager.Config.VideoPlayersEnabled;
         ServerUrl = ConfigManager.Config.YtdlpWebServerUrl;
         MaxCacheSize = ConfigManager.Config.CacheMaxSizeInGb;
         HostState = ElevatorManager.HasHostsLine;
@@ -206,6 +210,14 @@ public partial class DashboardViewModel : ViewModelBase
         {
             FfmpegStatus = "Up-To-Date";
         }
+    }
+
+    [RelayCommand]
+    private void ToggleVideoPlayers()
+    {
+        VideoPlayersEnabled = !VideoPlayersEnabled;
+        ConfigManager.Config.VideoPlayersEnabled = VideoPlayersEnabled;
+        ConfigManager.TrySaveConfig();
     }
 
     [RelayCommand]

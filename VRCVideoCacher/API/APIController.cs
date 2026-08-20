@@ -190,6 +190,13 @@ public class ApiController : WebApiController
 
         Log.Information("Request URL: {URL}", requestUrl);
 
+        if (!ConfigManager.Config.VideoPlayersEnabled)
+        {
+            Log.Warning("Video players are disabled via toggle. Blocking request: {URL}", requestUrl);
+            await HttpContext.SendStringAsync(string.Empty, "text/plain", Encoding.UTF8);
+            return;
+        }
+
         if (requestUrl.StartsWith("https://eu2.vrdancing.club/weekend/") && ConfigManager.Config.RedirectVRDancing)
         {
             await HttpContext.SendStringAsync(requestUrl.Replace("eu2", "na2"), "text/plain", Encoding.UTF8);
