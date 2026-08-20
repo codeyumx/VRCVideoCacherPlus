@@ -194,5 +194,8 @@
   "TestUrlPlaceholder": "URL de teste...",
   "UnsavedRulesTitle": "Alterações de regras não salvas",
   "UnsavedRulesMessage": "Você tem alterações não salvas nas suas regras. Deseja salvar ou descartar as alterações antes de sair?",
-  "Discard": "Descartar"
+  "Discard": "Descartar",
+  "ResetToDefaults": "Padrões",
+  "ConfirmResetDefaultsTitle": "Redefinir regras para os padrões?",
+  "ConfirmResetDefaultsMessage": "Tem certeza de que deseja redefinir todas as regras para os padrões de fábrica? As regras personalizadas serão substituídas."
 }

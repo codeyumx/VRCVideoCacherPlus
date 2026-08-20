@@ -14,6 +14,12 @@ public partial class ConfirmUnsavedViewModel : ObservableObject
 {
     public event Action<UnsavedChangesResult>? CloseRequested;
 
+    [ObservableProperty]
+    private string _title = Jeek.Avalonia.Localization.Localizer.Get("UnsavedRulesTitle");
+
+    [ObservableProperty]
+    private string _message = Jeek.Avalonia.Localization.Localizer.Get("UnsavedRulesMessage");
+
     [RelayCommand]
     private void Save() => CloseRequested?.Invoke(UnsavedChangesResult.Save);
 

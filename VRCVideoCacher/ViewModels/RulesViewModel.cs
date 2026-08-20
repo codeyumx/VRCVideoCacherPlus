@@ -295,15 +295,39 @@ public partial class RulesViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void ResetDefaultRules()
+    private async Task ResetDefaultRulesAsync(Window? parentWindow)
     {
-        Rules.Clear();
-        foreach (var rule in ConfigModel.GetDefaultRules())
+        var confirmVm = new ConfirmUnsavedViewModel
         {
-            Rules.Add(CreateEntry(rule));
+            Title = Localizer.Get("ConfirmResetDefaultsTitle"),
+            Message = Localizer.Get("ConfirmResetDefaultsMessage")
+        };
+        var dialog = new ConfirmUnsavedWindow { DataContext = confirmVm };
+
+        UnsavedChangesResult result = UnsavedChangesResult.Cancel;
+        confirmVm.CloseRequested += (res) =>
+        {
+            result = res;
+            dialog.Close();
+        };
+
+        if (parentWindow != null)
+        {
+            await dialog.ShowDialog(parentWindow);
         }
-        EvaluateTestUrl();
-        SetHasChanges();
+
+        if (result == UnsavedChangesResult.Save || result == UnsavedChangesResult.Discard)
+        {
+            _isLoading = true;
+            Rules.Clear();
+            foreach (var rule in ConfigModel.GetDefaultRules())
+            {
+                Rules.Add(CreateEntry(rule));
+            }
+            _isLoading = false;
+            EvaluateTestUrl();
+            SetHasChanges();
+        }
     }
 
     [RelayCommand]

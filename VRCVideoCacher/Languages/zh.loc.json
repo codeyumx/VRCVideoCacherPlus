@@ -194,5 +194,8 @@
   "TestUrlPlaceholder": "测试 URL...",
   "UnsavedRulesTitle": "未保存的规则更改",
   "UnsavedRulesMessage": "您有未保存的规则更改。在离开之前，要保存还是放弃更改？",
-  "Discard": "放弃"
+  "Discard": "放弃",
+  "ResetToDefaults": "默认值",
+  "ConfirmResetDefaultsTitle": "重置规则为默认值？",
+  "ConfirmResetDefaultsMessage": "您确定要将所有规则重置为出厂默认设置吗？自定义规则将被替换。"
 }

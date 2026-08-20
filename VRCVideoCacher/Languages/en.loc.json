@@ -194,5 +194,8 @@
   "TestUrlPlaceholder": "Test URL...",
   "UnsavedRulesTitle": "Unsaved Rules Changes",
   "UnsavedRulesMessage": "You have unsaved changes in your rules. Do you want to save or discard your changes before leaving?",
-  "Discard": "Discard"
+  "Discard": "Discard",
+  "ResetToDefaults": "Defaults",
+  "ConfirmResetDefaultsTitle": "Reset Rules to Defaults?",
+  "ConfirmResetDefaultsMessage": "Are you sure you want to reset all rules to factory defaults? Any custom rules will be replaced."
 }

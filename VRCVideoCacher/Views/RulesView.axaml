@@ -19,11 +19,13 @@
             <!-- Test URL Field -->
             <TextBox Grid.Column="2" Text="{Binding TestUrl, Mode=TwoWay}" PlaceholderText="{l:Localize TestUrlPlaceholder}" Width="240" Margin="0,0,10,0"/>
 
-            <!-- Reset Button -->
-            <Button Grid.Column="3" Command="{Binding ResetDefaultRulesCommand}" Margin="0,0,10,0">
+            <!-- Defaults Button -->
+            <Button Grid.Column="3" Command="{Binding ResetDefaultRulesCommand}"
+                    CommandParameter="{Binding $parent[Window]}"
+                    Background="#D32F2F" Foreground="White" Margin="0,0,10,0">
                 <StackPanel Orientation="Horizontal" Spacing="8">
-                    <mi:MaterialIcon Kind="Undo" Width="16" Height="16"/>
-                    <TextBlock Text="{l:Localize Reset}"/>
+                    <mi:MaterialIcon Kind="Refresh" Width="16" Height="16"/>
+                    <TextBlock Text="{l:Localize ResetToDefaults}"/>
                 </StackPanel>
             </Button>
 

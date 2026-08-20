@@ -194,5 +194,8 @@
   "TestUrlPlaceholder": "URL di prova...",
   "UnsavedRulesTitle": "Modifiche alle regole non salvate",
   "UnsavedRulesMessage": "Hai modifiche non salvate nelle tue regole. Vuoi salvare o scartare le modifiche prima di uscire?",
-  "Discard": "Scarta"
+  "Discard": "Scarta",
+  "ResetToDefaults": "Impostazioni predefinite",
+  "ConfirmResetDefaultsTitle": "Ripristinare le regole predefinite?",
+  "ConfirmResetDefaultsMessage": "Sei sicuro di voler ripristinare tutte le regole ai valori predefiniti di fabbrica? Le regole personalizzate verranno sostituite."
 }

@@ -194,5 +194,8 @@
   "TestUrlPlaceholder": "Teszt URL...",
   "UnsavedRulesTitle": "Mentetlen szabálymódosítások",
   "UnsavedRulesMessage": "Mentetlen szabálymódosításai vannak. Szeretné menteni vagy elvetni a módosításokat kilépés előtt?",
-  "Discard": "Elvetés"
+  "Discard": "Elvetés",
+  "ResetToDefaults": "Alapértelmezések",
+  "ConfirmResetDefaultsTitle": "Szabályok visszaállítása alapértelmezettre?",
+  "ConfirmResetDefaultsMessage": "Biztosan visszaállítja az összes szabályt a gyári alapértelmezésekre? Az egyedi szabályok felülíródnak."
 }
