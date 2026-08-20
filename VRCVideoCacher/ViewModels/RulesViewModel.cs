@@ -172,37 +172,25 @@ public partial class RulesViewModel : ViewModelBase
 
     public async Task<bool> CheckUnsavedChangesAsync(Window? parentWindow)
     {
-        if (!HasChanges) return true; // OK to proceed
+        if (!HasChanges) return true;
 
-        var confirmVm = new ConfirmUnsavedViewModel();
-        var dialog = new ConfirmUnsavedWindow { DataContext = confirmVm };
-
-        UnsavedChangesResult result = UnsavedChangesResult.Cancel;
-        confirmVm.CloseRequested += (res) =>
-        {
-            result = res;
-            dialog.Close();
-        };
+        var message = Localizer.Get("UnsavedRulesMessage");
+        var dialog = Views.PopupWindow.CreateConfirm(message, Localizer.Get("Save"), Localizer.Get("Discard"));
 
         if (parentWindow != null)
         {
             await dialog.ShowDialog(parentWindow);
         }
 
-        switch (result)
+        if (dialog.Confirmed)
         {
-            case UnsavedChangesResult.Save:
-                SaveToConfig();
-                return true;
-
-            case UnsavedChangesResult.Discard:
-                LoadFromConfig();
-                return true;
-
-            case UnsavedChangesResult.Cancel:
-            default:
-                return false;
+            SaveToConfig();
         }
+        else
+        {
+            LoadFromConfig();
+        }
+        return true;
     }
 
     [RelayCommand]
@@ -297,26 +285,15 @@ public partial class RulesViewModel : ViewModelBase
     [RelayCommand]
     private async Task ResetDefaultRulesAsync(Window? parentWindow)
     {
-        var confirmVm = new ConfirmUnsavedViewModel
-        {
-            Title = Localizer.Get("ConfirmResetDefaultsTitle"),
-            Message = Localizer.Get("ConfirmResetDefaultsMessage")
-        };
-        var dialog = new ConfirmUnsavedWindow { DataContext = confirmVm };
-
-        UnsavedChangesResult result = UnsavedChangesResult.Cancel;
-        confirmVm.CloseRequested += (res) =>
-        {
-            result = res;
-            dialog.Close();
-        };
+        var message = Localizer.Get("ConfirmResetDefaultsMessage");
+        var dialog = Views.PopupWindow.CreateConfirm(message, Localizer.Get("Yes"), Localizer.Get("No"));
 
         if (parentWindow != null)
         {
             await dialog.ShowDialog(parentWindow);
         }
 
-        if (result == UnsavedChangesResult.Save || result == UnsavedChangesResult.Discard)
+        if (dialog.Confirmed)
         {
             _isLoading = true;
             Rules.Clear();
