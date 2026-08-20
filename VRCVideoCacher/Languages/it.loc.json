@@ -6,7 +6,6 @@
   "History": "Cronologia",
   "Logs": "Logs",
   "About": "Informazioni",
-
   "Refresh": "Aggiorna",
   "Save": "Salva",
   "Reset": "Ripristina",
@@ -18,7 +17,6 @@
   "Done": "Fatto",
   "Language": "Lingua",
   "General": "Generale",
-
   "ToggleHostTooltip": "Usa il dominio YouTube per la cache di localhost",
   "ServerStatus": "Stato del Server",
   "Cache": "Cache",
@@ -36,7 +34,6 @@
   "Expired": "Scaduti",
   "Unknown": "Sconosciuto",
   "ServerRunning": "Server in esecuzione",
-
   "ServerSettings": "Impostazioni Server",
   "WebServerUrl": "URL Web Server",
   "DownloadSettings": "Impostazioni Download",
@@ -68,12 +65,10 @@
   "SettingsReset": "Impostazioni ripristinate ai valori salvati l'ultima volta.",
   "SettingsUnsavedChanges": "Hai modifiche non salvate.",
   "RedirectVRDancing": "Reindirizza EU VRDancing a NA",
-
   "OpenFolder": "Apri Cartella",
   "DeleteAllCache": "Elimina tutta la cache",
   "SearchVideosWatermark": "Cerca video...",
   "VideosCountFormat": "{0} di {1} video",
-
   "DownloadQueue": "Coda Download",
   "ClearQueue": "Svuota Coda",
   "CurrentDownload": "Download in corso",
@@ -82,7 +77,6 @@
   "EnterVideoUrl": "Inserisci URL video...",
   "QueuedDownloads": "Download in coda",
   "QueueIsEmpty": "La coda è vuota",
-
   "LogViewer": "Visualizzatore Logs",
   "ExportLogs": "Esporta Logs",
   "ClearLogs": "Svuota Logs",
@@ -92,9 +86,7 @@
   "Warning": "Avviso",
   "Error": "Errore",
   "AutoScroll": "Scorrimento automatico",
-
   "EntriesCountFormat": "{0} voci",
-
   "CookieSetupTitle": "Configurazione Estensione Cookie YouTube",
   "CookieSetupSubtitle": "Risolvi gli errori di rilevamento bot di YouTube",
   "CookieSetupStep1Header": "Passaggio 1: Seleziona il tuo browser",
@@ -124,14 +116,29 @@
   "AddHostsEntry": "Aggiungi Voce Hosts",
   "OpenChromeWebStore": "Apri Chrome Web Store",
   "OpenFirefoxAddons": "Apri Firefox Add-ons",
-
   "DontShowThisAgain": "Non mostrare più questo messaggio",
   "TrayShow": "Mostra",
   "TrayOpenCacheFolder": "Apri cartella Cache",
   "TrayExit": "Esci",
-
   "CreatedBy": "Creato da",
   "ReportAnIssue": "Segnala un problema",
   "OpenIssueOnGitHub": "Apri una segnalazione su GitHub",
-  "JoinOurDiscord": "Unisciti al nostro Discord per segnalare un problema"
+  "JoinOurDiscord": "Unisciti al nostro Discord per segnalare un problema",
+
+  "Rules": "Regole",
+  "AddRule": "Aggiungi regola",
+  "RuleName": "Nome regola",
+  "RegexPattern": "Pattern Regex",
+  "Action": "Azione",
+  "RedirectTarget": "URL di reindirizzamento di destinazione",
+  "Enabled": "Abilitato",
+  "Tools": "Strumenti",
+  "VideoPlayers": "Lettori video",
+  "Disable": "Disattiva",
+  "Enable": "Attiva",
+  "RulesManagedViaRulesTabNote": "La memorizzazione nella cache dei domini, i limiti di risoluzione, i reindirizzamenti e le riscritture sono gestiti tramite la scheda Regole.",
+  "TestUrlPlaceholder": "URL di prova...",
+  "UnsavedRulesTitle": "Modifiche alle regole non salvate",
+  "UnsavedRulesMessage": "Hai modifiche non salvate nelle tue regole. Vuoi salvare o scartare le modifiche prima di uscire?",
+  "Discard": "Scarta"
 }

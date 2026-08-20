@@ -6,7 +6,6 @@
   "History": "Előzmények",
   "Logs": "Naplók",
   "About": "Rólunk",
-
   "Refresh": "Frissítés",
   "Save": "Mentés",
   "Reset": "Visszaállítás",
@@ -18,7 +17,6 @@
   "Done": "Kész",
   "Language": "Nyelv",
   "General": "Általános",
-
   "ToggleHostTooltip": "A YouTube domain használatának bekapcsolása a localhost gyorsítótár számára",
   "ServerStatus": "Szerver Állapota",
   "Cache": "Gyorsítótár",
@@ -36,7 +34,6 @@
   "Expired": "Lejárt",
   "Unknown": "Ismeretlen",
   "ServerRunning": "Szerver Fut",
-
   "ServerSettings": "Szerver Beállítások",
   "WebServerUrl": "Web Szerver URL",
   "DownloadSettings": "Beállítások Letöltése",
@@ -68,12 +65,10 @@
   "SettingsSaved": "Beállítások Mentve!",
   "SettingsReset": "Beállítások visszaállnak az utoljára mentett értékekre.",
   "SettingsUnsavedChanges": "Vannak mentetlen változások.",
-
   "OpenFolder": "Mappa Megnyitás",
   "DeleteAllCache": "Összes gyorsítótár Törlése",
   "SearchVideosWatermark": "Videók Keresése...",
   "VideosCountFormat": "{0} az {1} videóból",
-
   "DownloadQueue": "Letöltési Sor",
   "ClearQueue": "Sor Törlése",
   "CurrentDownload": "Aktuális Letöltés",
@@ -82,7 +77,6 @@
   "EnterVideoUrl": "Írd be a videó linkjét...",
   "QueuedDownloads": "Sorban Álló Letöltések",
   "QueueIsEmpty": "A sor üres",
-
   "LogViewer": "Napló Néző",
   "ExportLogs": "Napló Exportálás",
   "ClearLogs": "Naplók Törlése",
@@ -92,9 +86,7 @@
   "Warning": "Figyelem",
   "Error": "Hiba",
   "AutoScroll": "Automatikus Görgetés",
-
   "EntriesCountFormat": "{0} bejegyzés",
-
   "CookieSetupTitle": "YouTube Süti Bővítmény Beállítása",
   "CookieSetupSubtitle": "Javítsd ki a YouTube bot észlelési hibáit",
   "CookieSetupStep1Header": "1. Lépés: Válaszd ki a böngésződ",
@@ -124,14 +116,29 @@
   "AddHostsEntry": "Hosztok Hozzáadása",
   "OpenChromeWebStore": "Chrome Web Áruház Megnyítás",
   "OpenFirefoxAddons": "Firefox Addonok Megnyítás",
-
   "DontShowThisAgain": "Ne mutasd ezt újra",
   "TrayShow": "Megjelenítés",
   "TrayOpenCacheFolder": "Gyorsítótár Mappa Megnyitása",
   "TrayExit": "Kilépés",
-
   "CreatedBy": "Készítette",
   "ReportAnIssue": "Hiba Jelentése",
   "OpenIssueOnGitHub": "Nyisd meg a probléma részt a GitHubon",
-  "JoinOurDiscord": "Csatlakozz a Discordunkhoz, hogy jelentsd a problémákat"
+  "JoinOurDiscord": "Csatlakozz a Discordunkhoz, hogy jelentsd a problémákat",
+
+  "Rules": "Szabályok",
+  "AddRule": "Szabály hozzáadása",
+  "RuleName": "Szabály neve",
+  "RegexPattern": "Regex minta",
+  "Action": "Művelet",
+  "RedirectTarget": "Átirányítási cél URL",
+  "Enabled": "Engedélyezve",
+  "Tools": "Ezközök",
+  "VideoPlayers": "Videolejátszók",
+  "Disable": "Letiltás",
+  "Enable": "Engedélyezés",
+  "RulesManagedViaRulesTabNote": "A tartomány-gyorsítótárazás, felbontási korlátok, átirányítások és URL-átírások a Szabályok lapon kezelhetők.",
+  "TestUrlPlaceholder": "Teszt URL...",
+  "UnsavedRulesTitle": "Mentetlen szabálymódosítások",
+  "UnsavedRulesMessage": "Mentetlen szabálymódosításai vannak. Szeretné menteni vagy elvetni a módosításokat kilépés előtt?",
+  "Discard": "Elvetés"
 }
