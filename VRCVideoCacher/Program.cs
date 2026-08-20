@@ -125,36 +125,7 @@ internal sealed class Program
 
         Updater.Cleanup();
         InitializeLogger();
-
-        TaskScheduler.UnobservedTaskException += (_, e) =>
-        {
-            if (e.Exception != null)
-                Logger.Warning(e.Exception, "Unobserved task exception");
-        };
-
-#if !DEBUG
-        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
-        {
-            try
-            {
-                var ex = e.ExceptionObject as Exception;
-                Logger.Error(ex, "Unhandled Exception");
-            }
-            catch
-            {
-            }
-
-            try
-            {
-                Console.WriteLine("Unhandled Exception: " + e.ExceptionObject);
-            }
-            catch
-            {
-            }
-
-            Log.CloseAndFlush();
-        };
-#endif
+        SetupGlobalExceptionHandlers();
 
         if (!LaunchArgs.HasGui)
         {
@@ -418,5 +389,69 @@ internal sealed class Program
     public static void NotifyCookiesUpdated()
     {
         OnCookiesUpdated?.Invoke();
+    }
+
+    private static void SetupGlobalExceptionHandlers()
+    {
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+        {
+            if (e.ExceptionObject is Exception ex)
+            {
+                Logger.Error(ex, "Unhandled AppDomain Exception");
+                SaveCrashReport(ex, "AppDomain.CurrentDomain.UnhandledException");
+            }
+            Log.CloseAndFlush();
+        };
+
+        TaskScheduler.UnobservedTaskException += (_, e) =>
+        {
+            if (e.Exception != null)
+            {
+                Logger.Warning(e.Exception, "Unobserved Task Exception");
+                SaveCrashReport(e.Exception, "TaskScheduler.UnobservedTaskException");
+            }
+        };
+
+        AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+        {
+            Logger.Information("ProcessExit signal received, performing shutdown tasks...");
+            Log.CloseAndFlush();
+        };
+    }
+
+    public static void SaveCrashReport(Exception ex, string source)
+    {
+        try
+        {
+            var reportPath = Path.Combine(DataPath, "CRASH_REPORT.txt");
+            Directory.CreateDirectory(DataPath);
+            var reportContent = $@"==================================================
+VRCVideoCacher Crash Report
+Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}
+Source: {source}
+Version: {Version}
+OS: {Environment.OSVersion} (64-bit: {Environment.Is64BitOperatingSystem})
+Process ID: {Environment.ProcessId}
+Command Line: {Environment.CommandLine}
+==================================================
+Exception Type: {ex.GetType().FullName}
+Message: {ex.Message}
+--------------------------------------------------
+Stack Trace:
+{ex.StackTrace}
+==================================================
+";
+            if (ex.InnerException != null)
+            {
+                reportContent += $@"
+Inner Exception: {ex.InnerException.GetType().FullName}: {ex.InnerException.Message}
+{ex.InnerException.StackTrace}
+==================================================
+";
+            }
+
+            File.WriteAllText(reportPath, reportContent);
+        }
+        catch { /* Ignore errors writing crash report */ }
     }
 }
