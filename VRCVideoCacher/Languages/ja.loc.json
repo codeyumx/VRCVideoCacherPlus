@@ -69,6 +69,7 @@
   "StartMinimized": "最小化して起動する",
   "StartWithSteamVr": "SteamVR と同時に起動する",
   "SettingsSaved": "設定を保存しました！",
+  "SettingsSavedRestartRequired": "保存しました — 新しいキャッシュフォルダーを適用するには VRCVideoCacher を再起動してください",
   "SettingsReset": "設定は最後に保存された値にリセットされます。",
   "SettingsUnsavedChanges": "保存していない変更があります。",
   "OpenFolder": "フォルダーを開く",

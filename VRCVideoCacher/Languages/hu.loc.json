@@ -69,6 +69,7 @@
   "StartMinimized": "Indítás Minimalizálva",
   "StartWithSteamVr": "Indítsd el az alkalmazást a SteamVR segítségével",
   "SettingsSaved": "Beállítások Mentve!",
+  "SettingsSavedRestartRequired": "Mentve — indítsd újra a VRCVideoCachert az új gyorsítótár mappához",
   "SettingsReset": "Beállítások visszaállnak az utoljára mentett értékekre.",
   "SettingsUnsavedChanges": "Vannak mentetlen változások.",
   "OpenFolder": "Mappa Megnyitás",

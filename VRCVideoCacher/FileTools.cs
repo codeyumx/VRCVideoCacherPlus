@@ -180,17 +180,35 @@ public class FileTools
         }
     }
 
-    public static void BackupAllYtdl()
+    /// <summary>
+    /// Brings the on-disk yt-dlp stubs in line with the current PatchVrChat and
+    /// PatchResonite settings: patches what is enabled, restores what is not.
+    ///
+    /// Replaces a patch-only pass that never undid anything, so turning a toggle off left
+    /// the game patched until the user happened to quit the application cleanly — and let
+    /// the Settings screen apply the change immediately rather than deferring it to the
+    /// next launch with no indication that it had.
+    /// </summary>
+    public static void ApplyPatchSettings()
     {
         if (ConfigManager.Config.PatchVrChat)
         {
             if (!BackupAndReplaceYtdl(YtdlPathVrc, BackupPathVrc))
                 Log.Error("Can't find VRC data, it may not be installed. {Path}", YtdlPathVrc);
         }
+        else
+        {
+            RestoreYtdl(YtdlPathVrc, BackupPathVrc);
+        }
+
         if (ConfigManager.Config.PatchResonite)
         {
             if (!BackupAndReplaceYtdl(YtdlPathReso, BackupPathReso))
                 Log.Warning("Can't find Resonite data, it may not be installed. {Path}", YtdlPathReso);
+        }
+        else
+        {
+            RestoreYtdl(YtdlPathReso, BackupPathReso);
         }
     }
 

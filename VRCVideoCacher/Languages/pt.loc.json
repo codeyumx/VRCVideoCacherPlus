@@ -69,6 +69,7 @@
   "StartMinimized": "Iniciar minimizado",
   "StartWithSteamVr": "Iniciar com o SteamVR",
   "SettingsSaved": "Preferências salvas!",
+  "SettingsSavedRestartRequired": "Salvo — reinicie o VRCVideoCacher para aplicar a nova pasta de cache",
   "SettingsReset": "Preferências redefinidas para os últimos valores salvos.",
   "SettingsUnsavedChanges": "Você tem mudanças não salvas.",
   "OpenFolder": "Abrir pasta",

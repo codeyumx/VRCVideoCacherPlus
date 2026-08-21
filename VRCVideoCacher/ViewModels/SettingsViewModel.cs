@@ -259,6 +259,12 @@ public partial class SettingsViewModel : ViewModelBase
     {
         var config = ConfigManager.Config;
 
+        // CacheManager resolves its path once at type initialisation and the web server
+        // serves that directory, so this one genuinely cannot be applied live — say so
+        // rather than appearing to have taken effect.
+        var cachePathChanged = config.CachedAssetPath != CachedAssetPath;
+        var patchSettingsChanged = config.PatchVrChat != PatchVRC || config.PatchResonite != PatchResonite;
+
         if (config.YtdlpWebServerUrl != WebServerUrl)
         {
             config.YtdlpWebServerUrl = WebServerUrl;
@@ -307,9 +313,16 @@ public partial class SettingsViewModel : ViewModelBase
             PlusConfigManager.OnConfigChanged += LoadFromConfig;
         }
 
+        // Patch toggles are applied straight away; they used to sit inert until the next
+        // launch, with nothing saying so.
+        if (patchSettingsChanged)
+            FileTools.ApplyPatchSettings();
+
         HasChanges = false;
-        StatusMessage = Localizer.Get("SettingsSaved");
-        StatusMessageColor = "#81C784";
+        StatusMessage = cachePathChanged
+            ? Localizer.Get("SettingsSavedRestartRequired")
+            : Localizer.Get("SettingsSaved");
+        StatusMessageColor = cachePathChanged ? "#FFB74D" : "#81C784";
     }
 
     [RelayCommand]

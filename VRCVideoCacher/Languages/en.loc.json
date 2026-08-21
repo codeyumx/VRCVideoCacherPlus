@@ -69,6 +69,7 @@
   "StartMinimized": "Start Minimized",
   "StartWithSteamVr": "Start with SteamVR",
   "SettingsSaved": "Settings saved!",
+  "SettingsSavedRestartRequired": "Saved — restart VRCVideoCacher for the new cache folder to take effect",
   "SettingsReset": "Settings reset to last saved values.",
   "SettingsUnsavedChanges": "You have unsaved changes.",
   "OpenFolder": "Open Folder",

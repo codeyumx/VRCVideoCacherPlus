@@ -69,6 +69,7 @@
   "StartMinimized": "启动时最小化",
   "StartWithSteamVr": "通过 SteamVR 启动应用",
   "SettingsSaved": "设置已保存！",
+  "SettingsSavedRestartRequired": "已保存 — 请重启 VRCVideoCacher 以应用新的缓存文件夹",
   "SettingsReset": "设置已重置为上次保存的值。",
   "SettingsUnsavedChanges": "有未保存的设置更改。",
   "OpenFolder": "打开文件夹",

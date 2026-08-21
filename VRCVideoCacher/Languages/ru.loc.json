@@ -69,6 +69,7 @@
   "StartMinimized": "Запускать Свёрнутым",
   "StartWithSteamVr": "Запустить приложение с помощью SteamVR",
   "SettingsSaved": "Настройки сохранены!",
+  "SettingsSavedRestartRequired": "Сохранено — перезапустите VRCVideoCacher, чтобы применить новую папку кэша",
   "SettingsReset": "Настройки сброшенны до последнего сохранения",
   "SettingsUnsavedChanges": "У вас есть несохраненные изменения!",
   "OpenFolder": "Открыть папку..",
