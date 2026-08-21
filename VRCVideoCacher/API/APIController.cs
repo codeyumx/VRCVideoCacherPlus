@@ -145,14 +145,36 @@ public class ApiController : WebApiController
             Log.Warning("Config is NOT set to use cookies from browser extension.");
     }
 
+    // Origins that legitimately talk to the cookie endpoints: a YouTube page (where the
+    // extension's content script runs) or an extension context. Note that an extension
+    // holding host_permissions for localhost bypasses CORS entirely, so the extension
+    // schemes here are belt-and-braces for the ones that don't.
+    private static readonly string[] AllowedCookieOrigins =
+    [
+        "https://www.youtube.com",
+        "https://youtube.com",
+        "https://m.youtube.com",
+        "https://music.youtube.com",
+        "https://studio.youtube.com"
+    ];
+
+    private static bool IsAllowedCookieOrigin(string origin) =>
+        AllowedCookieOrigins.Contains(origin, StringComparer.OrdinalIgnoreCase) ||
+        origin.StartsWith("chrome-extension://", StringComparison.OrdinalIgnoreCase) ||
+        origin.StartsWith("moz-extension://", StringComparison.OrdinalIgnoreCase);
+
     private void ApplyCorsHeaders()
     {
         var requestOrigin = HttpContext.Request.Headers["Origin"] ?? string.Empty;
-        // Always echo back the origin so any browser visiting YouTube can reach us.
-        // The endpoint only accepts cookies and has no sensitive side-effects on GET,
-        // so broad CORS is intentional here.
-        if (!string.IsNullOrEmpty(requestOrigin))
-            HttpContext.Response.Headers["Access-Control-Allow-Origin"] = requestOrigin;
+
+        // Previously echoed back whatever Origin arrived, so any page the user happened to
+        // be visiting could POST a cookie file at us and overwrite the real one. Only the
+        // origins that actually host the extension are answered now.
+        if (string.IsNullOrEmpty(requestOrigin) || !IsAllowedCookieOrigin(requestOrigin))
+            return;
+
+        HttpContext.Response.Headers["Access-Control-Allow-Origin"] = requestOrigin;
+        HttpContext.Response.Headers["Vary"] = "Origin";
 
         // Required for Chromium's Private Network Access (PNA) policy: allows a
         // public origin (youtube.com) to POST to a private address (localhost).
