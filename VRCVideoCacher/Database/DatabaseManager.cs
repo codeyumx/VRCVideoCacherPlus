@@ -18,10 +18,14 @@ public static class DatabaseManager
     {
         Directory.CreateDirectory(Database.CacheDir);
 
-        var options = new DbContextOptionsBuilder<Database>()
-            .UseSqlite($"Data Source={Database.DbPath}")
-            .EnableSensitiveDataLogging()
-            .Options;
+        var optionsBuilder = new DbContextOptionsBuilder<Database>()
+            .UseSqlite($"Data Source={Database.DbPath}");
+#if DEBUG
+        // Puts parameter values — watch history URLs and video ids — into the log output.
+        // Useful while developing, not something to ship enabled.
+        optionsBuilder = optionsBuilder.EnableSensitiveDataLogging();
+#endif
+        var options = optionsBuilder.Options;
 
         _contextFactory = new PooledDbContextFactory<Database>(options);
 
