@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Text.RegularExpressions;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -188,8 +187,10 @@ public partial class RulesViewModel : ViewModelBase
             {
                 try
                 {
-                    var regex = new Regex(entry.Pattern, RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(200));
-                    if (regex.IsMatch(url))
+                    // Shared cache with the request path, so typing in the test box doesn't
+                    // recompile every rule on every keystroke — and so the live matcher
+                    // uses exactly the regex options the real evaluation does.
+                    if (Services.RuleEngine.GetRegex(entry.Pattern).IsMatch(url))
                     {
                         entry.IsMatched = true;
                         foundMatch = true;

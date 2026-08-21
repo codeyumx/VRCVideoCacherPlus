@@ -21,6 +21,40 @@ public static class RuleEngine
 
     public static event Action<string>? OnRuleMatched;
 
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, Regex> RegexCache = new();
+
+    // Rules are few; this only exists so that a config edited into thousands of distinct
+    // patterns cannot grow the cache without bound.
+    private const int MaxCachedRegexes = 256;
+
+    /// <summary>
+    /// Returns a cached <see cref="Regex"/> for a rule pattern.
+    ///
+    /// Every rule was previously constructed fresh for every URL — a dozen pattern parses
+    /// per video request, and another dozen per keystroke in the Rules tab's live matcher.
+    /// Compiling once per distinct pattern instead makes evaluation essentially free.
+    ///
+    /// CultureInvariant matters as much as the caching: with IgnoreCase alone, case folding
+    /// follows the current culture, so under a Turkish locale "I" does not match "i" and
+    /// patterns like YOUTUBE\.COM quietly stop matching.
+    /// </summary>
+    public static Regex GetRegex(string pattern)
+    {
+        if (RegexCache.TryGetValue(pattern, out var cached))
+            return cached;
+
+        var regex = new Regex(
+            pattern,
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
+            TimeSpan.FromMilliseconds(500));
+
+        if (RegexCache.Count >= MaxCachedRegexes)
+            RegexCache.Clear();
+
+        RegexCache[pattern] = regex;
+        return regex;
+    }
+
     public static RuleEvaluationResult EvaluateUrl(string requestUrl)
     {
         var currentUrl = requestUrl.Trim();
@@ -38,8 +72,7 @@ public static class RuleEngine
 
             try
             {
-                var regex = new Regex(rule.Pattern, RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(500));
-                var match = regex.Match(currentUrl);
+                var match = GetRegex(rule.Pattern).Match(currentUrl);
 
                 if (!match.Success)
                     continue;
