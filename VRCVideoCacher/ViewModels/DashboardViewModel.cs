@@ -221,10 +221,10 @@ public partial class DashboardViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void ToggleHost()
+    private async Task ToggleHost()
     {
-        ElevatorManager.ToggleHostLine();
-        Dispatcher.UIThread.Post(() => { HostState = ElevatorManager.HasHostsLine; });
+        await ElevatorManager.ToggleHostLineAsync();
+        HostState = ElevatorManager.HasHostsLine;
     }
 
     private void RefreshCacheStats()

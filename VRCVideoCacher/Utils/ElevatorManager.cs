@@ -7,7 +7,23 @@ namespace VRCVideoCacher.Utils;
 public class ElevatorManager
 {
     private static readonly ILogger Log = Program.Logger.ForContext<ElevatorManager>();
-    public static bool HasHostsLine = HostsManager.IsHostAdded();
+    // Reading /etc/hosts can throw (permissions, or the file simply being absent on a
+    // stripped-down system). A static field initialiser that throws surfaces as a
+    // TypeInitializationException from whatever first touched this class.
+    public static bool HasHostsLine = SafeIsHostAdded();
+
+    private static bool SafeIsHostAdded()
+    {
+        try
+        {
+            return HostsManager.IsHostAdded();
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Could not read the hosts file; assuming the entry is absent.");
+            return false;
+        }
+    }
 
     private static readonly bool InPressureVessel = Directory.Exists("/run/pressure-vessel");
 
@@ -109,15 +125,17 @@ public class ElevatorManager
         return null;
     }
 
-    public static void ToggleHostLine()
-    {
-        if (HasHostsLine)
-            RemoveHostFile();
-        else
-            AddHostFile();
-    }
+    /// <summary>
+    /// Adds or removes the hosts entry, elevating as required.
+    ///
+    /// Async because the elevation prompt is modal to the *system*, not to us: the previous
+    /// synchronous WaitForExit ran on the UI thread, so the whole window froze — no repaint,
+    /// no tray, no response — for as long as the UAC or polkit dialog stayed open.
+    /// </summary>
+    public static Task ToggleHostLineAsync() =>
+        HasHostsLine ? RemoveHostFileAsync() : AddHostFileAsync();
 
-    private static void AddHostFile()
+    private static async Task AddHostFileAsync()
     {
         Process? proc;
         if (OperatingSystem.IsWindows())
@@ -142,7 +160,7 @@ public class ElevatorManager
             }
         }
 
-        proc.WaitForExit();
+        await proc.WaitForExitAsync();
 
         if (HostsManager.IsHostAdded())
         {
@@ -158,7 +176,7 @@ public class ElevatorManager
         }
     }
 
-    private static void RemoveHostFile()
+    private static async Task RemoveHostFileAsync()
     {
         Process? proc;
         if (OperatingSystem.IsWindows())
@@ -183,7 +201,7 @@ public class ElevatorManager
             }
         }
 
-        proc.WaitForExit();
+        await proc.WaitForExitAsync();
 
         if (!HostsManager.IsHostAdded())
         {
