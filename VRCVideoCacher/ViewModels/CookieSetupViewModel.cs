@@ -284,12 +284,5 @@ public partial class CookieSetupViewModel : ViewModelBase
         RequestClose?.Invoke();
     }
 
-    private static void OpenUrl(string url)
-    {
-        try
-        {
-            Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
-        }
-        catch { /* Ignore errors */ }
-    }
+    private static void OpenUrl(string url) => Utils.OpenUrl.Open(url);
 }

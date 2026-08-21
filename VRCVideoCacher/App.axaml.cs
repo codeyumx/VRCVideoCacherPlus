@@ -269,16 +269,5 @@ public partial class App : Application
         }
     }
 
-    private void OpenCacheFolder()
-    {
-        var cachePath = CacheManager.CachePath;
-        if (OperatingSystem.IsWindows())
-        {
-            System.Diagnostics.Process.Start("explorer.exe", cachePath);
-        }
-        else if (OperatingSystem.IsLinux())
-        {
-            System.Diagnostics.Process.Start("xdg-open", cachePath);
-        }
-    }
+    private void OpenCacheFolder() => OpenUrl.OpenFolder(CacheManager.CachePath);
 }

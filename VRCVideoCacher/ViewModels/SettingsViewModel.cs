@@ -345,13 +345,7 @@ public partial class SettingsViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void OpenUtilsFolder()
-    {
-        if (OperatingSystem.IsWindows())
-            System.Diagnostics.Process.Start("explorer.exe", Program.UtilsPath);
-        else if (OperatingSystem.IsLinux())
-            System.Diagnostics.Process.Start("xdg-open", Program.UtilsPath);
-    }
+    private void OpenUtilsFolder() => OpenUrl.OpenFolder(Program.UtilsPath);
 
     [ObservableProperty]
     private bool _isRedownloading;

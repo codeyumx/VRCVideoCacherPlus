@@ -170,17 +170,10 @@ public partial class MainWindowViewModel : ViewModelBase
     [RelayCommand]
     private void OpenReleasesPage()
     {
-        var url = _pendingRelease?.html_url
-                  ?? Program.LatestReleaseUrl;
-        try
-        {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = url,
-                UseShellExecute = true
-            });
-        }
-        catch { /* ignore — best effort */ }
+        // Through OpenUrl rather than Process.Start: html_url comes from the GitHub API
+        // response, and OpenUrl is what enforces the http/https allowlist. Handing an
+        // arbitrary string to ShellExecute does not.
+        OpenUrl.Open(_pendingRelease?.html_url ?? Program.LatestReleaseUrl);
     }
 
     public void CheckDnsFailure()

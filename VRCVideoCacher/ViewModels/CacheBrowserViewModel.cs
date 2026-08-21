@@ -147,18 +147,9 @@ public partial class CacheItemViewModel : ViewModelBase
         OpenUrlExternal(OriginalUrl);
     }
 
-    private static void OpenUrlExternal(string url)
-    {
-        try
-        {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = url,
-                UseShellExecute = true
-            });
-        }
-        catch { /* Ignore errors */ }
-    }
+    // OriginalUrl comes from play history — i.e. from whatever a world handed us — so it
+    // goes through OpenUrl.Open, which refuses anything that is not http(s).
+    private static void OpenUrlExternal(string url) => Utils.OpenUrl.Open(url);
 
     public bool HasCopyableUrl => IsYouTube || !string.IsNullOrEmpty(OriginalUrl);
 
@@ -332,22 +323,10 @@ public partial class CacheBrowserViewModel : ViewModelBase
     private void OpenInExplorer()
     {
         var cachePath = CacheManager.CachePath;
-        if (OperatingSystem.IsWindows())
-        {
-            if (SelectedItem != null)
-            {
-                var filePath = Path.Join(cachePath, SelectedItem.FileName);
-                System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{filePath}\"");
-            }
-            else
-            {
-                System.Diagnostics.Process.Start("explorer.exe", cachePath);
-            }
-        }
-        else if (OperatingSystem.IsLinux())
-        {
-            System.Diagnostics.Process.Start("xdg-open", cachePath);
-        }
+        if (SelectedItem != null)
+            Utils.OpenUrl.RevealFile(Path.Join(cachePath, SelectedItem.FileName));
+        else
+            Utils.OpenUrl.OpenFolder(cachePath);
     }
 
 }

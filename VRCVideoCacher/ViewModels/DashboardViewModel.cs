@@ -228,27 +228,13 @@ public partial class DashboardViewModel : ViewModelBase
     private void RefreshCacheStats()
     {
         TotalCacheSize = CacheManager.GetTotalCacheSize();
-        // Subtract 1 for index.html if it exists in the cache
-        var count = CacheManager.GetCachedVideoCount();
-        var assets = CacheManager.GetCachedAssets();
-        if (assets.ContainsKey("index.html"))
-            count--;
-        CachedVideoCount = count;
+        // The index only holds .mp4/.webm now, so index.html is never counted and no
+        // longer has to be subtracted back out.
+        CachedVideoCount = CacheManager.GetCachedVideoCount();
     }
 
     [RelayCommand]
-    private void OpenCacheFolder()
-    {
-        var cachePath = CacheManager.CachePath;
-        if (OperatingSystem.IsWindows())
-        {
-            System.Diagnostics.Process.Start("explorer.exe", cachePath);
-        }
-        else if (OperatingSystem.IsLinux())
-        {
-            System.Diagnostics.Process.Start("xdg-open", cachePath);
-        }
-    }
+    private void OpenCacheFolder() => OpenUrl.OpenFolder(CacheManager.CachePath);
 
     private async Task ValidateCookiesAsync()
     {
