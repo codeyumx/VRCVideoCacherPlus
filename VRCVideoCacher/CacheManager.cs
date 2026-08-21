@@ -69,6 +69,15 @@ public class CacheManager
         TryFlushCache();
     }
 
+    // The only file names this directory ever owns are "<videoId>.mp4" and "<videoId>.webm".
+    // Anything else in there belongs to someone else — the web server writes index.html into
+    // it, and users put things in it — so it must not be treated as a cache entry, validated
+    // as a video, or deleted.
+    private static readonly string[] CacheFileExtensions = [".mp4", ".webm"];
+
+    private static bool IsCacheFile(string fileName) =>
+        CacheFileExtensions.Contains(Path.GetExtension(fileName), StringComparer.OrdinalIgnoreCase);
+
     private static void BuildCache()
     {
         CachedAssets.Clear();
@@ -80,6 +89,13 @@ public class CacheManager
 
             // Skip the downloader's per-videoId scratch files; the downloader sweeps these.
             if (file.StartsWith("_tempVideo.", StringComparison.Ordinal))
+                continue;
+
+            // Previously every file here was validated as a video and deleted if it failed,
+            // which meant index.html was destroyed and recreated on every single launch —
+            // with a "Removed invalid cache entry" warning each time — and anything a user
+            // had put in the folder was deleted without asking.
+            if (!IsCacheFile(file))
                 continue;
 
             // Self-heal: if a previous session committed a tiny error body or otherwise
@@ -99,8 +115,13 @@ public class CacheManager
                 continue;
             }
 
-            AddToCache(file);
+            // Index without flushing per file: AddToCache calls TryFlushCache, which walks
+            // and sorts the whole dictionary, so using it here made startup quadratic in
+            // the number of cached videos. One flush at the end does the same job.
+            IndexCacheFile(file);
         }
+
+        TryFlushCache();
     }
 
     public static void TryFlushCache()
@@ -164,9 +185,23 @@ public class CacheManager
 
     public static void AddToCache(string fileName)
     {
+        if (!IndexCacheFile(fileName))
+            return;
+
+        OnCacheChanged?.Invoke(fileName, CacheChangeType.Added);
+        TryFlushCache();
+    }
+
+    /// <summary>
+    /// Records a file's size and timestamp in the index. Returns false if it has gone.
+    /// Split out from <see cref="AddToCache"/> so bulk indexing can skip the per-file
+    /// event and size-budget check.
+    /// </summary>
+    private static bool IndexCacheFile(string fileName)
+    {
         var filePath = Path.Join(CachePath, fileName);
         if (!File.Exists(filePath))
-            return;
+            return false;
 
         var fileInfo = new FileInfo(filePath);
         var videoCache = new VideoCache
@@ -179,9 +214,7 @@ public class CacheManager
         var existingCache = CachedAssets.GetOrAdd(videoCache.FileName, videoCache);
         existingCache.Size = fileInfo.Length;
         existingCache.LastModified = fileInfo.LastWriteTimeUtc;
-
-        OnCacheChanged?.Invoke(fileName, CacheChangeType.Added);
-        TryFlushCache();
+        return true;
     }
 
     private static long GetCacheSize()
