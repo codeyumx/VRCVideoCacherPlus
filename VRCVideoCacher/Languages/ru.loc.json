@@ -97,6 +97,7 @@
   "SkipReasonBotCheck": "Проверка YouTube на бота — установите расширение: github.com/clienthax/VRCVideoCacherBrowserExtension и используйте альтернативный аккаунт YouTube",
   "SkipReasonVideoUnavailable": "Видео недоступно",
   "SkipReasonPrivateVideo": "Видео является приватным",
+  "SkipReasonStalled": "Загрузка остановлена — данные не поступают",
   "LogViewer": "Просмотр логов",
   "ExportLogs": "Экспортировать логи",
   "ClearLogs": "Очистить логи",

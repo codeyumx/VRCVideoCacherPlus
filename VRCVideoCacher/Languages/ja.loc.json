@@ -97,6 +97,7 @@
   "SkipReasonBotCheck": "YouTubeのBot確認 — 拡張機能をインストールしてください: github.com/clienthax/VRCVideoCacherBrowserExtension また、別のYouTubeアカウントを使用してください",
   "SkipReasonVideoUnavailable": "動画は利用できません",
   "SkipReasonPrivateVideo": "非公開動画です",
+  "SkipReasonStalled": "ダウンロードが停止しました — データを受信できません",
   "LogViewer": "ログビューアー",
   "ExportLogs": "ログをエクスポート",
   "ClearLogs": "ログを消去",

@@ -97,6 +97,7 @@
   "SkipReasonBotCheck": "YouTube 机器人验证 — 请安装浏览器扩展：github.com/clienthax/VRCVideoCacherBrowserExtension 并使用其他 YouTube 账户",
   "SkipReasonVideoUnavailable": "视频不可用",
   "SkipReasonPrivateVideo": "视频为私有",
+  "SkipReasonStalled": "下载停滞 — 未接收到数据",
   "LogViewer": "日志查看器",
   "ExportLogs": "导出日志",
   "ClearLogs": "清除日志",

@@ -97,6 +97,7 @@
   "SkipReasonBotCheck": "YouTube 봇 확인 — 브라우저 확장 프로그램을 설치하세요: github.com/clienthax/VRCVideoCacherBrowserExtension 그리고 대체 YouTube 계정을 사용하세요",
   "SkipReasonVideoUnavailable": "동영상을 사용할 수 없습니다",
   "SkipReasonPrivateVideo": "비공개 동영상입니다",
+  "SkipReasonStalled": "다운로드가 중단됨 — 데이터를 수신하지 못했습니다",
   "LogViewer": "로그 뷰어",
   "ExportLogs": "로그 내보내기",
   "ClearLogs": "로그 지우기",

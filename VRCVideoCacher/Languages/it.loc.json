@@ -97,6 +97,7 @@
   "SkipReasonBotCheck": "YouTube bot-check — install the browser extension: github.com/clienthax/VRCVideoCacherBrowserExtension and use an alternative YouTube account",
   "SkipReasonVideoUnavailable": "Video unavailable",
   "SkipReasonPrivateVideo": "Video is private",
+  "SkipReasonStalled": "Download bloccato — nessun dato ricevuto",
   "LogViewer": "Visualizzatore Logs",
   "ExportLogs": "Esporta Logs",
   "ClearLogs": "Svuota Logs",

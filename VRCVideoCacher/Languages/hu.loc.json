@@ -97,6 +97,7 @@
   "SkipReasonBotCheck": "YouTube bot-ellenőrzés — telepítse a böngészőbővítményt: github.com/clienthax/VRCVideoCacherBrowserExtension és használjon alternatív YouTube fiókot",
   "SkipReasonVideoUnavailable": "A videó nem elérhető",
   "SkipReasonPrivateVideo": "A videó privát",
+  "SkipReasonStalled": "A letöltés elakadt — nem érkezett adat",
   "LogViewer": "Napló Néző",
   "ExportLogs": "Napló Exportálás",
   "ClearLogs": "Naplók Törlése",

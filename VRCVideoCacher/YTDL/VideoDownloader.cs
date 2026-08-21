@@ -21,10 +21,24 @@ public class VideoDownloader
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) " +
         "Chrome/124.0.0.0 Safari/537.36";
 
-    private static readonly HttpClient HttpClient = new()
+    // A cache download is an arbitrarily large file over an arbitrarily slow link, so the
+    // operation as a whole must not be time-boxed. HttpClient.Timeout covers reading the
+    // body as well as the headers even with ResponseHeadersRead, so the 100s default was
+    // cancelling any transfer that ran longer than that. Liveness is enforced per-read
+    // instead, via the stall watchdog in CopyWithStallGuardAsync.
+    private static readonly HttpClient HttpClient = new(new SocketsHttpHandler
     {
-        DefaultRequestHeaders = { { "User-Agent", DownloadUserAgent } }
+        PooledConnectionLifetime = TimeSpan.FromMinutes(2),
+        ConnectTimeout = TimeSpan.FromSeconds(30),
+    })
+    {
+        DefaultRequestHeaders = { { "User-Agent", DownloadUserAgent } },
+        Timeout = Timeout.InfiniteTimeSpan
     };
+
+    // How long a transfer may deliver no bytes at all before we give up on it. Generous
+    // enough to survive a CDN hiccup, short enough that a dead socket can't wedge the queue.
+    private static readonly TimeSpan StallTimeout = TimeSpan.FromSeconds(60);
 
     // Per-videoId temp paths so a leftover from one download can never be glued onto
     // a different video's resume request. Format: _tempVideo.<videoId>.<ext>
@@ -499,26 +513,57 @@ public class VideoDownloader
             OnDownloadProgress?.Invoke(percent);
     }
 
-    private static async Task ThrottledCopyAsync(Stream source, Stream destination, long bytesPerSecond, long totalBytes, CancellationToken ct)
+    /// <summary>
+    /// Copies the response body to disk, optionally rate-limited, under a stall watchdog.
+    /// The deadline is pushed forward on every read, so a transfer that keeps making
+    /// progress runs as long as it needs to while one that goes silent for
+    /// <see cref="StallTimeout"/> is cancelled. HttpClient.Timeout is disabled for this
+    /// client, so this is the only thing between a dead socket and a wedged queue.
+    /// </summary>
+    /// <param name="bytesPerSecond">Rate limit, or 0 for unlimited.</param>
+    private static async Task CopyWithStallGuardAsync(
+        Stream source, Stream destination, long bytesPerSecond, long totalBytes, CancellationTokenSource cts)
     {
         var buffer = new byte[81920];
         var stopwatch = Stopwatch.StartNew();
         long totalBytesRead = 0;
 
-        int bytesRead;
-        while ((bytesRead = await source.ReadAsync(buffer, ct)) > 0)
+        while (true)
         {
-            await destination.WriteAsync(buffer.AsMemory(0, bytesRead), ct);
+            cts.CancelAfter(StallTimeout);
+            var bytesRead = await source.ReadAsync(buffer, cts.Token);
+            if (bytesRead <= 0)
+                break;
+
+            await destination.WriteAsync(buffer.AsMemory(0, bytesRead), cts.Token);
             totalBytesRead += bytesRead;
 
             if (totalBytes > 0)
                 OnDownloadProgress?.Invoke((double)totalBytesRead / totalBytes * 100.0);
 
+            if (bytesPerSecond <= 0)
+                continue;
+
             var expectedMs = (double)totalBytesRead / bytesPerSecond * 1000;
             var elapsedMs = stopwatch.Elapsed.TotalMilliseconds;
             if (elapsedMs < expectedMs)
-                await Task.Delay(TimeSpan.FromMilliseconds(expectedMs - elapsedMs), ct);
+                await Task.Delay(TimeSpan.FromMilliseconds(expectedMs - elapsedMs), cts.Token);
         }
+
+        // Disarm, so the validation and move that follow can't trip the watchdog.
+        cts.CancelAfter(Timeout.InfiniteTimeSpan);
+    }
+
+    // A cancelled transfer is either the user's pause — which the caller reports as a pause,
+    // with no error — or the stall watchdog firing, which is a genuine failure and needs to
+    // reach the queue's status line instead of masquerading as a pause.
+    private static (bool Success, string? FailReason) CancelledOutcome(string url)
+    {
+        if (_pauseRequested)
+            return (false, null);
+
+        Log.Warning("Download for {URL} stalled for {Seconds}s with no data; giving up.", url, StallTimeout.TotalSeconds);
+        return (false, "SkipReasonStalled");
     }
 
 
@@ -556,10 +601,14 @@ public class VideoDownloader
             request.Headers.Add("Accept", "video/*");
             if (resumeFrom > 0)
                 request.Headers.Range = new RangeHeaderValue(resumeFrom, null);
-            
+
+            // Arm the watchdog for the headers too: ConnectTimeout only covers the TCP
+            // handshake, so a server that accepts and then says nothing would hang here.
+            cts.CancelAfter(StallTimeout);
             response = await HttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token);
+            cts.CancelAfter(Timeout.InfiniteTimeSpan);
         }
-        catch (OperationCanceledException) { return (false, null); }
+        catch (OperationCanceledException) { return CancelledOutcome(url); }
         catch (HttpRequestException ex)
         {
             Log.Error(ex, "Failed to start download for {URL}", url);
@@ -602,15 +651,13 @@ public class VideoDownloader
                 await using var fileStream = new FileStream(tempMp4, fileMode, FileAccess.Write, FileShare.None);
 
                 var rateLimitMBs = PlusConfigManager.Config.CacheDownloadRateLimitMBs;
-                if (rateLimitMBs > 0)
-                    await ThrottledCopyAsync(stream, fileStream, rateLimitMBs * 1024L * 1024L, expectedTotalBytes, cts.Token);
-                else
-                    await stream.CopyToAsync(fileStream, cts.Token);
+                var bytesPerSecond = rateLimitMBs > 0 ? rateLimitMBs * 1024L * 1024L : 0L;
+                await CopyWithStallGuardAsync(stream, fileStream, bytesPerSecond, expectedTotalBytes, cts);
             }
             catch (OperationCanceledException)
             {
                 response.Dispose();
-                return (false, null);
+                return CancelledOutcome(url);
             }
             catch (IOException ex)
             {
