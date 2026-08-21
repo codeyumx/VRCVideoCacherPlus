@@ -4,8 +4,16 @@ public class HostsManager
 {
     private static readonly Serilog.ILogger Log = Program.Logger.ForContext<HostsManager>();
 
-    private static readonly string Header = $"{Environment.NewLine}# ----- BEGIN VRCVIDEOCACHER -----{Environment.NewLine}";
-    private static readonly string Footer = $"{Environment.NewLine}# ----- END VRCVIDEOCACHER -----{Environment.NewLine}";
+    // Detection keys off the bare markers, not the newline-wrapped forms below: the hosts
+    // file may use LF while Environment.NewLine is CRLF, and a mismatch there made
+    // IsHostAdded report "absent" for a block that was plainly present — which in turn made
+    // Add() append a second copy every time.
+    private const string HeaderMarker = "# ----- BEGIN VRCVIDEOCACHER -----";
+    private const string FooterMarker = "# ----- END VRCVIDEOCACHER -----";
+    private const string ManagedHostLine = "127.0.0.1 localhost.youtube.com";
+
+    private static readonly string Header = $"{Environment.NewLine}{HeaderMarker}{Environment.NewLine}";
+    private static readonly string Footer = $"{Environment.NewLine}{FooterMarker}{Environment.NewLine}";
     private static readonly string HostsPath = OperatingSystem.IsWindows()
         ? $"{Environment.GetFolderPath(Environment.SpecialFolder.System)}/drivers/etc/hosts"
         : "/etc/hosts";
@@ -46,24 +54,46 @@ public class HostsManager
     {
         CreateHostsIfNotExists();
         var hostsFile = File.ReadAllText(HostsPath);
-        if (hostsFile.Contains(Header))
+        if (hostsFile.Contains(HeaderMarker, StringComparison.Ordinal))
             return;
 
-        File.AppendAllText(HostsPath,
-            $"{Header}127.0.0.1 localhost.youtube.com{Footer}");
+        File.AppendAllText(HostsPath, $"{Header}{ManagedHostLine}{Footer}");
     }
 
     private static void Remove()
     {
         CreateHostsIfNotExists();
         var hostsFile = File.ReadAllText(HostsPath);
-        if (!hostsFile.Contains(Header))
+
+        var headerStart = hostsFile.IndexOf(HeaderMarker, StringComparison.Ordinal);
+        if (headerStart < 0)
             return;
 
-        var headerStart = hostsFile.IndexOf(Header, StringComparison.Ordinal);
-        var headerEnd = hostsFile.IndexOf(Footer, StringComparison.Ordinal) + Footer.Length;
-        var newHostsFile = hostsFile.Remove(headerStart, headerEnd - headerStart);
-        File.WriteAllText(HostsPath, newHostsFile);
+        // Search for the footer *after* the header. Searching from index 0 meant that a
+        // hand-edited file with the footer deleted (IndexOf returns -1) or sitting before
+        // the header yielded a negative length, and String.Remove threw
+        // ArgumentOutOfRangeException — inside an elevated subprocess, where it is close to
+        // invisible and leaves the entry in place.
+        var footerStart = hostsFile.IndexOf(FooterMarker, headerStart, StringComparison.Ordinal);
+        if (footerStart >= 0)
+        {
+            var blockEnd = footerStart + FooterMarker.Length;
+            File.WriteAllText(HostsPath, hostsFile.Remove(headerStart, blockEnd - headerStart));
+            return;
+        }
+
+        // No footer, so there is no way to know how far the block was meant to extend, and
+        // everything after it may be the user's own entries. Drop only the marker and the
+        // single line we manage rather than guessing.
+        Log.Warning("Hosts block end marker missing; removing only the start marker and the managed entry.");
+        var kept = hostsFile
+            .Split('\n')
+            .Where(line =>
+            {
+                var trimmed = line.Trim();
+                return trimmed != HeaderMarker && trimmed != FooterMarker && trimmed != ManagedHostLine;
+            });
+        File.WriteAllText(HostsPath, string.Join('\n', kept));
     }
 
     public static bool IsHostAdded()
@@ -72,7 +102,7 @@ public class HostsManager
             return false;
 
         var hostsFile = File.ReadAllText(HostsPath);
-        return hostsFile.Contains(Header);
+        return hostsFile.Contains(HeaderMarker, StringComparison.Ordinal);
     }
 
     private static void CreateHostsIfNotExists()
