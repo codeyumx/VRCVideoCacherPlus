@@ -200,5 +200,14 @@
   "Discard": "Descartar",
   "ResetToDefaults": "Padrões",
   "ConfirmResetDefaultsTitle": "Redefinir regras para os padrões?",
-  "ConfirmResetDefaultsMessage": "Tem certeza de que deseja redefinir todas as regras para os padrões de fábrica? As regras personalizadas serão substituídas."
+  "ConfirmResetDefaultsMessage": "Tem certeza de que deseja redefinir todas as regras para os padrões de fábrica? As regras personalizadas serão substituídas.",
+  "EditRuleTitle": "Editar regra",
+  "AddRuleTitle": "Adicionar regra",
+  "PatternCannotBeEmpty": "O padrão não pode ficar vazio.",
+  "InvalidRegex": "Regex inválida: {0}",
+  "UpdateAvailable": "A versão {0} está disponível!",
+  "UpdateDownloading": "Baixando atualização...",
+  "UpdateFailed": "Falha na atualização. Verifique os logs e tente novamente.",
+  "SkipReasonInvalidDownload": "O arquivo baixado não passou na validação",
+  "SkipReasonTruncated": "O download ficou incompleto"
 }

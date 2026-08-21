@@ -200,5 +200,14 @@
   "Discard": "放弃",
   "ResetToDefaults": "默认值",
   "ConfirmResetDefaultsTitle": "重置规则为默认值？",
-  "ConfirmResetDefaultsMessage": "您确定要将所有规则重置为出厂默认设置吗？自定义规则将被替换。"
+  "ConfirmResetDefaultsMessage": "您确定要将所有规则重置为出厂默认设置吗？自定义规则将被替换。",
+  "EditRuleTitle": "编辑规则",
+  "AddRuleTitle": "添加规则",
+  "PatternCannotBeEmpty": "匹配模式不能为空。",
+  "InvalidRegex": "正则表达式无效：{0}",
+  "UpdateAvailable": "版本 {0} 可用！",
+  "UpdateDownloading": "正在下载更新...",
+  "UpdateFailed": "更新失败。请查看日志后重试。",
+  "SkipReasonInvalidDownload": "下载的文件未通过校验",
+  "SkipReasonTruncated": "下载不完整"
 }

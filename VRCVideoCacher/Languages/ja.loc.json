@@ -200,5 +200,14 @@
   "Discard": "破棄",
   "ResetToDefaults": "デフォルト",
   "ConfirmResetDefaultsTitle": "ルールをデフォルトに戻しますか？",
-  "ConfirmResetDefaultsMessage": "すべてのルールを工場出荷時のデフォルトにリセットしますか？カスタムルールは上書きされます。"
+  "ConfirmResetDefaultsMessage": "すべてのルールを工場出荷時のデフォルトにリセットしますか？カスタムルールは上書きされます。",
+  "EditRuleTitle": "ルールを編集",
+  "AddRuleTitle": "ルールを追加",
+  "PatternCannotBeEmpty": "パターンを空にはできません。",
+  "InvalidRegex": "正規表現が無効です: {0}",
+  "UpdateAvailable": "バージョン {0} が利用可能です！",
+  "UpdateDownloading": "更新をダウンロード中...",
+  "UpdateFailed": "更新に失敗しました。ログを確認して再試行してください。",
+  "SkipReasonInvalidDownload": "ダウンロードしたファイルの検証に失敗しました",
+  "SkipReasonTruncated": "ダウンロードが不完全でした"
 }

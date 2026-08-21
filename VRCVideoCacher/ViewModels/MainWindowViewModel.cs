@@ -141,7 +141,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public void ShowUpdate(UpdateInfo info)
     {
         _pendingRelease = info.Release;
-        UpdateVersionText = $"Version {info.Version} is available!";
+        UpdateVersionText = string.Format(Localizer.Get("UpdateAvailable"), info.Version);
         IsUpdateAvailable = true;
     }
 
@@ -150,14 +150,14 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         if (_pendingRelease == null) return;
         IsUpdatePending = true;
-        UpdateVersionText = "Downloading update...";
+        UpdateVersionText = Localizer.Get("UpdateDownloading");
         // ApplyUpdate exits the process on success, so the failure message only shows
         // when the swap or download legitimately failed.
         var ok = await Updater.ApplyUpdate(_pendingRelease);
         if (!ok)
         {
             IsUpdatePending = false;
-            UpdateVersionText = "Update failed. Check logs and try again.";
+            UpdateVersionText = Localizer.Get("UpdateFailed");
         }
     }
 

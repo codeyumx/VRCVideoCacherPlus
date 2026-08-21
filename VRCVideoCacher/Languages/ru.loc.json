@@ -200,5 +200,14 @@
   "Discard": "Отменить",
   "ResetToDefaults": "По умолчанию",
   "ConfirmResetDefaultsTitle": "Сбросить правила по умолчанию?",
-  "ConfirmResetDefaultsMessage": "Вы уверены, что хотите сбросить все правила до заводских настроек? Пользовательские правила будут заменены."
+  "ConfirmResetDefaultsMessage": "Вы уверены, что хотите сбросить все правила до заводских настроек? Пользовательские правила будут заменены.",
+  "EditRuleTitle": "Изменить правило",
+  "AddRuleTitle": "Добавить правило",
+  "PatternCannotBeEmpty": "Шаблон не может быть пустым.",
+  "InvalidRegex": "Неверное регулярное выражение: {0}",
+  "UpdateAvailable": "Доступна версия {0}!",
+  "UpdateDownloading": "Загрузка обновления...",
+  "UpdateFailed": "Не удалось обновить. Проверьте журнал и повторите попытку.",
+  "SkipReasonInvalidDownload": "Загруженный файл не прошёл проверку",
+  "SkipReasonTruncated": "Загрузка не завершена"
 }

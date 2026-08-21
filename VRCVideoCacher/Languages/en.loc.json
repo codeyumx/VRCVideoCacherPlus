@@ -200,5 +200,14 @@
   "Discard": "Discard",
   "ResetToDefaults": "Defaults",
   "ConfirmResetDefaultsTitle": "Reset Rules to Defaults?",
-  "ConfirmResetDefaultsMessage": "Are you sure you want to reset all rules to factory defaults? Any custom rules will be replaced."
+  "ConfirmResetDefaultsMessage": "Are you sure you want to reset all rules to factory defaults? Any custom rules will be replaced.",
+  "EditRuleTitle": "Edit Rule",
+  "AddRuleTitle": "Add Rule",
+  "PatternCannotBeEmpty": "Pattern cannot be empty.",
+  "InvalidRegex": "Invalid regex: {0}",
+  "UpdateAvailable": "Version {0} is available!",
+  "UpdateDownloading": "Downloading update...",
+  "UpdateFailed": "Update failed. Check the logs and try again.",
+  "SkipReasonInvalidDownload": "Downloaded file failed validation",
+  "SkipReasonTruncated": "Download was incomplete"
 }

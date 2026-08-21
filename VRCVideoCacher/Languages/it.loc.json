@@ -200,5 +200,14 @@
   "Discard": "Scarta",
   "ResetToDefaults": "Impostazioni predefinite",
   "ConfirmResetDefaultsTitle": "Ripristinare le regole predefinite?",
-  "ConfirmResetDefaultsMessage": "Sei sicuro di voler ripristinare tutte le regole ai valori predefiniti di fabbrica? Le regole personalizzate verranno sostituite."
+  "ConfirmResetDefaultsMessage": "Sei sicuro di voler ripristinare tutte le regole ai valori predefiniti di fabbrica? Le regole personalizzate verranno sostituite.",
+  "EditRuleTitle": "Modifica regola",
+  "AddRuleTitle": "Aggiungi regola",
+  "PatternCannotBeEmpty": "Il pattern non può essere vuoto.",
+  "InvalidRegex": "Regex non valida: {0}",
+  "UpdateAvailable": "La versione {0} è disponibile!",
+  "UpdateDownloading": "Download dell'aggiornamento...",
+  "UpdateFailed": "Aggiornamento non riuscito. Controlla i log e riprova.",
+  "SkipReasonInvalidDownload": "Il file scaricato non ha superato la validazione",
+  "SkipReasonTruncated": "Il download è incompleto"
 }

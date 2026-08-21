@@ -200,5 +200,14 @@
   "Discard": "Elvetés",
   "ResetToDefaults": "Alapértelmezések",
   "ConfirmResetDefaultsTitle": "Szabályok visszaállítása alapértelmezettre?",
-  "ConfirmResetDefaultsMessage": "Biztosan visszaállítja az összes szabályt a gyári alapértelmezésekre? Az egyedi szabályok felülíródnak."
+  "ConfirmResetDefaultsMessage": "Biztosan visszaállítja az összes szabályt a gyári alapértelmezésekre? Az egyedi szabályok felülíródnak.",
+  "EditRuleTitle": "Szabály szerkesztése",
+  "AddRuleTitle": "Szabály hozzáadása",
+  "PatternCannotBeEmpty": "A minta nem lehet üres.",
+  "InvalidRegex": "Érvénytelen reguláris kifejezés: {0}",
+  "UpdateAvailable": "A(z) {0} verzió elérhető!",
+  "UpdateDownloading": "Frissítés letöltése...",
+  "UpdateFailed": "A frissítés sikertelen. Ellenőrizd a naplót, és próbáld újra.",
+  "SkipReasonInvalidDownload": "A letöltött fájl nem ment át az ellenőrzésen",
+  "SkipReasonTruncated": "A letöltés hiányos volt"
 }

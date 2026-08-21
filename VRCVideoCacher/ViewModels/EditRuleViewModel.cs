@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Jeek.Avalonia.Localization;
 using VRCVideoCacher.Models;
 
 namespace VRCVideoCacher.ViewModels;
@@ -8,7 +9,7 @@ namespace VRCVideoCacher.ViewModels;
 public partial class EditRuleViewModel : ObservableObject
 {
     [ObservableProperty]
-    private string _title = "Edit Rule";
+    private string _title = string.Empty;
 
     [ObservableProperty]
     private string _name = string.Empty;
@@ -60,8 +61,8 @@ public partial class EditRuleViewModel : ObservableObject
     public bool IsCacheAction => SelectedAction == RuleAction.Resolve && Cache;
     public bool IsRedirectAction => SelectedAction == RuleAction.Redirect || SelectedAction == RuleAction.Rewrite;
     public string TargetUrlLabel => SelectedAction == RuleAction.Rewrite
-        ? Jeek.Avalonia.Localization.Localizer.Get("RewriteTarget")
-        : Jeek.Avalonia.Localization.Localizer.Get("RedirectTarget");
+        ? Localizer.Get("RewriteTarget")
+        : Localizer.Get("RedirectTarget");
 
     public UriRule RuleResult { get; private set; }
 
@@ -71,7 +72,7 @@ public partial class EditRuleViewModel : ObservableObject
     {
         if (ruleToEdit != null)
         {
-            Title = "Edit Rule";
+            Title = Localizer.Get("EditRuleTitle");
             RuleResult = ruleToEdit.Clone();
             Name = ruleToEdit.Name;
             Pattern = ruleToEdit.Pattern;
@@ -85,7 +86,7 @@ public partial class EditRuleViewModel : ObservableObject
         }
         else
         {
-            Title = "Add Rule";
+            Title = Localizer.Get("AddRuleTitle");
             RuleResult = new UriRule();
             Name = "New Rule";
             Pattern = @"^https?://";
@@ -123,7 +124,7 @@ public partial class EditRuleViewModel : ObservableObject
         if (string.IsNullOrWhiteSpace(Pattern))
         {
             IsValidPattern = false;
-            PatternError = "Pattern cannot be empty.";
+            PatternError = Localizer.Get("PatternCannotBeEmpty");
             return;
         }
 
@@ -136,7 +137,7 @@ public partial class EditRuleViewModel : ObservableObject
         catch (Exception ex)
         {
             IsValidPattern = false;
-            PatternError = $"Invalid Regex: {ex.Message}";
+            PatternError = string.Format(Localizer.Get("InvalidRegex"), ex.Message);
         }
     }
 
