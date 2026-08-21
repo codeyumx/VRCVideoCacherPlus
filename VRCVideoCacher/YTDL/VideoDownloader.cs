@@ -30,6 +30,9 @@ public class VideoDownloader
     {
         PooledConnectionLifetime = TimeSpan.FromMinutes(2),
         ConnectTimeout = TimeSpan.FromSeconds(30),
+        // Downloads whatever URL the resolver settled on, which ultimately came from a
+        // world; same address guard as the probe path.
+        ConnectCallback = Utils.UrlPolicy.GuardedConnectAsync,
     })
     {
         DefaultRequestHeaders = { { "User-Agent", DownloadUserAgent } },

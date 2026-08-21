@@ -9,9 +9,16 @@ public class ThirdPartyYTResolver : ISiteHandler
 
     // AllowAutoRedirect=false so we can check each hop and stop as soon as
     // the destination is a URL a specific handler recognises
-    private static readonly HttpClient NoAutoRedirectClient = new(new HttpClientHandler { AllowAutoRedirect = false })
+    private static readonly HttpClient NoAutoRedirectClient = new(new SocketsHttpHandler
     {
-        DefaultRequestHeaders = { { "User-Agent", "VRCVideoCacher" } }
+        AllowAutoRedirect = false,
+        ConnectTimeout = TimeSpan.FromSeconds(10),
+        // Walks redirect chains for URLs chosen by whoever is in the instance.
+        ConnectCallback = Utils.UrlPolicy.GuardedConnectAsync,
+    })
+    {
+        DefaultRequestHeaders = { { "User-Agent", "VRCVideoCacher" } },
+        Timeout = TimeSpan.FromSeconds(20)
     };
 
     public bool CanHandle(Uri uri) => false; // rewrite only
@@ -42,6 +49,14 @@ public class ThirdPartyYTResolver : ISiteHandler
 
                 if (!Uri.TryCreate(next, UriKind.Absolute, out var nextUri))
                     break;
+
+                // A Location header can name any scheme it likes; only http(s) is ever a
+                // video we could go on to fetch.
+                if (!Utils.UrlPolicy.IsFetchableWebUrl(nextUri))
+                {
+                    Log.Warning("Stopping redirect chain at non-web URL {Url}", next);
+                    break;
+                }
 
                 // Stop as soon as the redirect target has a specific handler
                 if (SiteHandlerRegistry.HasSpecificHandler(nextUri))

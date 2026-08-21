@@ -21,6 +21,9 @@ public class HlsHandler : ISiteHandler
         PooledConnectionLifetime = TimeSpan.FromMinutes(2),
         ConnectTimeout = TimeSpan.FromSeconds(3),
         AllowAutoRedirect = true,
+        // Probes whatever URL a world hands us, and follows redirects while doing it, so
+        // the address guard belongs at connect time where it also covers those redirects.
+        ConnectCallback = Utils.UrlPolicy.GuardedConnectAsync,
     })
     {
         DefaultRequestHeaders = { { "User-Agent", "VRCVideoCacher" } },
@@ -234,6 +237,12 @@ public class HlsHandler : ISiteHandler
         if (depth >= ProbeMaxDepth)
         {
             Log.Debug("HLS probe depth limit reached for {URL}", url);
+            return new ProbeResult(false, null, false, null);
+        }
+
+        if (!Utils.UrlPolicy.IsFetchableWebUrl(url))
+        {
+            Log.Debug("Skipping HLS probe for non-web URL {URL}", url);
             return new ProbeResult(false, null, false, null);
         }
 

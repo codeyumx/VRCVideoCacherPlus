@@ -197,9 +197,37 @@ public class ApiController : WebApiController
         await HttpContext.SendStringAsync(reason, "text/plain", Encoding.UTF8);
     }
 
+    /// <summary>
+    /// The only legitimate caller of /getvideo is yt-dlp-stub, a plain HTTP client with no
+    /// browser context. A cross-origin GET from a web page needs no preflight, so without
+    /// this check any site the user visits could drive the resolver: make the application
+    /// fetch arbitrary URLs, queue downloads and write into the cache. It could not read
+    /// the responses, but it would not need to.
+    ///
+    /// Sec-Fetch-Site: none means the user typed the URL themselves, which is deliberate
+    /// and cannot be triggered by a third party, so that case is allowed through.
+    /// </summary>
+    private bool IsBrowserOriginatedRequest()
+    {
+        if (!string.IsNullOrEmpty(HttpContext.Request.Headers["Origin"]))
+            return true;
+
+        var fetchSite = HttpContext.Request.Headers["Sec-Fetch-Site"];
+        return !string.IsNullOrEmpty(fetchSite) &&
+               !string.Equals(fetchSite, "none", StringComparison.OrdinalIgnoreCase);
+    }
+
     [Route(HttpVerbs.Get, "/getvideo")]
     public async Task GetVideo()
     {
+        if (IsBrowserOriginatedRequest())
+        {
+            Log.Warning("Rejecting browser-originated request to /getvideo.");
+            HttpContext.Response.StatusCode = 403;
+            await HttpContext.SendStringAsync("This endpoint is not callable from a browser.", "text/plain", Encoding.UTF8);
+            return;
+        }
+
         // No quote-mangling here any more: yt-dlp arguments go through ArgumentList, so a
         // quote in a URL can no longer break out of the command line. The old
         // Replace("\"", "%22") was the single guard for the whole application and it also
