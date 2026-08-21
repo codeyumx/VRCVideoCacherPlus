@@ -87,6 +87,25 @@ public static class SiteHandlerRegistry
         return handler; // GenericHandler or null
     }
 
+    /// <summary>
+    /// Returns the handler that produced a <see cref="VideoInfo"/>, identified by its
+    /// <see cref="UrlType"/>.
+    ///
+    /// Preferred over re-resolving from the URL once a VideoInfo exists: GetVideoInfo
+    /// canonicalises as it goes — a /shorts/ link or a bare video id both come back as
+    /// /watch?v=... — so re-running rule evaluation against the new form can legitimately
+    /// pick a different rule, and therefore a different handler, than the one that actually
+    /// created the record.
+    /// </summary>
+    public static ISiteHandler? ResolveByUrlType(UrlType urlType) => urlType switch
+    {
+        UrlType.YouTube => Handlers.OfType<YouTubeHandler>().FirstOrDefault(),
+        UrlType.PyPyDance => Handlers.OfType<PyPyDanceHandler>().FirstOrDefault(),
+        UrlType.VRDancing => Handlers.OfType<VRDancingHandler>().FirstOrDefault(),
+        UrlType.Hls => Handlers.OfType<HlsHandler>().FirstOrDefault(),
+        _ => Handlers.OfType<GenericHandler>().FirstOrDefault(),
+    };
+
     public static bool HasSpecificHandler(Uri uri) =>
         Handlers.Any(h => h is not GenericHandler && h.CanHandle(uri));
 }

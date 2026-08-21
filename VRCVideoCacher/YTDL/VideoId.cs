@@ -213,8 +213,12 @@ public class VideoId
 
         var url = videoInfo.VideoUrl;
         var uri = ToUri(url);
-        var evalResult = Services.RuleEngine.EvaluateUrl(url);
-        var handler = uri != null ? SiteHandlerRegistry.Resolve(uri, evalResult.MatchedRule) : null;
+
+        // Select the handler from the type recorded on the VideoInfo rather than
+        // re-evaluating the rules against its URL. GetVideoInfo has already canonicalised
+        // that URL, so a second evaluation is both redundant and able to disagree with the
+        // handler that produced this record in the first place.
+        var handler = uri != null ? SiteHandlerRegistry.ResolveByUrlType(videoInfo.UrlType) : null;
         var args = handler?.GetYtdlpArguments(uri!, avPro) ?? [];
         args.Add("--get-url");
 
