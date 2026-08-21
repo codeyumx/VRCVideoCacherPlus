@@ -67,10 +67,25 @@ public class VideoDownloader
     private static Process? _currentProcess;
     private static CancellationTokenSource? _downloadCts;
 
+    private static int _started;
+
     static VideoDownloader()
     {
         SweepStaleTempFiles();
         ActiveStreamTracker.OnStreamingActivity += OnStreamingActivity;
+    }
+
+    /// <summary>
+    /// Starts the download loop. Called once from startup rather than from the static
+    /// constructor: a type initialiser that spawns a background worker means merely
+    /// subscribing to one of the events on this class — which the dashboard view model does
+    /// while building the UI — silently starts the queue running.
+    /// </summary>
+    public static void Start()
+    {
+        if (Interlocked.Exchange(ref _started, 1) == 1)
+            return;
+
         Task.Run(DownloadThread);
     }
 
@@ -109,9 +124,18 @@ public class VideoDownloader
 
     private static async Task DownloadThread()
     {
-        while (true)
+        var shutdown = Program.ShutdownToken;
+
+        while (!shutdown.IsCancellationRequested)
         {
-            await Task.Delay(500);
+            try
+            {
+                await Task.Delay(500, shutdown);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
 
             var idleSeconds = PlusConfigManager.Config.CacheDownloadIdleSeconds;
 

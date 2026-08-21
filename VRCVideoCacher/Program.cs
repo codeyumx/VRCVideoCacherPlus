@@ -38,6 +38,28 @@ internal sealed class Program
     private const string SingleInstanceMutexName = @"Local\VRCVideoCacher_SingleInstance";
     private static Mutex? _singleInstanceMutex;
 
+    private static readonly CancellationTokenSource ShutdownCts = new();
+
+    /// <summary>
+    /// Cancelled when the application is shutting down. Long-running background loops
+    /// should await on this so they unwind promptly instead of being terminated mid-step by
+    /// the Environment.Exit at the end of Main.
+    /// </summary>
+    public static CancellationToken ShutdownToken => ShutdownCts.Token;
+
+    public static void SignalShutdown()
+    {
+        try
+        {
+            if (!ShutdownCts.IsCancellationRequested)
+                ShutdownCts.Cancel();
+        }
+        catch (Exception ex)
+        {
+            Logger.Debug("Error signalling shutdown: {Error}", ex.Message);
+        }
+    }
+
     private static bool TryAcquireSingleInstanceMutex()
     {
         _singleInstanceMutex = new Mutex(false, SingleInstanceMutexName);
@@ -146,7 +168,9 @@ internal sealed class Program
         // Start the UI — blocks until Avalonia shuts down
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
 
-        // Force-exit so background threads (web server, download loop, OpenVR) don't keep the process alive
+        // Ask the background loops to unwind first, then force-exit as a backstop for
+        // anything still holding the process open (web server, OpenVR).
+        SignalShutdown();
         Environment.Exit(0);
     }
 
@@ -233,6 +257,7 @@ internal sealed class Program
             Logger.Warning("No cookies found, please use the browser extension to send cookies or disable \"ytdlUseCookies\" in config.");
 
         CacheManager.Init();
+        VideoDownloader.Start();
         // Runs after CacheManager.Init so already-cached videos are skipped; not awaited
         // because resolving each URL hits the network and must not delay startup.
         _ = VideoPreCache.QueueConfiguredVideos();
@@ -389,6 +414,7 @@ internal sealed class Program
 
     private static void OnAppQuit()
     {
+        SignalShutdown();
         API.WebServer.Stop();
         FileTools.RestoreAllYtdl();
         Logger.Information("Exiting...");

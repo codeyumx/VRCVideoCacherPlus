@@ -172,20 +172,26 @@ public class YtdlManager
 
     private static async Task YtdlUpdaterTask()
     {
-        const int interval = 60 * 60 * 1000; // 1 hour
-        while (true)
+        var interval = TimeSpan.FromHours(1);
+        var token = Program.ShutdownToken;
+
+        while (!token.IsCancellationRequested)
         {
-            await Task.Delay(interval);
             try
             {
+                await Task.Delay(interval, token);
                 await TryDownloadYtdlp();
+            }
+            catch (OperationCanceledException)
+            {
+                // Shutting down.
+                return;
             }
             catch (Exception ex)
             {
                 Log.Warning(ex, "YT-DLP update check failed, will retry next interval.");
             }
         }
-        // ReSharper disable once FunctionNeverReturns
     }
 
     public static async Task TryDownloadYtdlp()

@@ -29,21 +29,31 @@ public static class VRDancingSheetService
     {
         _ = Task.Run(async () =>
         {
-            while (true)
+            var token = Program.ShutdownToken;
+            while (!token.IsCancellationRequested)
             {
                 try
                 {
                     if (IsStale())
                         await SyncOnceAsync();
+
+                    await Task.Delay(SyncInterval, token);
+                }
+                catch (OperationCanceledException)
+                {
+                    // Shutting down.
+                    return;
                 }
                 catch (Exception ex)
                 {
                     Logger.Warning(ex, "VRDancing sheet sync failed");
-                }
 
-                await Task.Delay(SyncInterval);
+                    // Still wait out the interval after a failure, or a persistent error
+                    // turns this into a hot loop.
+                    try { await Task.Delay(SyncInterval, token); }
+                    catch (OperationCanceledException) { return; }
+                }
             }
-            // ReSharper disable once FunctionNeverReturns
         });
     }
 
