@@ -43,15 +43,6 @@ public class ApiController : WebApiController
         HttpContext.Request.Headers[NewExtensionHeader] == NewExtensionId;
 
     private static readonly Serilog.ILogger Log = Program.Logger.ForContext<ApiController>();
-    private static readonly HttpClient HttpClient = new(new SocketsHttpHandler
-    {
-        PooledConnectionLifetime = TimeSpan.FromMinutes(2),
-        ConnectTimeout = TimeSpan.FromSeconds(10),
-    })
-    {
-        DefaultRequestHeaders = { { "User-Agent", "VRCVideoCacher" } },
-        Timeout = TimeSpan.FromSeconds(30),
-    };
 
     // [OLD + NEW EXTENSION] CORS preflight for the youtube-cookies POST. Used by BOTH the
     // old/upstream (EllyVR) extension and the new one — do not gate this behind IsNewExtension.
