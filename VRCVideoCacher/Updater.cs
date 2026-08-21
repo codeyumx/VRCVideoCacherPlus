@@ -25,6 +25,15 @@ public class Updater
 
     public static async Task<UpdateInfo?> CheckForUpdates()
     {
+        // The Settings toggle is the user's "don't bother me about updates" switch. Honouring
+        // it here covers both callers — the startup check and the UI banner — so turning it
+        // off actually suppresses the network call as well as the prompt.
+        if (!ConfigManager.Config.AutoUpdateVrcVideoCacher)
+        {
+            Log.Information("Update check disabled in config. Skipping.");
+            return null;
+        }
+
         Log.Information("Checking for updates...");
         var isDebug = false;
 #if DEBUG
