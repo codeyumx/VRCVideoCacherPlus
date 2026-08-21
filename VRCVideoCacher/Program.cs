@@ -236,22 +236,31 @@ internal sealed class Program
         AppDomain.CurrentDomain.ProcessExit += (_, _) => OnAppQuit();
 
         YtdlpHash = GetOurYtdlpHash();
-        await VvcConfigService.GetConfig();
+
+        // Nothing below needs the message of the day, so don't hold the application behind
+        // a network round trip to fetch it.
+        RunDetached(VvcConfigService.GetConfig(), "Config API fetch");
+
         if (ConfigManager.Config.YtdlpAutoUpdate && !LaunchArgs.UseGlobalPath)
         {
+            // Awaited deliberately: yt-dlp and Deno have to be on disk before the web
+            // server starts answering resolve requests with them.
             await Task.WhenAll(
                 YtdlManager.TryDownloadYtdlp(),
                 YtdlManager.TryDownloadDeno()
             );
             YtdlManager.StartYtdlUpdaterThread();
-            _ = YtdlManager.TryDownloadFfmpeg();
+            RunDetached(YtdlManager.TryDownloadFfmpeg(), "FFmpeg download");
         }
 
         if (OperatingSystem.IsWindows())
             AutoStartShortcut.TryUpdateShortcutPath();
         WebServer.Init();
         FileTools.ApplyPatchSettings();
-        await BulkPreCache.DownloadFileList();
+
+        // Mirrors listed in PreCacheUrls can run to gigabytes. Awaiting them meant the
+        // cache index and the download queue did not come up until every one had finished.
+        RunDetached(BulkPreCache.DownloadFileList(), "Bulk pre-cache");
 
         if (ConfigManager.Config.YtdlpUseCookies && !IsCookiesEnabledAndValid())
             Logger.Warning("No cookies found, please use the browser extension to send cookies or disable \"ytdlUseCookies\" in config.");
@@ -260,7 +269,7 @@ internal sealed class Program
         VideoDownloader.Start();
         // Runs after CacheManager.Init so already-cached videos are skipped; not awaited
         // because resolving each URL hits the network and must not delay startup.
-        _ = VideoPreCache.QueueConfiguredVideos();
+        RunDetached(VideoPreCache.QueueConfiguredVideos(), "Video pre-cache");
         VRDancingSheetService.StartBackgroundSync();
 
         // run after init to avoid text spam blocking user input
@@ -268,6 +277,17 @@ internal sealed class Program
             _ = WinGet.TryInstallPackages();
 
         await Task.Delay(-1);
+    }
+
+    /// <summary>
+    /// Starts a task without waiting for it, logging a failure rather than letting it
+    /// surface later as an unobserved task exception at an arbitrary GC.
+    /// </summary>
+    private static void RunDetached(Task task, string description)
+    {
+        _ = task.ContinueWith(
+            completed => Logger.Warning(completed.Exception?.GetBaseException(), "{Description} failed.", description),
+            TaskContinuationOptions.OnlyOnFaulted);
     }
 
     private static AppBuilder BuildAvaloniaApp()
