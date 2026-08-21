@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Security.Cryptography;
 using Newtonsoft.Json;
 using Semver;
 using Serilog;
@@ -149,7 +148,7 @@ public class Updater
                 await stream.CopyToAsync(fileStream);
             }
 
-            if (!await HashCheck(NewFilePath, asset.digest))
+            if (!await FileHash.VerifyGitHubDigestAsync(NewFilePath, asset.digest, ReleaseAssetName))
             {
                 Log.Warning("Hash check failed, aborting update.");
                 TryDelete(NewFilePath);
@@ -210,18 +209,6 @@ public class Updater
         // Hand off — the new process waits on our PID, then cleans up the .old file on startup.
         Environment.Exit(0);
         return true; // unreachable
-    }
-
-    private static async Task<bool> HashCheck(string path, string githubHash)
-    {
-        using var sha256 = SHA256.Create();
-        await using var stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-        var hashBytes = await sha256.ComputeHashAsync(stream);
-        var hashString = Convert.ToHexString(hashBytes);
-        var expected = githubHash.Contains(':') ? githubHash.Split(':')[1] : githubHash;
-        var match = string.Equals(expected, hashString, StringComparison.OrdinalIgnoreCase);
-        Log.Information("FileHash: {FileHash} GitHubHash: {GitHubHash} HashMatch: {HashMatches}", hashString, expected, match);
-        return match;
     }
 
     private static void TryDelete(string path)

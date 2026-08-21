@@ -55,6 +55,58 @@ public class YtdlManager
     }
 
     /// <summary>
+    /// Downloads an archive to a temporary file and verifies its GitHub digest before the
+    /// caller extracts it. Returns null when the download or the check fails.
+    ///
+    /// Buffering to disk first is the point: the archive contents get marked executable and
+    /// run, so they have to be verified before extraction rather than streamed straight out
+    /// of the socket into the utils directory.
+    /// </summary>
+    private static async Task<string?> DownloadArchiveAsync(string url, string? digest, string label)
+    {
+        var tempPath = Path.Join(Program.UtilsPath, $"_{label}.download");
+        try
+        {
+            using var response = await DownloadHttpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+            if (!response.IsSuccessStatusCode)
+            {
+                Log.Warning("{Label}: download failed with {StatusCode}.", label, response.StatusCode);
+                return null;
+            }
+
+            await using (var responseStream = await response.Content.ReadAsStreamAsync())
+            await using (var fileStream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None))
+            {
+                await responseStream.CopyToAsync(fileStream);
+            }
+
+            if (await FileHash.VerifyGitHubDigestAsync(tempPath, digest, label))
+                return tempPath;
+        }
+        catch
+        {
+            TryDeleteTemp(tempPath);
+            throw;
+        }
+
+        TryDeleteTemp(tempPath);
+        return null;
+    }
+
+    private static void TryDeleteTemp(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+        catch (Exception ex)
+        {
+            Log.Debug("Could not remove temporary download {Path}: {Error}", path, ex.Message);
+        }
+    }
+
+    /// <summary>
     /// Resolves an archive entry to a destination inside <see cref="Program.UtilsPath"/>,
     /// flattening any directory component and refusing anything that still escapes.
     ///
@@ -372,16 +424,17 @@ public class YtdlManager
         }
 
         Log.Information("Downloading Deno...");
-        var url = assets.First().browser_download_url;
+        var asset = assets.First();
 
-        using var response = await DownloadHttpClient.GetAsync(url);
-        if (!response.IsSuccessStatusCode)
+        var archivePath = await DownloadArchiveAsync(asset.browser_download_url, asset.digest, "Deno");
+        if (archivePath == null)
         {
             Log.Information("Failed to download deno from github attempting fallback download.");
             await TryDownloadDenoFallback(assetName);
             return;
         }
-        await using var responseStream = await response.Content.ReadAsStreamAsync();
+
+        await using var responseStream = File.OpenRead(archivePath);
         var reader = await ReaderFactory.OpenAsyncReader(responseStream);
         try
         {
@@ -411,6 +464,8 @@ public class YtdlManager
         finally
         {
             await reader.DisposeAsync();
+            await responseStream.DisposeAsync();
+            TryDeleteTemp(archivePath);
         }
 
         Log.Error("Failed to extract Deno files.");
@@ -427,14 +482,17 @@ public class YtdlManager
         }
         var latestVersion = (await response.Content.ReadAsStringAsync()).Trim();
         var url = $"{DenoFallBackDownloadURL}{latestVersion}/{assetName}";
-        using var downloadResponse = await DownloadHttpClient.GetAsync(url);
-        if (!downloadResponse.IsSuccessStatusCode)
+
+        // dl.deno.land publishes no digest, so this path is TLS-only. DownloadArchiveAsync
+        // logs that fact rather than letting it pass unnoticed.
+        var archivePath = await DownloadArchiveAsync(url, digest: null, "Deno (fallback)");
+        if (archivePath == null)
         {
-            Log.Error("Failed to download Deno from fallback URL: {ResponseStatusCode}", downloadResponse.StatusCode);
+            Log.Error("Failed to download Deno from fallback URL.");
             return;
         }
 
-        await using var responseStream = await downloadResponse.Content.ReadAsStreamAsync();
+        await using var responseStream = File.OpenRead(archivePath);
         var reader = await ReaderFactory.OpenAsyncReader(responseStream);
         try
         {
@@ -464,6 +522,8 @@ public class YtdlManager
         finally
         {
             await reader.DisposeAsync();
+            await responseStream.DisposeAsync();
+            TryDeleteTemp(archivePath);
         }
 
         Log.Error("Failed to extract Deno files from fallback download.");
@@ -554,18 +614,22 @@ public class YtdlManager
             Log.Error("Unsupported operating system {OperatingSystem}", Environment.OSVersion);
             return;
         }
-        var url = json.assets
-            .FirstOrDefault(assetVersion => assetVersion.name.EndsWith(assetSuffix, StringComparison.OrdinalIgnoreCase))
-            ?.browser_download_url ?? string.Empty;
-        if (string.IsNullOrEmpty(url))
+        var asset = json.assets
+            .FirstOrDefault(assetVersion => assetVersion.name.EndsWith(assetSuffix, StringComparison.OrdinalIgnoreCase));
+        if (asset == null || string.IsNullOrEmpty(asset.browser_download_url))
         {
             Log.Error("Unable to find ffmpeg asset for this platform.");
             return;
         }
         Log.Information("Downloading FFmpeg...");
 
-        using var response = await DownloadHttpClient.GetAsync(url);
-        await using var responseStream = await response.Content.ReadAsStreamAsync();
+        // Previously streamed straight into the archive reader without even checking the
+        // status code, so a 404 body was handed to SharpCompress as if it were an archive.
+        var archivePath = await DownloadArchiveAsync(asset.browser_download_url, asset.digest, "FFmpeg");
+        if (archivePath == null)
+            return;
+
+        await using var responseStream = File.OpenRead(archivePath);
         var reader = await ReaderFactory.OpenAsyncReader(responseStream);
         var success = false;
         try
@@ -596,6 +660,8 @@ public class YtdlManager
         finally
         {
             await reader.DisposeAsync();
+            await responseStream.DisposeAsync();
+            TryDeleteTemp(archivePath);
         }
 
         if (!success)
@@ -641,7 +707,6 @@ public class YtdlManager
             if (assetVersion.name != assetName)
                 continue;
 
-            await using var stream = await DownloadHttpClient.GetStreamAsync(assetVersion.browser_download_url);
             if (string.IsNullOrEmpty(Program.UtilsPath))
                 throw new Exception("Failed to get YT-DLP path");
 
@@ -650,8 +715,28 @@ public class YtdlManager
             if (!string.IsNullOrEmpty(ytdlDir))
                 Directory.CreateDirectory(ytdlDir);
 
-            await using var fileStream = new FileStream(YtdlPath, FileMode.Create, FileAccess.Write, FileShare.None);
-            await stream.CopyToAsync(fileStream);
+            // Stage, verify, then move into place. This binary is marked executable and run
+            // on every video request, so an unverified body must never occupy the final
+            // path — not even briefly, and not even if the verification then fails.
+            var tempPath = YtdlPath + ".download";
+            try
+            {
+                await using (var stream = await DownloadHttpClient.GetStreamAsync(assetVersion.browser_download_url))
+                await using (var fileStream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                {
+                    await stream.CopyToAsync(fileStream);
+                }
+
+                if (!await FileHash.VerifyGitHubDigestAsync(tempPath, assetVersion.digest, "yt-dlp"))
+                    throw new Exception("yt-dlp download failed its digest check.");
+
+                File.Move(tempPath, YtdlPath, overwrite: true);
+            }
+            finally
+            {
+                TryDeleteTemp(tempPath);
+            }
+
             Log.Information("Downloaded YT-DLP.");
             FileTools.MarkFileExecutable(YtdlPath);
             Versions.CurrentVersion.Ytdlp = json.tag_name;
