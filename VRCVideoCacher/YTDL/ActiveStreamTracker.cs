@@ -16,11 +16,15 @@ public static class ActiveStreamTracker
     private static readonly object Lock = new();
 
     /// <summary>
-    /// Tracks the expected end time of each active stream by video ID.
-    /// If no duration is known, the entry stores just the start time
-    /// and the idle buffer alone governs the delay.
+    /// When the stream currently being served is expected to finish. If no duration is
+    /// known this is just the time it started, and the idle buffer alone governs the delay.
+    ///
+    /// This was a dictionary keyed by video id, but RecordActivity cleared it on every call
+    /// — a new stream means the user moved on — so it never held more than one entry, and
+    /// the "latest end across all active streams" scan in IsIdle could only ever see that
+    /// one. A single field says the same thing without implying otherwise.
     /// </summary>
-    private static readonly Dictionary<string, DateTime> _expectedEndTimes = new();
+    private static DateTime _expectedEndOfCurrentStream = DateTime.MinValue;
 
     /// <summary>
     /// Fallback: the last time any activity was recorded, used when
@@ -45,15 +49,11 @@ public static class ActiveStreamTracker
 
             if (!string.IsNullOrEmpty(videoId))
             {
-                // A new stream means the user moved on — clear previous entries
-                // so skipped videos don't stack their durations.
-                _expectedEndTimes.Clear();
-
-                var expectedEnd = durationSeconds > 0
+                // A new stream replaces the previous one rather than stacking with it, so a
+                // run of skipped videos doesn't accumulate their durations.
+                _expectedEndOfCurrentStream = durationSeconds > 0
                     ? DateTime.UtcNow.AddSeconds(durationSeconds.Value)
                     : DateTime.UtcNow;
-
-                _expectedEndTimes[videoId] = expectedEnd;
             }
         }
         Task.Run(() => OnStreamingActivity?.Invoke());
@@ -70,18 +70,13 @@ public static class ActiveStreamTracker
         {
             if (!_hasActivity) return true;
 
-            var now = DateTime.UtcNow;
+            // Idle = past the current video's expected end, plus the buffer. Falls back to
+            // the last activity timestamp when that is later, or when no duration is known.
+            var latestEnd = _expectedEndOfCurrentStream > _lastActivityAt
+                ? _expectedEndOfCurrentStream
+                : _lastActivityAt;
 
-            // Find the latest expected end time across all active streams
-            var latestEnd = _lastActivityAt;
-            foreach (var endTime in _expectedEndTimes.Values)
-            {
-                if (endTime > latestEnd)
-                    latestEnd = endTime;
-            }
-
-            // Idle = we're past the longest video's expected end + the buffer
-            return (now - latestEnd).TotalSeconds >= idleSeconds;
+            return (DateTime.UtcNow - latestEnd).TotalSeconds >= idleSeconds;
         }
     }
 }
