@@ -182,44 +182,12 @@ public class HlsHandler : ISiteHandler
 
     public List<string> GetYtdlpArguments(Uri uri, bool avPro) => [];
 
-    // Share-URL rewriting is opt-in: this rewriter sees *every* URL (content detection
-    // happens later), so the Dropbox/GDrive rewrites would change behavior for plain MP4
-    // shares too. Gating on CacheHlsPlaylists keeps the default install unaffected.
-    public Task<string> RewriteUrl(string url, Uri uri) =>
-        Task.FromResult(ConfigManager.Config.CacheHlsPlaylists ? RewriteShareUrl(url, uri) : url);
-
-    /// <summary>
-    /// Rewrites common cloud-host share URLs to their direct-download form so the probe
-    /// and yt-dlp see the actual file body instead of an HTML preview page. Applies to
-    /// the request URL only — segment URLs inside an HLS manifest aren't touched.
-    /// </summary>
-    public static string RewriteShareUrl(string url, Uri uri)
-    {
-        var host = uri.Host.ToLowerInvariant();
-
-        // Dropbox: dl=0 (preview page) → dl=1 (direct download). Also covers
-        // www.dropbox.com/s/... and dropbox.com/scl/fi/... share URLs.
-        if (host == "dropbox.com" || host.EndsWith(".dropbox.com"))
-        {
-            var q = uri.Query;
-            if (q.Contains("dl=0"))
-                return url.Replace("dl=0", "dl=1");
-            if (string.IsNullOrEmpty(q))
-                return url + "?dl=1";
-            if (!q.Contains("dl=1") && !q.Contains("raw=1"))
-                return url + "&dl=1";
-        }
-
-        // Google Drive: /file/d/<id>/view → /uc?export=download&id=<id>
-        if (host == "drive.google.com")
-        {
-            var m = System.Text.RegularExpressions.Regex.Match(uri.AbsolutePath, @"^/file/d/([^/]+)");
-            if (m.Success)
-                return $"https://drive.google.com/uc?export=download&id={m.Groups[1].Value}";
-        }
-
-        return url;
-    }
+    // Share-URL rewriting used to live here as well as in the default rules, gated on
+    // CacheHlsPlaylists — a flag with nothing to do with Dropbox or Google Drive. Two
+    // implementations of the same behaviour, reachable under different conditions, is one
+    // too many: the rules engine is the user-visible, user-editable place for it, so the
+    // "Dropbox Share Rewrite", "Dropbox Direct Download" and "Google Drive File Rewrite"
+    // default rules are now the only implementation.
 
     private static async Task<ProbeResult> ProbeCached(string url)
     {

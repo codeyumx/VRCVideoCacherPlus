@@ -15,13 +15,16 @@ public static class SiteHandlerRegistry
         new GenericHandler(),
     ];
 
-    // Rewriters run first, in order, before handler resolution
+    // Rewriters run first, in order, before handler resolution.
+    // Cloud share-link rewriting (Dropbox, Google Drive) is deliberately absent: it lives in
+    // the default rules, where the user can see and change it. HlsHandler used to appear
+    // here too, as a second instance of the one in Handlers above, purely to carry that
+    // duplicate implementation.
     private static readonly List<ISiteHandler> Rewriters =
     [
         new NicoVideoHandler(),   // rewrites nico.ms → nicovideo.life
         new YTSHandler(),      // rewrites /sr/ → /yt/
         new ThirdPartyYTResolver(), // dmn.moe, u2b.cx etc → real YT url
-        new HlsHandler(),         // Dropbox ?dl=0 → ?dl=1, GDrive /file/d/<id>/view → /uc?...
     ];
 
     public static async Task<string> ApplyRewrites(string url)
