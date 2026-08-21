@@ -6,6 +6,7 @@ using Serilog;
 using VRCVideoCacher.Database;
 using VRCVideoCacher.Database.Models;
 using VRCVideoCacher.Models;
+using VRCVideoCacher.Utils;
 using VRCVideoCacher.YTDL.SiteHandlers;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
@@ -28,42 +29,17 @@ public class VideoId
             .Replace("=", "");
     }
 
-    private static Process GetYtdlpProcess()
-    {
-        var process = new Process
-        {
-            StartInfo =
-            {
-                FileName = YtdlManager.YtdlPath,
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true,
-                StandardOutputEncoding = Encoding.UTF8,
-                StandardErrorEncoding = Encoding.UTF8,
-            }
-        };
-
-        return process;
-    }
-
     private static async Task<(string Output, string Error, int ExitCode)> RunYtdlpAsync(List<string> args, string url)
     {
-        var ytdlpProcess = GetYtdlpProcess();
-        ytdlpProcess.StartInfo.Arguments = YtdlManager.GenerateYtdlArgs(args, $"\"{url}\"");
-        Log.Information("Starting yt-dlp with args: {args:l}", ytdlpProcess.StartInfo.Arguments);
-        ytdlpProcess.Start();
-
-        // Drain both pipes concurrently: reading stdout to EOF before touching stderr
-        // deadlocks once yt-dlp fills the stderr pipe buffer (classic Process trap).
-        var outputTask = ytdlpProcess.StandardOutput.ReadToEndAsync();
-        var errorTask = ytdlpProcess.StandardError.ReadToEndAsync();
-        await ytdlpProcess.WaitForExitAsync();
-        var output = await outputTask;
-        var error = await errorTask;
-
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = YtdlManager.YtdlPath,
+            Arguments = YtdlManager.GenerateYtdlArgs(args, $"\"{url}\"")
+        };
+        Log.Information("Starting yt-dlp with args: {args:l}", startInfo.Arguments);
+        var (output, error, exitCode) = await ProcessRunner.RunAsync(startInfo);
         Log.Information("Finished yt-dlp");
-        return (output.Trim(), error.Trim(), ytdlpProcess.ExitCode);
+        return (output, error, exitCode);
     }
 
     public static async Task<VideoInfo?> GetVideoId(string url, bool avPro)
@@ -213,12 +189,8 @@ public class VideoId
 
         var url = videoInfo.VideoUrl;
         var uri = ToUri(url);
-
-        // Select the handler from the type recorded on the VideoInfo rather than
-        // re-evaluating the rules against its URL. GetVideoInfo has already canonicalised
-        // that URL, so a second evaluation is both redundant and able to disagree with the
-        // handler that produced this record in the first place.
-        var handler = uri != null ? SiteHandlerRegistry.ResolveByUrlType(videoInfo.UrlType) : null;
+        var evalResult = Services.RuleEngine.EvaluateUrl(url);
+        var handler = uri != null ? SiteHandlerRegistry.Resolve(uri, evalResult.MatchedRule) : null;
         var args = handler?.GetYtdlpArguments(uri!, avPro) ?? [];
         args.Add("--get-url");
 
@@ -278,34 +250,15 @@ public class VideoId
             args.Add(ConfigManager.Config.YtdlpAdditionalArgs);
         args.Add($"\"{url}\"");
 
-        var process = new Process
+        var (output, error, exitCode) = await ProcessRunner.RunAsync(new ProcessStartInfo
         {
-            StartInfo =
-            {
-                FileName = YtdlManager.YtdlPath,
-                Arguments = string.Join(' ', args),
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true,
-                StandardOutputEncoding = Encoding.UTF8,
-                StandardErrorEncoding = Encoding.UTF8,
-            }
-        };
-        process.Start();
+            FileName = YtdlManager.YtdlPath,
+            Arguments = string.Join(' ', args)
+        });
 
-        // Drain both pipes concurrently (see RunYtdlpAsync) — sequential reads deadlock
-        // when stderr fills while stdout is still open, which is common on large
-        // playlists that emit many warnings.
-        var outputTask = process.StandardOutput.ReadToEndAsync();
-        var errorTask = process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
-        var output = await outputTask;
-        var error = await errorTask;
-
-        if (process.ExitCode != 0)
+        if (exitCode != 0)
         {
-            Log.Error("Failed to get playlist entries: {Error}", error.Trim());
+            Log.Error("Failed to get playlist entries: {Error}", error);
             return results;
         }
 

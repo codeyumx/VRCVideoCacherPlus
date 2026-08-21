@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Newtonsoft.Json;
 using Serilog;
@@ -257,19 +258,12 @@ public class YtdlManager
     {
         try
         {
-            using var process = new System.Diagnostics.Process();
-            process.StartInfo = new System.Diagnostics.ProcessStartInfo
+            var result = await ProcessRunner.RunAsync(new ProcessStartInfo
             {
                 FileName = YtdlPath,
-                Arguments = "--version",
-                RedirectStandardOutput = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-            process.Start();
-            var output = await process.StandardOutput.ReadToEndAsync();
-            await process.WaitForExitAsync();
-            return output.Trim();
+                Arguments = "--version"
+            });
+            return result.Output;
         }
         catch (Exception ex)
         {
@@ -282,20 +276,13 @@ public class YtdlManager
     {
         try
         {
-            using var process = new System.Diagnostics.Process();
-            process.StartInfo = new System.Diagnostics.ProcessStartInfo
+            var result = await ProcessRunner.RunAsync(new ProcessStartInfo
             {
                 FileName = FfmpegPath,
-                Arguments = "-version",
-                RedirectStandardOutput = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-            process.Start();
-            var output = await process.StandardOutput.ReadToEndAsync();
-            await process.WaitForExitAsync();
+                Arguments = "-version"
+            });
             // Output: "ffmpeg version 7.1.1-full_build-www.gyan.dev ..."
-            var firstLine = output.Split('\n')[0].Trim();
+            var firstLine = result.Output.Split('\n')[0].Trim();
             var parts = firstLine.Split(' ');
             if (parts.Length >= 3 && parts[0] == "ffmpeg" && parts[1] == "version")
                 return parts[2].Split('-')[0]; // strip "-full_build-..." suffix
@@ -311,20 +298,13 @@ public class YtdlManager
     {
         try
         {
-            using var process = new System.Diagnostics.Process();
-            process.StartInfo = new System.Diagnostics.ProcessStartInfo
+            var result = await ProcessRunner.RunAsync(new ProcessStartInfo
             {
                 FileName = DenoPath,
-                Arguments = "--version",
-                RedirectStandardOutput = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-            process.Start();
-            var output = await process.StandardOutput.ReadToEndAsync();
-            await process.WaitForExitAsync();
+                Arguments = "--version"
+            });
             // Output: "deno 2.8.0\n..."
-            var firstLine = output.Split('\n')[0].Trim();
+            var firstLine = result.Output.Split('\n')[0].Trim();
             var parts = firstLine.Split(' ');
             if (parts.Length >= 2 && parts[0] == "deno")
                 return $"v{parts[1]}";
@@ -757,21 +737,12 @@ public class YtdlManager
         var processName = Path.GetFileNameWithoutExtension(path);
         try
         {
-            using var process = new System.Diagnostics.Process();
-            process.StartInfo = new System.Diagnostics.ProcessStartInfo
+            var (output, error, exitCode) = await ProcessRunner.RunAsync(new ProcessStartInfo
             {
                 FileName = path,
-                Arguments = arg,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-            process.Start();
-            var output = await process.StandardOutput.ReadToEndAsync();
-            var error = await process.StandardError.ReadToEndAsync();
-            await process.WaitForExitAsync();
-            if (process.ExitCode != 0)
+                Arguments = arg
+            });
+            if (exitCode != 0)
             {
                 Log.Error("Error starting {ProcessName}: {Output} {Error}", processName, output, error);
                 return false;
