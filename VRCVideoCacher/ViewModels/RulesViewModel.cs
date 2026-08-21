@@ -25,7 +25,69 @@ public partial class RuleEntryViewModel : ObservableObject
     [ObservableProperty]
     private bool _isMatched;
 
-    public string RowBackground => IsMatched ? "#1E4D2B" : "Transparent";
+    private double _flashOpacity = 0.0;
+    private CancellationTokenSource? _flashCts;
+
+    public string RowBackground
+    {
+        get
+        {
+            if (IsMatched)
+                return "#1E4D2B";
+
+            if (_flashOpacity > 0.0)
+            {
+                int alpha = (int)(_flashOpacity * 255);
+                return $"#{alpha:X2}1DB954";
+            }
+
+            return "Transparent";
+        }
+    }
+
+    public void TriggerFlash()
+    {
+        _flashCts?.Cancel();
+        _flashCts = new CancellationTokenSource();
+        var token = _flashCts.Token;
+
+        _flashOpacity = 1.0;
+        OnPropertyChanged(nameof(RowBackground));
+
+        Task.Run(async () =>
+        {
+            const int totalSteps = 40;
+            const int stepDelayMs = 50;
+
+            for (int i = 1; i <= totalSteps; i++)
+            {
+                if (token.IsCancellationRequested)
+                    return;
+
+                try
+                {
+                    await Task.Delay(stepDelayMs, token);
+                }
+                catch (TaskCanceledException)
+                {
+                    return;
+                }
+
+                _flashOpacity = 1.0 - ((double)i / totalSteps);
+
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    OnPropertyChanged(nameof(RowBackground));
+                });
+            }
+
+            _flashOpacity = 0.0;
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                OnPropertyChanged(nameof(RowBackground));
+            });
+        }, token);
+    }
 
     partial void OnIsMatchedChanged(bool value)
     {
@@ -83,7 +145,17 @@ public partial class RulesViewModel : ViewModelBase
     public RulesViewModel()
     {
         PlusConfigManager.OnConfigChanged += LoadFromConfig;
+        Services.RuleEngine.OnRuleMatched += HandleRuleMatched;
         LoadFromConfig();
+    }
+
+    private void HandleRuleMatched(string ruleId)
+    {
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            var entry = Rules.FirstOrDefault(r => r.Rule.Id == ruleId);
+            entry?.TriggerFlash();
+        });
     }
 
     private RuleEntryViewModel CreateEntry(UriRule rule)

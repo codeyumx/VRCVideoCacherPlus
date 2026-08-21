@@ -19,6 +19,8 @@ public static class RuleEngine
 {
     private static readonly Serilog.ILogger Log = Program.Logger.ForContext(typeof(RuleEngine));
 
+    public static event Action<string>? OnRuleMatched;
+
     public static RuleEvaluationResult EvaluateUrl(string requestUrl)
     {
         var currentUrl = requestUrl.Trim();
@@ -43,6 +45,7 @@ public static class RuleEngine
                     continue;
 
                 Log.Information("URL '{URL}' matched rule '{RuleName}' ({Action})", currentUrl, rule.Name, rule.Action);
+                OnRuleMatched?.Invoke(rule.Id);
 
                 var result = new RuleEvaluationResult
                 {
