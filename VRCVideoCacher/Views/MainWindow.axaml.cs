@@ -16,10 +16,7 @@ public partial class MainWindow : Window
 
     private void OnUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
-        if (e.Exception != null && e.Exception is Exception ex)
-        {
-            LoggerUtils.LogUnhandledException(ex, "Unhandled UI thread exception");
-        }
+        LoggerUtils.LogUnhandledException(e.Exception, "Unhandled UI thread exception");
     }
 
     private async void OnWindowOpened(object? sender, EventArgs e)

@@ -436,9 +436,9 @@ internal sealed class Program
         return ComputeBinaryContentHash(ms.ToArray());
     }
 
-    public static string ComputeBinaryContentHash(byte[] base64)
+    public static string ComputeBinaryContentHash(byte[] content)
     {
-        return Convert.ToBase64String(SHA256.HashData(base64));
+        return Convert.ToBase64String(SHA256.HashData(content));
     }
 
     private static void OnAppQuit()

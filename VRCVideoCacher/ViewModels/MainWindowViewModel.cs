@@ -84,14 +84,8 @@ public partial class MainWindowViewModel : ViewModelBase
         }
     }
 
-    private static string FormatSize(long bytes)
-    {
-        string[] suffixes = ["B", "KB", "MB", "GB", "TB"];
-        if (bytes == 0) return "0 B";
-        var mag = Math.Min((int)Math.Log(bytes, 1024), suffixes.Length - 1);
-        var adjustedSize = bytes / Math.Pow(1024, mag);
-        return $"{adjustedSize:N2} {suffixes[mag]}";
-    }
+    // Second copy of this lived here; CacheStats.FormatSize is the one covered by tests.
+    private static string FormatSize(long bytes) => Utils.CacheStats.FormatSize(bytes);
 
     private async Task NavigateToAsync(ViewModelBase targetView)
     {

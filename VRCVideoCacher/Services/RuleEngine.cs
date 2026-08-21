@@ -142,15 +142,7 @@ public static class RuleEngine
         }
 
         // 2. Parse URL for token substitution {url...}
-        Uri? uri = null;
-        try
-        {
-            Uri.TryCreate(originalUrl, UriKind.Absolute, out uri);
-        }
-        catch
-        {
-            // ignored
-        }
+        Uri.TryCreate(originalUrl, UriKind.Absolute, out var uri);
 
         // Token replacements
         result = result.Replace("{url}", originalUrl);

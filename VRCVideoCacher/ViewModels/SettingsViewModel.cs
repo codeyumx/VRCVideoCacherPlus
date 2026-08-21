@@ -157,7 +157,6 @@ public partial class SettingsViewModel : ViewModelBase
         YtdlAdditionalArgs = config.YtdlpAdditionalArgs;
         YtdlDubLanguage = config.YtdlpDubLanguage;
         CachedAssetPath = config.CachedAssetPath;
-        CachedAssetPath = config.CachedAssetPath;
         CacheMaxSizeInGb = config.CacheMaxSizeInGb;
         CacheHlsPlaylists = config.CacheHlsPlaylists;
         CacheHlsMaxLength = config.CacheHlsMaxLength;

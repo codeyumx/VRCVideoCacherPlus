@@ -355,8 +355,9 @@ public class ApiController : WebApiController
             response = string.Empty;
         }
 
+        // The StartsWith("https://manifest.googlevideo.com") that used to sit here was
+        // subsumed by the Contains check on the same line.
         if (videoInfo.UrlType == UrlType.YouTube ||
-            videoInfo.VideoUrl.StartsWith("https://manifest.googlevideo.com") ||
             videoInfo.VideoUrl.Contains("googlevideo.com"))
         {
             var isPrefetchSuccessful = await VideoTools.Prefetch(response, YoutubePrefetchMaxRetries);

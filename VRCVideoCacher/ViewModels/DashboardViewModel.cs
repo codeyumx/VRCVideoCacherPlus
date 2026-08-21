@@ -11,8 +11,6 @@ using VRCVideoCacher.YTDL;
 
 namespace VRCVideoCacher.ViewModels;
 
-public partial class MainWindowViewModel;
-
 public partial class DashboardViewModel : ViewModelBase
 {
     [ObservableProperty]
