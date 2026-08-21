@@ -382,7 +382,10 @@ public class VideoDownloader
 
         var rateLimitMBs = PlusConfigManager.Config.CacheDownloadRateLimitMBs;
         if (rateLimitMBs > 0)
-            args.Add($"--limit-rate {rateLimitMBs}M");
+        {
+            args.Add("--limit-rate");
+            args.Add($"{rateLimitMBs}M");
+        }
 
         using var process = new Process
         {
@@ -406,30 +409,38 @@ public class VideoDownloader
             var audioArg = string.IsNullOrEmpty(ConfigManager.Config.YtdlpDubLanguage)
                 ? "+ba[acodec=opus][ext=webm]"
                 : $"+(ba[acodec=opus][ext=webm][language={ConfigManager.Config.YtdlpDubLanguage}]/ba[acodec=opus][ext=webm])";
-            args.Add($"-o \"{tempWebm}\"");
-            args.Add($"-f \"bv*[height<={maxRes}][vcodec~='^av01'][ext=mp4][dynamic_range='SDR']{audioArg}/bv*[height<={maxRes}][vcodec~='vp9'][ext=webm][dynamic_range='SDR']{audioArg}\"");
+            args.Add("-o");
+            args.Add(tempWebm);
+            args.Add("-f");
+            args.Add($"bv*[height<={maxRes}][vcodec~='^av01'][ext=mp4][dynamic_range='SDR']{audioArg}/bv*[height<={maxRes}][vcodec~='vp9'][ext=webm][dynamic_range='SDR']{audioArg}");
         }
         else
         {
             var audioArgPotato = string.IsNullOrEmpty(ConfigManager.Config.YtdlpDubLanguage)
                 ? "+ba[ext=m4a]"
                 : $"+(ba[ext=m4a][language={ConfigManager.Config.YtdlpDubLanguage}]/ba[ext=m4a])";
-            args.Add($"-o \"{tempMp4}\"");
+            args.Add("-o");
+            args.Add(tempMp4);
+            args.Add("-f");
             if (PlusConfigManager.Config.CacheYouTubePreferVp9)
             {
                 // VP9+aac in mp4 — best compression, universal compatibility (20-50% smaller than h264)
-                args.Add($"-f \"bv*[height<={maxRes}][vcodec~='^vp9']{audioArgPotato}/bv*[height<={maxRes}][vcodec~='^(avc|h264)']{audioArgPotato}/bv*[height<={maxRes}][vcodec~='^av01'][dynamic_range='SDR']\"");
+                args.Add($"bv*[height<={maxRes}][vcodec~='^vp9']{audioArgPotato}/bv*[height<={maxRes}][vcodec~='^(avc|h264)']{audioArgPotato}/bv*[height<={maxRes}][vcodec~='^av01'][dynamic_range='SDR']");
             }
             else
             {
                 // h264+aac — fastest decode, widest hardware support
-                args.Add($"-f \"bv*[height<={maxRes}][vcodec~='^(avc|h264)']{audioArgPotato}/bv*[height<={maxRes}][vcodec~='^av01'][dynamic_range='SDR']\"");
+                args.Add($"bv*[height<={maxRes}][vcodec~='^(avc|h264)']{audioArgPotato}/bv*[height<={maxRes}][vcodec~='^av01'][dynamic_range='SDR']");
             }
-            args.Add("--remux-video mp4");
+            args.Add("--remux-video");
+            args.Add("mp4");
         }
 
-        process.StartInfo.Arguments = YtdlManager.GenerateYtdlArgs(args, $"-- \"{videoId}\"");
-        Log.Information("Downloading YouTube Video: {Args}", process.StartInfo.Arguments);
+        // "--" so a video id starting with a dash can never be read as a flag.
+        var arguments = YtdlManager.GenerateYtdlArgs(args, ["--", videoId]);
+        foreach (var argument in arguments)
+            process.StartInfo.ArgumentList.Add(argument);
+        Log.Information("Downloading YouTube Video: {Args}", string.Join(' ', arguments));
 
         lock (StateLock) { _currentProcess = process; }
 
@@ -794,20 +805,23 @@ public class VideoDownloader
         var args = new List<string>
         {
             "--newline",
-            $"-o \"{tempMp4}\"",
-            "--remux-video mp4",
+            "-o", tempMp4,
+            "--remux-video", "mp4",
             // Let yt-dlp pick native vs. ffmpeg HLS downloader — native chokes on
             // fMP4/CMAF (#EXT-X-MAP) playlists, ffmpeg handles those.
-            "--concurrent-fragments 4",
+            "--concurrent-fragments", "4",
             // CDN segment fetches can be flaky; retry the manifest a few times and
             // each individual segment more aggressively before giving up.
-            "--retries 3",
-            "--fragment-retries 5"
+            "--retries", "3",
+            "--fragment-retries", "5"
         };
 
         var rateLimitMBs = PlusConfigManager.Config.CacheDownloadRateLimitMBs;
         if (rateLimitMBs > 0)
-            args.Add($"--limit-rate {rateLimitMBs}M");
+        {
+            args.Add("--limit-rate");
+            args.Add($"{rateLimitMBs}M");
+        }
 
         using var process = new Process
         {
@@ -823,8 +837,10 @@ public class VideoDownloader
             },
         };
 
-        process.StartInfo.Arguments = YtdlManager.GenerateYtdlArgs(args, $"\"{videoInfo.VideoUrl}\"");
-        Log.Information("Downloading HLS Video: {Args}", process.StartInfo.Arguments);
+        var arguments = YtdlManager.GenerateYtdlArgs(args, ["--", videoInfo.VideoUrl]);
+        foreach (var argument in arguments)
+            process.StartInfo.ArgumentList.Add(argument);
+        Log.Information("Downloading HLS Video: {Args}", string.Join(' ', arguments));
 
         lock (StateLock) { _currentProcess = process; }
 

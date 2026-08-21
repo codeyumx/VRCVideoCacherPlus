@@ -135,35 +135,109 @@ public class YtdlManager
         return destination;
     }
 
-    public static string GenerateYtdlArgs(List<string> args, string urlArg)
+    /// <summary>
+    /// Builds the complete yt-dlp argument list. Every element is exactly one argv entry
+    /// and must NOT be pre-quoted — the result goes to ProcessStartInfo.ArgumentList, which
+    /// applies the correct platform quoting itself.
+    ///
+    /// This used to return a single concatenated command line with hand-written quotes,
+    /// which made the URL's own quoting the caller's problem. Exactly one call site escaped
+    /// it (a lone Replace("\"", "%22") in ApiController), so a URL arriving by any other
+    /// route — the pre-cache list, playlist expansion, the UI — could close the quote and
+    /// append flags of its own. yt-dlp has --exec, so that is arbitrary code execution.
+    /// </summary>
+    public static List<string> GenerateYtdlArgs(List<string> args, IEnumerable<string> trailingArgs)
     {
-        var globalArgs = new List<string>
-        {
-            "--encoding utf-8",
+        args.AddRange([
+            "--encoding", "utf-8",
             "--ignore-config",
             "--no-playlist",
             "--no-warnings",
             "--no-mtime",
             "--no-progress"
-        };
-        args.AddRange(globalArgs);
+        ]);
 
         if (File.Exists(FfmpegPath))
-            args.Add($"--ffmpeg-location \"{FfmpegPath}\"");
+        {
+            args.Add("--ffmpeg-location");
+            args.Add(FfmpegPath);
+        }
 
         if (File.Exists(DenoPath))
-            args.Add($"--js-runtimes deno:\"{DenoPath}\"");
+        {
+            args.Add("--js-runtimes");
+            args.Add($"deno:{DenoPath}");
+        }
         else
+        {
             Log.Error("Deno runtime not found at path: {DenoPath}", DenoPath);
+        }
 
         if (Program.IsCookiesEnabledAndValid())
-            args.Add($"--cookies \"{CookiesPath}\"");
+        {
+            args.Add("--cookies");
+            args.Add(CookiesPath);
+        }
 
-        if (!string.IsNullOrEmpty(ConfigManager.Config.YtdlpAdditionalArgs))
-            args.Add(ConfigManager.Config.YtdlpAdditionalArgs);
+        args.AddRange(SplitArguments(ConfigManager.Config.YtdlpAdditionalArgs));
+        args.AddRange(trailingArgs);
+        return args;
+    }
 
-        args.Add(urlArg);
-        return string.Join(' ', args);
+    /// <summary>
+    /// Splits the user's free-form "additional arguments" setting into individual argv
+    /// entries, honouring double and single quotes the way a shell would. The setting is a
+    /// single config string, but ArgumentList needs one token per element — appending it
+    /// whole would pass e.g. `--retries 3` as one argument named "--retries 3".
+    /// </summary>
+    internal static List<string> SplitArguments(string? value)
+    {
+        var result = new List<string>();
+        if (string.IsNullOrWhiteSpace(value))
+            return result;
+
+        var current = new System.Text.StringBuilder();
+        var quote = '\0';
+        var hasToken = false;
+
+        foreach (var c in value)
+        {
+            if (quote != '\0')
+            {
+                if (c == quote)
+                    quote = '\0';
+                else
+                    current.Append(c);
+                continue;
+            }
+
+            switch (c)
+            {
+                case '"':
+                case '\'':
+                    quote = c;
+                    hasToken = true;
+                    break;
+                case ' ':
+                case '\t':
+                    if (hasToken)
+                    {
+                        result.Add(current.ToString());
+                        current.Clear();
+                        hasToken = false;
+                    }
+                    break;
+                default:
+                    current.Append(c);
+                    hasToken = true;
+                    break;
+            }
+        }
+
+        if (hasToken)
+            result.Add(current.ToString());
+
+        return result;
     }
 
     public static void StartYtdlUpdaterThread()

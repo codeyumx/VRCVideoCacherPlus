@@ -60,20 +60,24 @@ public class YouTubeHandler : ISiteHandler
         {
             // Using the Safari impersonation with the web client gets us the muxed m3u8's that aren't normally available otherwise.
             // These are the only streams that are compatible with AVPro currently due to WMF being unmaintained.
-            args.Add("--impersonate=\"safari\"");
-            args.Add("--extractor-args=\"youtube:player_client=web\"");
+            args.Add("--impersonate");
+            args.Add("safari");
+            args.Add("--extractor-args");
+            args.Add("youtube:player_client=web");
 
             // AVPro
             var lang = ConfigManager.Config.YtdlpDubLanguage;
             // If dub language is set, attempt to fetch, else use defaults.
+            args.Add("-f");
             args.Add(!string.IsNullOrEmpty(lang)
-                ? $"-f \"[language={lang}]/{AVProFormat}\""
-                : $"-f \"{AVProFormat}\"");
+                ? $"[language={lang}]/{AVProFormat}"
+                : AVProFormat);
         }
         else
         {
             // Unity Player
-            args.Add($"-f \"{UnityPlayerFormat}\"");
+            args.Add("-f");
+            args.Add(UnityPlayerFormat);
         }
 
         return args;

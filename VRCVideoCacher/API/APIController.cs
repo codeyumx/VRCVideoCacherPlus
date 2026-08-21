@@ -200,8 +200,11 @@ public class ApiController : WebApiController
     [Route(HttpVerbs.Get, "/getvideo")]
     public async Task GetVideo()
     {
-        // escape double quotes for our own safety
-        var requestUrl = Request.QueryString["url"]?.Replace("\"", "%22").Trim();
+        // No quote-mangling here any more: yt-dlp arguments go through ArgumentList, so a
+        // quote in a URL can no longer break out of the command line. The old
+        // Replace("\"", "%22") was the single guard for the whole application and it also
+        // corrupted any URL that legitimately contained one.
+        var requestUrl = Request.QueryString["url"]?.Trim();
         var avPro = string.Compare(Request.QueryString["avpro"], "true", StringComparison.OrdinalIgnoreCase) == 0;
         var source = Request.QueryString["source"];
 

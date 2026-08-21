@@ -31,13 +31,10 @@ public class VideoId
 
     private static async Task<(string Output, string Error, int ExitCode)> RunYtdlpAsync(List<string> args, string url)
     {
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = YtdlManager.YtdlPath,
-            Arguments = YtdlManager.GenerateYtdlArgs(args, $"\"{url}\"")
-        };
-        Log.Information("Starting yt-dlp with args: {args:l}", startInfo.Arguments);
-        var (output, error, exitCode) = await ProcessRunner.RunAsync(startInfo);
+        // "--" so a URL that happens to start with a dash is never taken for a flag.
+        var arguments = YtdlManager.GenerateYtdlArgs(args, ["--", url]);
+        Log.Information("Starting yt-dlp with args: {args:l}", string.Join(' ', arguments));
+        var (output, error, exitCode) = await ProcessRunner.RunAsync(YtdlManager.YtdlPath, arguments);
         Log.Information("Finished yt-dlp");
         return (output, error, exitCode);
     }
@@ -73,8 +70,8 @@ public class VideoId
             var args = new List<string>
             {
                 "-j",
-                "--impersonate=\"safari\"",
-                "--extractor-args=\"youtube:player_client=web\""
+                "--impersonate", "safari",
+                "--extractor-args", "youtube:player_client=web"
             };
 
             var (rawData, error, exitCode) = await RunYtdlpAsync(args, url);
@@ -158,13 +155,18 @@ public class VideoId
     {
         var args = new List<string>();
         if (!string.IsNullOrEmpty(ConfigManager.Config.YtdlpDubLanguage))
-            args.Add($"-f \"[language={ConfigManager.Config.YtdlpDubLanguage}]\"");
+        {
+            args.Add("-f");
+            args.Add($"[language={ConfigManager.Config.YtdlpDubLanguage}]");
+        }
         args.Add("--flat-playlist");
         args.Add("-i");
         args.Add("-J"); // --dump-single-json
         args.Add("-s");
-        args.Add("--impersonate=\"safari\"");
-        args.Add("--extractor-args=\"youtube:player_client=web\"");
+        args.Add("--impersonate");
+        args.Add("safari");
+        args.Add("--extractor-args");
+        args.Add("youtube:player_client=web");
 
         var (output, error, exitCode) = await RunYtdlpAsync(args, url);
         if (exitCode != 0)
@@ -237,24 +239,29 @@ public class VideoId
             "-j",
             "--ignore-config",
             "--no-warnings",
-            "--encoding utf-8"
+            "--encoding", "utf-8"
         };
 
         if (File.Exists(YtdlManager.FfmpegPath))
-            args.Add($"--ffmpeg-location \"{YtdlManager.FfmpegPath}\"");
-        if (File.Exists(YtdlManager.DenoPath))
-            args.Add($"--js-runtimes deno:\"{YtdlManager.DenoPath}\"");
-        if (Program.IsCookiesEnabledAndValid())
-            args.Add($"--cookies \"{YtdlManager.CookiesPath}\"");
-        if (!string.IsNullOrEmpty(ConfigManager.Config.YtdlpAdditionalArgs))
-            args.Add(ConfigManager.Config.YtdlpAdditionalArgs);
-        args.Add($"\"{url}\"");
-
-        var (output, error, exitCode) = await ProcessRunner.RunAsync(new ProcessStartInfo
         {
-            FileName = YtdlManager.YtdlPath,
-            Arguments = string.Join(' ', args)
-        });
+            args.Add("--ffmpeg-location");
+            args.Add(YtdlManager.FfmpegPath);
+        }
+        if (File.Exists(YtdlManager.DenoPath))
+        {
+            args.Add("--js-runtimes");
+            args.Add($"deno:{YtdlManager.DenoPath}");
+        }
+        if (Program.IsCookiesEnabledAndValid())
+        {
+            args.Add("--cookies");
+            args.Add(YtdlManager.CookiesPath);
+        }
+        args.AddRange(YtdlManager.SplitArguments(ConfigManager.Config.YtdlpAdditionalArgs));
+        args.Add("--");
+        args.Add(url);
+
+        var (output, error, exitCode) = await ProcessRunner.RunAsync(YtdlManager.YtdlPath, args);
 
         if (exitCode != 0)
         {

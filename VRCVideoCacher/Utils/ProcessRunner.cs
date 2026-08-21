@@ -18,6 +18,20 @@ public static class ProcessRunner
     public readonly record struct ProcessResult(string Output, string Error, int ExitCode);
 
     /// <summary>
+    /// Runs <paramref name="fileName"/> with each element of <paramref name="arguments"/>
+    /// passed as one argv entry. Prefer this over building a command-line string: quoting
+    /// is then the runtime's problem, and untrusted values cannot inject extra arguments.
+    /// </summary>
+    public static Task<ProcessResult> RunAsync(string fileName, IEnumerable<string> arguments, CancellationToken ct = default)
+    {
+        var startInfo = new ProcessStartInfo { FileName = fileName };
+        foreach (var argument in arguments)
+            startInfo.ArgumentList.Add(argument);
+
+        return RunAsync(startInfo, ct);
+    }
+
+    /// <summary>
     /// Starts <paramref name="startInfo"/> with both streams redirected, drains them in
     /// parallel with the wait, and returns the trimmed output once the process exits.
     /// </summary>
