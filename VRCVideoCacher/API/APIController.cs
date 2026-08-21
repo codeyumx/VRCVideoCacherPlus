@@ -173,6 +173,17 @@ public class ApiController : WebApiController
         return string.Join('\n', filtered);
     }
 
+    // An empty 200 means "nothing to resolve, play the URL as-is" — which is precisely what
+    // the Direct and bypass paths want, and precisely wrong for a block: the game happily
+    // plays a direct .mp4 without any help from us, so an empty body blocks nothing. Only a
+    // non-2xx makes yt-dlp-stub exit non-zero, which is the signal that actually stops
+    // playback. Callers that mean "bypass" must keep sending an empty 200.
+    private async Task SendBlockedAsync(string reason)
+    {
+        HttpContext.Response.StatusCode = 403;
+        await HttpContext.SendStringAsync(reason, "text/plain", Encoding.UTF8);
+    }
+
     [Route(HttpVerbs.Get, "/getvideo")]
     public async Task GetVideo()
     {
@@ -193,7 +204,7 @@ public class ApiController : WebApiController
         if (!ConfigManager.Config.VideoPlayersEnabled)
         {
             Log.Warning("Video players are disabled via toggle. Blocking request: {URL}", requestUrl);
-            await HttpContext.SendStringAsync(string.Empty, "text/plain", Encoding.UTF8);
+            await SendBlockedAsync("Video players are disabled in VRCVideoCacher.");
             return;
         }
 
@@ -208,7 +219,7 @@ public class ApiController : WebApiController
             {
                 case RuleAction.Block:
                     Log.Warning("URL blocked by rule '{RuleName}': {URL}", evalResult.MatchedRule.Name, requestUrl);
-                    await HttpContext.SendStringAsync(string.Empty, "text/plain", Encoding.UTF8);
+                    await SendBlockedAsync($"Blocked by VRCVideoCacher rule '{evalResult.MatchedRule.Name}'.");
                     return;
 
                 case RuleAction.Direct:

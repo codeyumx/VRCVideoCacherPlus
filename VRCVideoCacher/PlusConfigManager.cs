@@ -242,7 +242,10 @@ public class PlusConfigManager
                 Name = "Block Rickrolls",
                 Pattern = @"^https?://(?:www\.)?youtube\.com/watch\?v=(?:dQw4w9WgXcQ|jzmz6K8K4L0|XfELJU1mRMg)",
                 Action = RuleAction.Block,
-                Enabled = true
+                // Ships disabled: Block now genuinely prevents playback, and a fresh install
+                // silently refusing specific videos is a surprise, not a default. Existing
+                // configs keep whatever the user already has.
+                Enabled = false
             },
             new UriRule
             {
