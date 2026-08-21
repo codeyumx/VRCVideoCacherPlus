@@ -525,12 +525,19 @@ public class VideoDownloader
     /// client, so this is the only thing between a dead socket and a wedged queue.
     /// </summary>
     /// <param name="bytesPerSecond">Rate limit, or 0 for unlimited.</param>
+    /// <param name="totalBytes">Expected final size on disk, including any resumed prefix.</param>
+    /// <param name="alreadyOnDisk">
+    /// Bytes already present from a previous attempt. Progress is reported against the file
+    /// as a whole, so this has to be counted: without it a download resuming at 90% restarted
+    /// its progress bar from 0 and crept back up, which reads as the transfer having reset.
+    /// </param>
     private static async Task CopyWithStallGuardAsync(
-        Stream source, Stream destination, long bytesPerSecond, long totalBytes, CancellationTokenSource cts)
+        Stream source, Stream destination, long bytesPerSecond, long totalBytes, long alreadyOnDisk, CancellationTokenSource cts)
     {
         var buffer = new byte[81920];
         var stopwatch = Stopwatch.StartNew();
         long totalBytesRead = 0;
+        var lastReportedPercent = -1.0;
 
         while (true)
         {
@@ -543,7 +550,17 @@ public class VideoDownloader
             totalBytesRead += bytesRead;
 
             if (totalBytes > 0)
-                OnDownloadProgress?.Invoke((double)totalBytesRead / totalBytes * 100.0);
+            {
+                // Only raise the event when the rounded percentage actually moves: this
+                // fired once per 80 KiB chunk, so a large file pushed thousands of
+                // redundant updates at the UI thread.
+                var percent = Math.Round((alreadyOnDisk + totalBytesRead) / (double)totalBytes * 100.0, 1);
+                if (percent > lastReportedPercent)
+                {
+                    lastReportedPercent = percent;
+                    OnDownloadProgress?.Invoke(percent);
+                }
+            }
 
             if (bytesPerSecond <= 0)
                 continue;
@@ -659,7 +676,7 @@ public class VideoDownloader
 
                     var rateLimitMBs = PlusConfigManager.Config.CacheDownloadRateLimitMBs;
                     var bytesPerSecond = rateLimitMBs > 0 ? rateLimitMBs * 1024L * 1024L : 0L;
-                    await CopyWithStallGuardAsync(stream, fileStream, bytesPerSecond, expectedTotalBytes, cts);
+                    await CopyWithStallGuardAsync(stream, fileStream, bytesPerSecond, expectedTotalBytes, resumeFrom, cts);
                 }
                 catch (OperationCanceledException)
                 {
