@@ -70,7 +70,7 @@ public static class RuleEngine
                         return result;
 
                     case RuleAction.Block:
-                    case RuleAction.Cache:
+                    case RuleAction.Resolve:
                     case RuleAction.Direct:
                     default:
                         result.FinalUrl = currentUrl;
@@ -86,8 +86,8 @@ public static class RuleEngine
         // Fallback default if no rule matched
         return new RuleEvaluationResult
         {
-            MatchedRule = new UriRule { Name = "Everything else", Action = RuleAction.Direct },
-            Action = RuleAction.Direct,
+            MatchedRule = new UriRule { Name = "Everything else", Action = RuleAction.Resolve, Cache = false },
+            Action = RuleAction.Resolve,
             FinalUrl = currentUrl
         };
     }

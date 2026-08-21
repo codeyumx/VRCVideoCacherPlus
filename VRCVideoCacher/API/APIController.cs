@@ -221,7 +221,7 @@ public class ApiController : WebApiController
                     await HttpContext.SendStringAsync(evalResult.RedirectUrl, "text/plain", Encoding.UTF8);
                     return;
 
-                case RuleAction.Cache:
+                case RuleAction.Resolve:
                 case RuleAction.Rewrite:
                 default:
                     requestUrl = evalResult.FinalUrl;
@@ -351,7 +351,7 @@ public class ApiController : WebApiController
 
         // check if file is cached again to handle race condition
         (isCached, _, _) = GetCachedFile(videoInfo.VideoId, avPro);
-        if (!isCached && evalResult.Action == RuleAction.Cache)
+        if (!isCached && evalResult.MatchedRule?.Cache == true)
         {
             VideoDownloader.QueueDownload(videoInfo);
         }

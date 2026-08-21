@@ -5,7 +5,7 @@ namespace VRCVideoCacher.Models;
 public enum RuleAction
 {
     Direct,
-    Cache,
+    Resolve,
     Redirect,
     Rewrite,
     Block
@@ -17,14 +17,18 @@ public class UriRule
     public bool Enabled { get; set; } = true;
     public string Name { get; set; } = string.Empty;
     public string Pattern { get; set; } = string.Empty;
-    public RuleAction Action { get; set; } = RuleAction.Cache;
+    public RuleAction Action { get; set; } = RuleAction.Resolve;
 
-    // Cache action options
+    // Cache options
+    public bool Cache { get; set; } = false;
     public int? MaxResolution { get; set; } // e.g. 1080
     public int? MaxDurationMinutes { get; set; } // e.g. 120
 
     // Redirect / Rewrite action option
     public string RedirectTarget { get; set; } = string.Empty;
+
+    // Site Integration Name (YouTube, PyPyDance, VRDancing, etc.)
+    public string? Integration { get; set; } = null;
 
     public UriRule Clone()
     {
@@ -35,9 +39,11 @@ public class UriRule
             Name = Name,
             Pattern = Pattern,
             Action = Action,
+            Cache = Cache,
             MaxResolution = MaxResolution,
             MaxDurationMinutes = MaxDurationMinutes,
-            RedirectTarget = RedirectTarget
+            RedirectTarget = RedirectTarget,
+            Integration = Integration
         };
     }
 
@@ -48,15 +54,19 @@ public class UriRule
             case RuleAction.Direct:
                 return "Direct";
 
-            case RuleAction.Cache:
-                var parts = new List<string>();
-                if (MaxResolution.HasValue && MaxResolution.Value > 0)
-                    parts.Add($"<{MaxResolution.Value}p");
-                if (MaxDurationMinutes.HasValue && MaxDurationMinutes.Value > 0)
-                    parts.Add($"<{MaxDurationMinutes.Value}m");
-                if (parts.Count > 0)
-                    return $"Cache if {string.Join(", ", parts)}";
-                return "Cache";
+            case RuleAction.Resolve:
+                if (Cache)
+                {
+                    var parts = new List<string>();
+                    if (MaxResolution.HasValue && MaxResolution.Value > 0)
+                        parts.Add($"<{MaxResolution.Value}p");
+                    if (MaxDurationMinutes.HasValue && MaxDurationMinutes.Value > 0)
+                        parts.Add($"<{MaxDurationMinutes.Value}m");
+                    if (parts.Count > 0)
+                        return $"Resolve & Cache ({string.Join(", ", parts)})";
+                    return "Resolve & Cache";
+                }
+                return "Resolve";
 
             case RuleAction.Redirect:
                 return string.IsNullOrWhiteSpace(RedirectTarget)

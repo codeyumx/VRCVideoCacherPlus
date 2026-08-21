@@ -1,4 +1,4 @@
-﻿using System.Web;
+using System.Web;
 using Serilog;
 using VRCVideoCacher.Models;
 using VRCVideoCacher.Services;
@@ -12,6 +12,7 @@ public class PyPyDanceHandler : ISiteHandler
     private static readonly string[] Prefixes = ["http://api.pypy.dance/video", "https://api.pypy.dance/video"];
 
     public bool CanHandle(Uri uri) => Prefixes.Any(p => uri.ToString().StartsWith(p));
+    public string? IntegrationName => "PyPyDance";
 
     public async Task<VideoInfo?> GetVideoInfo(string url, Uri uri, bool avPro)
     {

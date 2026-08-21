@@ -1,4 +1,4 @@
-﻿using System.Text.RegularExpressions;
+using System.Text.RegularExpressions;
 using Serilog;
 using VRCVideoCacher.Models;
 
@@ -14,6 +14,7 @@ public class YouTubeHandler : ISiteHandler
     private const string UnityPlayerFormat = "(mp4/best)[vcodec!=av01][vcodec!=vp9.2][height<=?1080][height>=?64][width>=?64][protocol^=http]";
 
     public bool CanHandle(Uri uri) => Hosts.Contains(uri.Host);
+    public string? IntegrationName => "YouTube";
 
     public Task<VideoInfo?> GetVideoInfo(string url, Uri uri, bool avPro)
     {

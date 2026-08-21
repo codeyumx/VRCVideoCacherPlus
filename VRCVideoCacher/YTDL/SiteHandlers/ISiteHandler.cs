@@ -1,4 +1,4 @@
-﻿using VRCVideoCacher.Models;
+using VRCVideoCacher.Models;
 
 namespace VRCVideoCacher.YTDL;
 
@@ -11,5 +11,7 @@ public interface ISiteHandler
     Task<VideoInfo?> GetVideoInfo(string url, Uri uri, bool avPro);
     List<string> GetYtdlpArguments(Uri uri, bool avPro) => [];
     Task<string> RewriteUrl(string url, Uri uri) => Task.FromResult(url);
+
+    string? IntegrationName => null;
 
 }

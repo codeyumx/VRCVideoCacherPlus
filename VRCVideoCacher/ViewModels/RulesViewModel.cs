@@ -20,6 +20,7 @@ public partial class RuleEntryViewModel : ObservableObject
     public string Pattern => Rule.Pattern;
     public RuleAction Action => Rule.Action;
     public string ActionSummary => Rule.GetActionSummary();
+    public string? Integration => Rule.Integration;
 
     [ObservableProperty]
     private bool _isMatched;
@@ -57,6 +58,7 @@ public partial class RuleEntryViewModel : ObservableObject
         OnPropertyChanged(nameof(Action));
         OnPropertyChanged(nameof(ActionSummary));
         OnPropertyChanged(nameof(Enabled));
+        OnPropertyChanged(nameof(Integration));
     }
 }
 
@@ -236,8 +238,11 @@ public partial class RulesViewModel : ViewModelBase
             entry.Rule.Pattern = editVm.RuleResult.Pattern;
             entry.Rule.Action = editVm.RuleResult.Action;
             entry.Rule.Enabled = editVm.RuleResult.Enabled;
+            entry.Rule.Cache = editVm.RuleResult.Cache;
             entry.Rule.MaxResolution = editVm.RuleResult.MaxResolution;
+            entry.Rule.MaxDurationMinutes = editVm.RuleResult.MaxDurationMinutes;
             entry.Rule.RedirectTarget = editVm.RuleResult.RedirectTarget;
+            entry.Rule.Integration = editVm.RuleResult.Integration;
 
             entry.RefreshProperties();
             EvaluateTestUrl();

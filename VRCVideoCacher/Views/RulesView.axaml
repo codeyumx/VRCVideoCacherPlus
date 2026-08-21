@@ -76,6 +76,9 @@
                     <!-- Rule Name -->
                     <DataGridTextColumn Header="Rule Name" Binding="{Binding Name}" Width="160"/>
 
+                    <!-- Site Integration -->
+                    <DataGridTextColumn Header="Integration" Binding="{Binding Integration}" Width="110" IsReadOnly="True"/>
+
                     <!-- Regex Pattern -->
                     <DataGridTemplateColumn Header="Regex Pattern" Width="*">
                         <DataGridTemplateColumn.CellTemplate>

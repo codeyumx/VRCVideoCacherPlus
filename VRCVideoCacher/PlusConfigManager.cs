@@ -194,30 +194,37 @@ public class PlusConfigManager
             {
                 Name = "YouTube",
                 Pattern = @"^https?:\/\/(?:[a-zA-Z0-9-]+\.)*(?:youtube\.com|youtu\.be|youtube-nocookie\.com)(?:[\/?#]|$)",
-                Action = RuleAction.Cache,
+                Action = RuleAction.Resolve,
+                Cache = true,
                 MaxResolution = 1080,
                 MaxDurationMinutes = 120,
-                Enabled = true
+                Enabled = true,
+                Integration = "YouTube"
             },
             new UriRule
             {
                 Name = "PyPyDance",
-                Pattern = @"^https?:\/\/(?:[a-zA-Z0-9-]+\.)*pypydance\.com(?:[\/?#]|$)",
-                Action = RuleAction.Cache,
-                Enabled = true
+                Pattern = @"^https?:\/\/(?:[a-zA-Z0-9-]+\.)*pypy\.dance(?:[\/?#]|$)",
+                Action = RuleAction.Resolve,
+                Cache = true,
+                Enabled = true,
+                Integration = "PyPyDance"
             },
             new UriRule
             {
                 Name = "VRDancing",
                 Pattern = @"^https?:\/\/(?:[a-zA-Z0-9-]+\.)*vrdancing\.club(?:[\/?#]|$)",
-                Action = RuleAction.Cache,
-                Enabled = true
+                Action = RuleAction.Resolve,
+                Cache = true,
+                Enabled = true,
+                Integration = "VRDancing"
             },
             new UriRule
             {
                 Name = "Everything else",
                 Pattern = @".*",
-                Action = RuleAction.Direct,
+                Action = RuleAction.Resolve,
+                Cache = false,
                 Enabled = true
             }
         ];

@@ -1,4 +1,5 @@
-﻿using VRCVideoCacher.YTDL.SiteHandlers.Sites;
+using VRCVideoCacher.YTDL.SiteHandlers.Sites;
+using VRCVideoCacher.Models;
 
 namespace VRCVideoCacher.YTDL.SiteHandlers;
 
@@ -34,16 +35,35 @@ public static class SiteHandlerRegistry
         return url;
     }
 
-    public static ISiteHandler? Resolve(Uri uri) => Handlers.FirstOrDefault(h => h.CanHandle(uri));
+    public static ISiteHandler? Resolve(Uri uri, UriRule? matchedRule = null)
+    {
+        if (matchedRule != null && !string.IsNullOrEmpty(matchedRule.Integration))
+        {
+            var handler = Handlers.FirstOrDefault(h => h.IntegrationName == matchedRule.Integration);
+            if (handler != null)
+                return handler;
+        }
+        return Handlers.FirstOrDefault(h => h.CanHandle(uri));
+    }
 
     /// <summary>
     /// Like <see cref="Resolve"/>, but when only the GenericHandler would match,
     /// performs an async content probe to detect HLS manifests served under
     /// arbitrary URLs (no .m3u8 extension, unknown hosts).
     /// </summary>
-    public static async Task<ISiteHandler?> ResolveAsync(string url, Uri uri)
+    public static async Task<ISiteHandler?> ResolveAsync(string url, Uri uri, UriRule? matchedRule = null)
     {
-        var handler = Handlers.FirstOrDefault(h => h.CanHandle(uri));
+        ISiteHandler? handler = null;
+        if (matchedRule != null && !string.IsNullOrEmpty(matchedRule.Integration))
+        {
+            handler = Handlers.FirstOrDefault(h => h.IntegrationName == matchedRule.Integration);
+        }
+        
+        if (handler == null)
+        {
+            handler = Handlers.FirstOrDefault(h => h.CanHandle(uri));
+        }
+
         if (handler is not null and not GenericHandler)
             return handler;
 

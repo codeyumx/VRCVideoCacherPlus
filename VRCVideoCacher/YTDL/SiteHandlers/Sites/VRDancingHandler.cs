@@ -1,4 +1,4 @@
-﻿using Serilog;
+using Serilog;
 using VRCVideoCacher.Models;
 using VRCVideoCacher.Services;
 
@@ -11,6 +11,7 @@ public class VRDancingHandler : ISiteHandler
     private static readonly string[] Prefixes = ["https://na2.vrdancing.club", "https://eu2.vrdancing.club", "https://mpegts-beta.vrdancing.club"];
 
     public bool CanHandle(Uri uri) => Prefixes.Any(p => uri.ToString().StartsWith(p));
+    public string? IntegrationName => "VRDancing";
 
     public Task<VideoInfo?> GetVideoInfo(string url, Uri uri, bool avPro)
     {

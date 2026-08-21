@@ -74,7 +74,7 @@ public class VideoId
         var uri = ToUri(url);
         if (uri == null) return null;
 
-        var handler = await SiteHandlerRegistry.ResolveAsync(url, uri);
+        var handler = await SiteHandlerRegistry.ResolveAsync(url, uri, Services.RuleEngine.EvaluateUrl(url).MatchedRule);
         return handler == null ? null : await handler.GetVideoInfo(url, uri, avPro);
     }
 
@@ -213,7 +213,8 @@ public class VideoId
 
         var url = videoInfo.VideoUrl;
         var uri = ToUri(url);
-        var handler = uri != null ? SiteHandlerRegistry.Resolve(uri) : null;
+        var evalResult = Services.RuleEngine.EvaluateUrl(url);
+        var handler = uri != null ? SiteHandlerRegistry.Resolve(uri, evalResult.MatchedRule) : null;
         var args = handler?.GetYtdlpArguments(uri!, avPro) ?? [];
         args.Add("--get-url");
 
