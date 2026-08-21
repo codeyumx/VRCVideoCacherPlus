@@ -36,28 +36,35 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private GitHubRelease? _pendingRelease;
 
-    public DashboardViewModel Dashboard { get; }
-    public RulesViewModel Rules { get; }
-    public SettingsViewModel Settings { get; }
-    public CookiesViewModel Cookies { get; }
-    public CacheBrowserViewModel CacheBrowser { get; }
-    public DownloadQueueViewModel DownloadQueue { get; }
-    public LogViewerViewModel LogViewer { get; }
-    public HistoryViewModel History { get; }
-    public AboutViewModel About { get; }
+    // Built on first navigation rather than up front. All nine used to be constructed in
+    // this constructor, on the UI thread, before the first frame was ever drawn — each one
+    // querying the database, scanning the cache directory or reading config. Only the
+    // dashboard is needed to show the window.
+    //
+    // The window binds CurrentView and picks the view by DataTemplate on type, so nothing
+    // in XAML touches these properties; only the navigation commands do.
+    private readonly Lazy<DashboardViewModel> _dashboard = new(() => new DashboardViewModel());
+    private readonly Lazy<RulesViewModel> _rules = new(() => new RulesViewModel());
+    private readonly Lazy<SettingsViewModel> _settings = new(() => new SettingsViewModel());
+    private readonly Lazy<CookiesViewModel> _cookies = new(() => new CookiesViewModel());
+    private readonly Lazy<CacheBrowserViewModel> _cacheBrowser = new(() => new CacheBrowserViewModel());
+    private readonly Lazy<DownloadQueueViewModel> _downloadQueue = new(() => new DownloadQueueViewModel());
+    private readonly Lazy<LogViewerViewModel> _logViewer = new(() => new LogViewerViewModel());
+    private readonly Lazy<HistoryViewModel> _history = new(() => new HistoryViewModel());
+    private readonly Lazy<AboutViewModel> _about = new(() => new AboutViewModel());
+
+    public DashboardViewModel Dashboard => _dashboard.Value;
+    public RulesViewModel Rules => _rules.Value;
+    public SettingsViewModel Settings => _settings.Value;
+    public CookiesViewModel Cookies => _cookies.Value;
+    public CacheBrowserViewModel CacheBrowser => _cacheBrowser.Value;
+    public DownloadQueueViewModel DownloadQueue => _downloadQueue.Value;
+    public LogViewerViewModel LogViewer => _logViewer.Value;
+    public HistoryViewModel History => _history.Value;
+    public AboutViewModel About => _about.Value;
 
     public MainWindowViewModel()
     {
-        Dashboard = new DashboardViewModel();
-        Rules = new RulesViewModel();
-        Settings = new SettingsViewModel();
-        Cookies = new CookiesViewModel();
-        CacheBrowser = new CacheBrowserViewModel();
-        DownloadQueue = new DownloadQueueViewModel();
-        LogViewer = new LogViewerViewModel();
-        History = new HistoryViewModel();
-        About = new AboutViewModel();
-
         _currentView = Dashboard;
 
         // Subscribe to cache changes for status bar
@@ -91,12 +98,14 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         if (CurrentView == targetView) return;
 
-        if (CurrentView == Rules && Rules.HasChanges)
+        // Guard on IsValueCreated first: reading the Rules property would construct the
+        // view model purely to ask whether it has unsaved changes, which defeats the point
+        // of deferring it.
+        if (_rules.IsValueCreated && ReferenceEquals(CurrentView, _rules.Value) && _rules.Value.HasChanges)
         {
             var lifetime = Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime;
             var parentWindow = lifetime?.MainWindow;
-            var canProceed = await Rules.CheckUnsavedChangesAsync(parentWindow);
-            if (!canProceed) return;
+            await _rules.Value.CheckUnsavedChangesAsync(parentWindow);
         }
 
         CurrentView = targetView;
