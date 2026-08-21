@@ -217,9 +217,14 @@ public partial class RulesViewModel : ViewModelBase
             configRules = PlusConfigManager.Config.UriRules;
         }
 
+        // Clone on the way in. The entries used to hold the very objects stored in
+        // PlusConfigManager.Config.UriRules, so editing a rule or flipping its checkbox
+        // mutated the live config immediately — RuleEngine picked the change up before the
+        // user pressed Save, and "Discard" re-read those same mutated objects and appeared
+        // to do nothing. Working on copies is what makes the unsaved-changes guard real.
         foreach (var rule in configRules)
         {
-            Rules.Add(CreateEntry(rule));
+            Rules.Add(CreateEntry(rule.Clone()));
         }
 
         HasChanges = false;
@@ -238,7 +243,9 @@ public partial class RulesViewModel : ViewModelBase
 
     public void SaveToConfig()
     {
-        PlusConfigManager.Config.UriRules = Rules.Select(r => r.Rule).ToList();
+        // Clone on the way out too, so the entries keep their own instances and the next
+        // edit doesn't reach straight back into the saved config.
+        PlusConfigManager.Config.UriRules = Rules.Select(r => r.Rule.Clone()).ToList();
         PlusConfigManager.TrySaveConfig();
         HasChanges = false;
         StatusMessage = Localizer.Get("SettingsSaved");
@@ -250,13 +257,15 @@ public partial class RulesViewModel : ViewModelBase
     {
         if (!HasChanges) return true;
 
+        // With no window to parent the dialog on we cannot ask, and the old code fell
+        // through to dialog.Confirmed == false and discarded silently. Keep the edits
+        // pending in the view model instead — the user can still save them later.
+        if (parentWindow == null)
+            return true;
+
         var message = Localizer.Get("UnsavedRulesMessage");
         var dialog = Views.PopupWindow.CreateConfirm(message, Localizer.Get("Save"), Localizer.Get("Discard"));
-
-        if (parentWindow != null)
-        {
-            await dialog.ShowDialog(parentWindow);
-        }
+        await dialog.ShowDialog(parentWindow);
 
         if (dialog.Confirmed)
         {
