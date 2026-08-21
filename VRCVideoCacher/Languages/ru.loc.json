@@ -68,8 +68,6 @@
   "CloseToTray": "Закрыть в Трей",
   "StartMinimized": "Запускать Свёрнутым",
   "StartWithSteamVr": "Запустить приложение с помощью SteamVR",
-  "BlockedUrls": "Заблокированный URL",
-  "BlockedUrlRedirect": "Перенаправление заблокированного URL",
   "SettingsSaved": "Настройки сохранены!",
   "SettingsReset": "Настройки сброшенны до последнего сохранения",
   "SettingsUnsavedChanges": "У вас есть несохраненные изменения!",

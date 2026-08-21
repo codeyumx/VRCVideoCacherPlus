@@ -96,15 +96,9 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty]
     private bool _startMinimized;
 
-    // Blocked URLs
-    public ObservableCollection<UrlEntry> BlockedUrls { get; } = [];
-
     // Video URLs pre-cached at startup (distinct from config.PreCacheUrls, which mirrors
     // JSON manifests of direct file downloads and has no UI).
     public ObservableCollection<UrlEntry> PreCacheVideos { get; } = [];
-
-    [ObservableProperty]
-    private string _blockRedirect = string.Empty;
 
     // Status
     [ObservableProperty]
@@ -147,7 +141,6 @@ public partial class SettingsViewModel : ViewModelBase
 
     public SettingsViewModel()
     {
-        BlockedUrls.CollectionChanged += OnUrlCollectionChanged;
         PreCacheVideos.CollectionChanged += OnUrlCollectionChanged;
         ConfigManager.OnConfigChanged += LoadFromConfig;
         PlusConfigManager.OnConfigChanged += LoadFromConfig;
@@ -325,18 +318,6 @@ public partial class SettingsViewModel : ViewModelBase
         LoadFromConfig();
         StatusMessage = Localizer.Get("SettingsReset");
         StatusMessageColor = "#81C784";
-    }
-
-    [RelayCommand]
-    private void AddBlockedUrl()
-    {
-        BlockedUrls.Add(new UrlEntry("https://"));
-    }
-
-    [RelayCommand]
-    private void RemoveBlockedUrl(UrlEntry url)
-    {
-        BlockedUrls.Remove(url);
     }
 
     [RelayCommand]

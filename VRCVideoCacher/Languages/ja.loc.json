@@ -68,8 +68,6 @@
   "CloseToTray": "タスクトレイに収納する",
   "StartMinimized": "最小化して起動する",
   "StartWithSteamVr": "SteamVR と同時に起動する",
-  "BlockedUrls": "ブロックする URL",
-  "BlockedUrlRedirect": "ブロックした URL のリダイレクト",
   "SettingsSaved": "設定を保存しました！",
   "SettingsReset": "設定は最後に保存された値にリセットされます。",
   "SettingsUnsavedChanges": "保存していない変更があります。",
