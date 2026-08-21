@@ -37,8 +37,11 @@ public class VideoTools
 
     public static async Task<bool> Prefetch(string videoUrl, int maxRetryCount = 7)
     {
-        // If the URL is invalid, skip prefetching
-        if (string.IsNullOrWhiteSpace(videoUrl) || !Uri.IsWellFormedUriString(videoUrl, UriKind.RelativeOrAbsolute))
+        // Must be absolute, not merely well-formed: RelativeOrAbsolute accepted a relative
+        // reference that `new Uri(...)` below then threw UriFormatException on, and the
+        // catch clauses here only cover HttpRequestException and TaskCanceledException — so
+        // it escaped into the request handler.
+        if (string.IsNullOrWhiteSpace(videoUrl) || !Uri.TryCreate(videoUrl, UriKind.Absolute, out var uri))
         {
             Log.Warning("Invalid video URL provided for prefetch: {URL}", videoUrl);
             return false;
@@ -47,7 +50,6 @@ public class VideoTools
         try
         {
             // Determine if the URL is an M3U8 playlist
-            var uri = new Uri(videoUrl);
             var isM3U8 = uri.AbsolutePath.EndsWith(".m3u8", StringComparison.OrdinalIgnoreCase) || videoUrl.Contains("mime=application/vnd.apple.mpegurl");
 
             // Prefetch the video URL

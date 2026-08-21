@@ -258,7 +258,10 @@ public class ApiController : WebApiController
         var (isCached, filePath, fileName) = GetCachedFile(videoInfo.VideoId, avPro);
         if (isCached)
         {
-            File.SetLastWriteTimeUtc(filePath, DateTime.UtcNow);
+            // LRU bookkeeping only — the file may be open for serving or mid-eviction, and
+            // failing to stamp it is not a reason to fail the request.
+            try { File.SetLastWriteTimeUtc(filePath, DateTime.UtcNow); }
+            catch (Exception ex) { Log.Debug("Could not stamp {File}: {Err}", fileName, ex.Message); }
             DatabaseManager.UpdateVideoWatchStats(videoInfo.VideoId);
             var url = $"{ConfigManager.Config.YtdlpWebServerUrl}/{fileName}";
             Log.Information("Responding with Cached URL: {URL}", url);

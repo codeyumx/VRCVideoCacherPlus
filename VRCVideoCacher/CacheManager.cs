@@ -113,15 +113,33 @@ public class CacheManager
             var filePath = Path.Join(CachePath, kvp.Value.FileName);
             if (File.Exists(filePath))
             {
-                File.Delete(filePath);
-                cacheSize -= kvp.Value.Size;
+                // A cache file can be open for serving or being written by the downloader.
+                // ClearCache already tolerated that; eviction did not, and the exception
+                // propagated out through AddToCache into the download-completion path.
+                try
+                {
+                    File.Delete(filePath);
+                    cacheSize -= kvp.Value.Size;
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning("Could not evict {FileName}: {Error}", kvp.Value.FileName, ex.Message);
+                    continue;
+                }
 
                 // delete thumbnail if not in recent history
                 if (recentPlayHistory.All(h => h.Id != videoId))
                 {
                     var thumbnailPath = ThumbnailManager.GetThumbnailPath(videoId);
-                    if (File.Exists(thumbnailPath))
-                        File.Delete(thumbnailPath);
+                    try
+                    {
+                        if (File.Exists(thumbnailPath))
+                            File.Delete(thumbnailPath);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Debug("Could not delete thumbnail {Path}: {Error}", thumbnailPath, ex.Message);
+                    }
                 }
             }
             CachedAssets.TryRemove(kvp.Key, out _);
@@ -175,7 +193,18 @@ public class CacheManager
         if (!File.Exists(filePath))
             return;
 
-        File.Delete(filePath);
+        try
+        {
+            File.Delete(filePath);
+        }
+        catch (Exception ex)
+        {
+            // Reached from the request path via EnsureValidOrEvict, where the file may
+            // still be open. Leave the entry in place and try again on the next read.
+            Log.Warning("Could not delete cached video {FileName}: {Error}", fileName, ex.Message);
+            return;
+        }
+
         CachedAssets.TryRemove(fileName, out _);
         OnCacheChanged?.Invoke(fileName, CacheChangeType.Removed);
         Log.Information("Deleted cached video: {FileName}", fileName);

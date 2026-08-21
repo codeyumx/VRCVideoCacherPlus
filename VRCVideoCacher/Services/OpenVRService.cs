@@ -82,15 +82,19 @@ public class OpenVRService
                                 }]
                             }
                             """;
-                        await File.WriteAllTextAsync(manifestPath, manifestJson);
-                        var manifestError = OpenVR.Applications.AddApplicationManifest(manifestPath, false);
-                        if (manifestError != EVRApplicationError.None)
+                        // The manifest lands next to the executable, which may well be a
+                        // read-only install directory. This runs inside a fire-and-forget
+                        // Task, so an escaping exception surfaces only as an unobserved
+                        // task fault — SteamVR registration failing is not worth that.
+                        try
                         {
-                            Logger.Warning("Failed to register startup manifest: {Error}", manifestError);
-                        }
-                        else
-                        {
-                            if (OpenVR.Applications.IsApplicationInstalled(ForkAppKey))
+                            await File.WriteAllTextAsync(manifestPath, manifestJson);
+                            var manifestError = OpenVR.Applications.AddApplicationManifest(manifestPath, false);
+                            if (manifestError != EVRApplicationError.None)
+                            {
+                                Logger.Warning("Failed to register startup manifest: {Error}", manifestError);
+                            }
+                            else if (OpenVR.Applications.IsApplicationInstalled(ForkAppKey))
                             {
                                 Logger.Information("Startup manifest registered successfully");
 
@@ -101,6 +105,10 @@ public class OpenVRService
                             {
                                 Logger.Warning("Failed to register startup manifest");
                             }
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Warning(ex, "Could not write or register the SteamVR manifest at {Path}", manifestPath);
                         }
 
                         if (LaunchArgs.CloseWithSteamVr)

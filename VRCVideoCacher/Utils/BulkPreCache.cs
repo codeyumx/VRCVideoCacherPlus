@@ -73,8 +73,17 @@ public class BulkPreCache
                 continue;
             }
 
-            await downloadFiles(files);
-            Log.Information("All {Count} files for {URL} are up to date.", files.Count, url);
+            try
+            {
+                await downloadFiles(files);
+                Log.Information("All {Count} files for {URL} are up to date.", files.Count, url);
+            }
+            catch (Exception ex)
+            {
+                // DownloadFileList is awaited during startup, and in console mode there is
+                // nothing above it to catch — one unreachable mirror must not be fatal.
+                Log.Warning("Failed while downloading files for {Url}: {Error}", url, ex.Message);
+            }
         }
     }
 
@@ -110,9 +119,11 @@ public class BulkPreCache
                     await DownloadFile(file);
                 }
             }
-            catch (HttpRequestException ex)
+            catch (Exception ex)
             {
-                Log.Error("Error downloading {FileName}: {ExMessage}", file.FileName, ex.ToString());
+                // Was HttpRequestException only, so a timeout (TaskCanceledException) or a
+                // disk error aborted the whole manifest instead of skipping one file.
+                Log.Warning("Error downloading {FileName}: {ExMessage}", file.FileName, ex.Message);
             }
         }
     }
