@@ -463,7 +463,11 @@ public class VideoDownloader
             Log.Error("Failed to download YouTube Video: {exitCode} {URL} {error}", process.ExitCode, url, error);
             return (false, $"yt-dlp exited with code {process.ExitCode}");
         }
-        Thread.Sleep(100);
+
+        // Let yt-dlp's final rename settle before looking for the output file. Was
+        // Thread.Sleep, which blocks a thread-pool thread for no reason in an async method
+        // — the sibling HLS path already used Task.Delay here.
+        await Task.Delay(100);
 
         var fileName = $"{videoId}.{videoInfo.DownloadFormat.ToString().ToLower()}";
         var filePath = Path.Join(CacheManager.CachePath, fileName);
@@ -617,63 +621,63 @@ public class VideoDownloader
 
         // HttpClient follows redirects automatically by default; manual handling is unnecessary.
 
-        // 416 = server says our range is beyond the file — treat as already complete
         long expectedTotalBytes = 0;
         string? responseContentType = null;
-        if (response.StatusCode != HttpStatusCode.RequestedRangeNotSatisfiable)
+
+        // Scoped `using` rather than a Dispose call on each of the six exit paths — one of
+        // which had to be added every time a new early return appeared.
+        using (response)
         {
-            if (!response.IsSuccessStatusCode && response.StatusCode != HttpStatusCode.PartialContent)
+            // 416 = server says our range is beyond the file — treat as already complete
+            if (response.StatusCode != HttpStatusCode.RequestedRangeNotSatisfiable)
             {
-                Log.Warning("Failed to download video: {URL} {Status}", url, response.StatusCode);
-                response.Dispose();
-                return (false, $"HTTP {(int)response.StatusCode}");
-            }
+                if (!response.IsSuccessStatusCode && response.StatusCode != HttpStatusCode.PartialContent)
+                {
+                    Log.Warning("Failed to download video: {URL} {Status}", url, response.StatusCode);
+                    return (false, $"HTTP {(int)response.StatusCode}");
+                }
 
-            // Reject obvious non-video bodies (HTML error pages, JSON errors served as 200, etc.)
-            // before they ever hit disk. The magic-byte check after download catches the rest.
-            responseContentType = response.Content.Headers.ContentType?.MediaType;
-            if (!VideoFileValidator.IsAcceptableContentType(responseContentType))
-            {
-                Log.Warning("Skipping cache for {URL}: unexpected Content-Type {Ct}", url, responseContentType);
-                response.Dispose();
-                VideoFileValidator.TryDelete(tempMp4);
-                return (false, $"unexpected content-type {responseContentType}");
-            }
+                // Reject obvious non-video bodies (HTML error pages, JSON errors served as 200, etc.)
+                // before they ever hit disk. The magic-byte check after download catches the rest.
+                responseContentType = response.Content.Headers.ContentType?.MediaType;
+                if (!VideoFileValidator.IsAcceptableContentType(responseContentType))
+                {
+                    Log.Warning("Skipping cache for {URL}: unexpected Content-Type {Ct}", url, responseContentType);
+                    VideoFileValidator.TryDelete(tempMp4);
+                    return (false, $"unexpected content-type {responseContentType}");
+                }
 
-            var contentLength = response.Content.Headers.ContentLength ?? 0;
-            if (contentLength > 0)
-                expectedTotalBytes = resumeFrom + contentLength;
+                var contentLength = response.Content.Headers.ContentLength ?? 0;
+                if (contentLength > 0)
+                    expectedTotalBytes = resumeFrom + contentLength;
 
-            try
-            {
-                await using var stream = await response.Content.ReadAsStreamAsync(cts.Token);
-                var fileMode = resumeFrom > 0 ? FileMode.Append : FileMode.Create;
-                await using var fileStream = new FileStream(tempMp4, fileMode, FileAccess.Write, FileShare.None);
+                try
+                {
+                    await using var stream = await response.Content.ReadAsStreamAsync(cts.Token);
+                    var fileMode = resumeFrom > 0 ? FileMode.Append : FileMode.Create;
+                    await using var fileStream = new FileStream(tempMp4, fileMode, FileAccess.Write, FileShare.None);
 
-                var rateLimitMBs = PlusConfigManager.Config.CacheDownloadRateLimitMBs;
-                var bytesPerSecond = rateLimitMBs > 0 ? rateLimitMBs * 1024L * 1024L : 0L;
-                await CopyWithStallGuardAsync(stream, fileStream, bytesPerSecond, expectedTotalBytes, cts);
-            }
-            catch (OperationCanceledException)
-            {
-                response.Dispose();
-                return CancelledOutcome(url);
-            }
-            catch (IOException ex)
-            {
-                response.Dispose();
-                Log.Warning("Download stream failed for {URL}: {Err}", url, ex.Message);
-                return (false, "network error");
-            }
-            catch (HttpRequestException ex)
-            {
-                response.Dispose();
-                Log.Warning("Download stream failed for {URL}: {Err}", url, ex.Message);
-                return (false, "network error");
+                    var rateLimitMBs = PlusConfigManager.Config.CacheDownloadRateLimitMBs;
+                    var bytesPerSecond = rateLimitMBs > 0 ? rateLimitMBs * 1024L * 1024L : 0L;
+                    await CopyWithStallGuardAsync(stream, fileStream, bytesPerSecond, expectedTotalBytes, cts);
+                }
+                catch (OperationCanceledException)
+                {
+                    return CancelledOutcome(url);
+                }
+                catch (IOException ex)
+                {
+                    Log.Warning("Download stream failed for {URL}: {Err}", url, ex.Message);
+                    return (false, "network error");
+                }
+                catch (HttpRequestException ex)
+                {
+                    Log.Warning("Download stream failed for {URL}: {Err}", url, ex.Message);
+                    return (false, "network error");
+                }
             }
         }
 
-        response.Dispose();
         await Task.Delay(10);
 
         var fileName = $"{videoInfo.VideoId}.{videoInfo.DownloadFormat.ToString().ToLower()}";
