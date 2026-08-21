@@ -61,30 +61,60 @@ public class UiLogSink : ILogEventSink
 {
     private static PopupWindow? _currentPopup;
 
+    // The same error usually repeats — a failing CDN retried once per request, a tool that
+    // stays missing. A modal for each occurrence buries the user in dialogs, mid-session,
+    // in VR. Identical text is shown at most once per window.
+    private static readonly TimeSpan RepeatSuppression = TimeSpan.FromMinutes(1);
+    private static readonly object PopupLock = new();
+    private static string? _lastMessage;
+    private static DateTime _lastShownAt = DateTime.MinValue;
+
     public void Emit(LogEvent logEvent)
     {
-        if (ConfigManager.Config is { ErrorPopups: true } && logEvent.Level >= LogEventLevel.Error)
-        {
-            Dispatcher.UIThread.Post(() =>
-            {
-                App.MainWindow?.Show();
-                _currentPopup?.Close();
-                _currentPopup = null;
-                var source = logEvent.Properties.TryGetValue("SourceContext", out var sourceContext)
-                    ? sourceContext.ToString()
-                    : "Unknown";
-                var message = logEvent.RenderMessage();
-                _currentPopup = new PopupWindow(message)
-                {
-                    Title = $"Error from {source}"
-                };
-                if (source.Contains("YtdlManager"))
-                    _currentPopup.SetFolderHint(
-                        "You can manually place deno.exe / yt-dlp.exe / ffmpeg.exe here:",
-                        Program.UtilsPath);
-                _ = _currentPopup.ShowDialog(App.MainWindow!);
-            });
-        }
+        // Feed the log viewer first, so an entry still reaches it when the popup below is
+        // suppressed or the config isn't loaded yet.
         LogService.EmitLogEntry(logEvent);
+
+        if (ConfigManager.Config is not { ErrorPopups: true } || logEvent.Level < LogEventLevel.Error)
+            return;
+
+        var message = logEvent.RenderMessage();
+        lock (PopupLock)
+        {
+            var now = DateTime.UtcNow;
+            if (message == _lastMessage && now - _lastShownAt < RepeatSuppression)
+                return;
+
+            _lastMessage = message;
+            _lastShownAt = now;
+        }
+
+        var source = logEvent.Properties.TryGetValue("SourceContext", out var sourceContext)
+            ? sourceContext.ToString()
+            : "Unknown";
+
+        Dispatcher.UIThread.Post(() =>
+        {
+            // No window yet — an error logged during startup, before the UI exists. The old
+            // code force-unwrapped App.MainWindow here, so that threw on the UI thread and
+            // brought the application down over a log line.
+            var owner = App.MainWindow;
+            if (owner == null)
+                return;
+
+            if (!owner.IsVisible)
+                owner.Show();
+
+            _currentPopup?.Close();
+            _currentPopup = new PopupWindow(message)
+            {
+                Title = $"Error from {source}"
+            };
+            if (source.Contains("YtdlManager"))
+                _currentPopup.SetFolderHint(
+                    "You can manually place deno.exe / yt-dlp.exe / ffmpeg.exe here:",
+                    Program.UtilsPath);
+            _ = _currentPopup.ShowDialog(owner);
+        });
     }
 }

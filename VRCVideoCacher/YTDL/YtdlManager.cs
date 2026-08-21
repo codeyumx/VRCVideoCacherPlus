@@ -36,6 +36,9 @@ public class YtdlManager
     private const string DenoFallBackVersionURL = "https://dl.deno.land/release-latest.txt";
     private const string DenoFallBackDownloadURL = "https://dl.deno.land/release/";
 
+    // Guards the "Deno missing" error so it is reported on transition, not per invocation.
+    private static int _denoMissingReported;
+
 
     static YtdlManager()
     {
@@ -167,9 +170,13 @@ public class YtdlManager
         {
             args.Add("--js-runtimes");
             args.Add($"deno:{DenoPath}");
+            Interlocked.Exchange(ref _denoMissingReported, 0);
         }
-        else
+        else if (Interlocked.Exchange(ref _denoMissingReported, 1) == 0)
         {
+            // Reported once per transition to missing, not once per invocation. This method
+            // runs for every single video request, and an error-level log raises a modal
+            // dialog — which, mid-session in VR, is not a small thing to do repeatedly.
             Log.Error("Deno runtime not found at path: {DenoPath}", DenoPath);
         }
 
