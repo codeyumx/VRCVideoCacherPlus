@@ -65,6 +65,15 @@ public class LaunchArgs
         }
     }
 
+    /// <summary>
+    /// Reconstructs the flags this process was started with, so that the updater's relaunch
+    /// preserves how the user (or SteamVR, or VRCX) launched it. Only --no-gui and
+    /// --global-path used to be re-emitted, so an update silently dropped --no-steam,
+    /// --no-ovr, --close-with-steamvr and --kill-existing-instance.
+    ///
+    /// Deliberately excludes --wait-for-pid, which the updater supplies itself, and the
+    /// one-shot hosts commands, which belong to a subprocess that exits immediately.
+    /// </summary>
     public static List<string> BuildArgs()
     {
         var args = new List<string>();
@@ -73,6 +82,18 @@ public class LaunchArgs
 
         if (UseGlobalPath)
             args.Add(GlobalPathArg);
+
+        if (!SteamSdk)
+            args.Add(NoSteamArg);
+
+        if (!OVR)
+            args.Add(NoOvrArg);
+
+        if (CloseWithSteamVr)
+            args.Add(CloseWithSteamVrArg);
+
+        if (KillExistingInstance)
+            args.Add(KillExistingInstanceArg);
 
         return args;
     }
