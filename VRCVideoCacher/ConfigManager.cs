@@ -155,7 +155,6 @@ public class ConfigModel
     public bool StartMinimized = false;
     public bool StartWithSteamVr = true;
     public bool CookieSetupCompleted = false;
-    public bool RedirectVRDancing = false;
     public bool ErrorPopups = true;
 
     // Localization

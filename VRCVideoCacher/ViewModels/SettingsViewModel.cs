@@ -84,9 +84,6 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty]
     private bool _patchVRC;
 
-    [ObservableProperty]
-    private bool _redirectVRDancing;
-
 
     // Updates
     [ObservableProperty]
@@ -184,7 +181,6 @@ public partial class SettingsViewModel : ViewModelBase
         StartMinimized = config.StartMinimized;
         StartWithSteamVr = config.StartWithSteamVr;
         ErrorPopups = config.ErrorPopups;
-        RedirectVRDancing = config.RedirectVRDancing;
         AutoUpdate = config.AutoUpdateVrcVideoCacher;
 
         PreCacheVideos.Clear();
@@ -261,7 +257,6 @@ public partial class SettingsViewModel : ViewModelBase
     partial void OnPatchVRCChanged(bool value) => SetHasChanges();
     partial void OnCloseToTrayChanged(bool value) => SetHasChanges();
     partial void OnStartMinimizedChanged(bool value) => SetHasChanges();
-    partial void OnRedirectVRDancingChanged(bool value) => SetHasChanges();
     partial void OnAutoUpdateChanged(bool value) => SetHasChanges();
     partial void OnStartWithSteamVrChanged(bool value) => SetHasChanges();
     partial void OnErrorPopupsChanged(bool value) => SetHasChanges();
@@ -303,7 +298,6 @@ public partial class SettingsViewModel : ViewModelBase
             foreach (var url in config.PreCacheVideos)
                 PreCacheVideos.Add(new UrlEntry(url));
         }
-        config.RedirectVRDancing = RedirectVRDancing;
         config.AutoUpdateVrcVideoCacher = AutoUpdate;
 
         // Temporarily unhook config-changed events to avoid redundant LoadFromConfig calls during save
