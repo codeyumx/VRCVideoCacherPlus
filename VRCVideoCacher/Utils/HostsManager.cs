@@ -20,7 +20,7 @@ public class HostsManager
 
     public static void TryRun()
     {
-        if (Environment.CommandLine.Contains("--addhost"))
+        if (LaunchArgs.AddHost)
         {
             try
             {
@@ -34,7 +34,7 @@ public class HostsManager
                 Environment.Exit(1);
             }
         }
-        if (Environment.CommandLine.Contains("--removehost"))
+        if (LaunchArgs.RemoveHost)
         {
             try
             {

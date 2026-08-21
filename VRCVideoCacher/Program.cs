@@ -55,9 +55,17 @@ internal sealed class Program
     [STAThread]
     public static void Main(string[] args)
     {
-        // Must run before Steam API init — this process may be a privileged subprocess invoked by ElevatorManager
-        HostsManager.TryRun();
         LaunchArgs.SetupArguments(args);
+
+        // Logging comes first so that everything below is actually recorded. It used to be
+        // initialised further down, which meant HostsManager.TryRun, WaitForPreviousInstance
+        // and the kill-existing-instance branch all logged into Serilog's silent default
+        // sink — a failed elevated hosts edit produced no output anywhere at all.
+        InitializeLogger();
+
+        // Must run before Steam API init — this process may be a privileged subprocess
+        // invoked by ElevatorManager, in which case it edits the hosts file and exits.
+        HostsManager.TryRun();
 
 #if STEAMRELEASE
         if (LaunchArgs.SteamSdk)
@@ -124,7 +132,6 @@ internal sealed class Program
         }
 
         Updater.Cleanup();
-        InitializeLogger();
         SetupGlobalExceptionHandlers();
 
         if (!LaunchArgs.HasGui)
@@ -170,7 +177,9 @@ internal sealed class Program
                 rollingInterval: RollingInterval.Day,
                 retainedFileCountLimit: 5);
 
-        if (LaunchArgs.HasGui)
+        // The hosts-edit subprocess has no UI, and UiLogSink reads ConfigManager.Config —
+        // which under elevation would create a second config under the admin's profile.
+        if (LaunchArgs.HasGui && !LaunchArgs.IsHostsEdit)
         {
             loggerConfiguration = loggerConfiguration.WriteTo.Sink(new UiLogSink());
         }

@@ -9,6 +9,8 @@ public class LaunchArgs
     private const string NoSteamArg = "--no-steam";
     private const string NoOvrArg = "--no-ovr";
     private const string CloseWithSteamVrArg = "--close-with-steamvr";
+    private const string AddHostArg = "--addhost";
+    private const string RemoveHostArg = "--removehost";
 
     public static bool HasGui = true;
     public static bool UseGlobalPath;
@@ -17,6 +19,14 @@ public class LaunchArgs
     public static bool SteamSdk = true;
     public static bool OVR = true;
     public static bool CloseWithSteamVr = false;
+    public static bool AddHost = false;
+    public static bool RemoveHost = false;
+
+    /// <summary>
+    /// True when this process was spawned by the elevation helper purely to edit the hosts
+    /// file and exit. Such a process has no UI and should not touch user config.
+    /// </summary>
+    public static bool IsHostsEdit => AddHost || RemoveHost;
 
     public static void SetupArguments(params string[] args)
     {
@@ -46,6 +56,12 @@ public class LaunchArgs
 
             if (arg.Equals(CloseWithSteamVrArg, StringComparison.OrdinalIgnoreCase))
                 CloseWithSteamVr = true;
+
+            if (arg.Equals(AddHostArg, StringComparison.OrdinalIgnoreCase))
+                AddHost = true;
+
+            if (arg.Equals(RemoveHostArg, StringComparison.OrdinalIgnoreCase))
+                RemoveHost = true;
         }
     }
 
