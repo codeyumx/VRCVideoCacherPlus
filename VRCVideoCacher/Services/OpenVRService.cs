@@ -39,25 +39,32 @@ public class OpenVRService
                 switch (initError)
                 {
                     case EVRInitError.None:
-                        // Upstream EllyVR build (including its Steam release) registers itself under
-                        // "com.github.ellyvr.vrcvideocacher". If a user previously ran the Steam build
-                        // and SteamVR still has that key set to auto-launch, SteamVR tries to launch
-                        // it via Steam and Steam pops the store page when the app isn't owned.
-                        // Proactively clear that auto-launch on startup.
-                        const string LegacyAppKey = "com.github.ellyvr.vrcvideocacher";
-                        const string ForkAppKey = "com.github.codeyumx.vrcvideocacherplus";
-                        try
+                        // Builds we may have previously registered as. The upstream EllyVR build
+                        // (including its Steam release) uses "com.github.ellyvr.vrcvideocacher"; the
+                        // codeyumx Plus fork — which this fork used to identify as — uses its own key.
+                        // If SteamVR still has either set to auto-launch it tries to start them via
+                        // Steam, which pops the store page when the app isn't owned. Clear both.
+                        string[] legacyAppKeys =
+                        [
+                            "com.github.ellyvr.vrcvideocacher",
+                            "com.github.codeyumx.vrcvideocacherplus"
+                        ];
+                        const string ForkAppKey = "com.github.bluscream.vrcvideocacherplusplus";
+                        foreach (var legacyAppKey in legacyAppKeys)
                         {
-                            if (OpenVR.Applications.IsApplicationInstalled(LegacyAppKey) &&
-                                OpenVR.Applications.GetApplicationAutoLaunch(LegacyAppKey))
+                            try
                             {
-                                Logger.Information("Disabling stale SteamVR auto-launch for legacy app key {Key}", LegacyAppKey);
-                                OpenVR.Applications.SetApplicationAutoLaunch(LegacyAppKey, false);
+                                if (OpenVR.Applications.IsApplicationInstalled(legacyAppKey) &&
+                                    OpenVR.Applications.GetApplicationAutoLaunch(legacyAppKey))
+                                {
+                                    Logger.Information("Disabling stale SteamVR auto-launch for legacy app key {Key}", legacyAppKey);
+                                    OpenVR.Applications.SetApplicationAutoLaunch(legacyAppKey, false);
+                                }
                             }
-                        }
-                        catch (Exception ex)
-                        {
-                            Logger.Warning(ex, "Failed to clear legacy auto-launch entry");
+                            catch (Exception ex)
+                            {
+                                Logger.Warning(ex, "Failed to clear legacy auto-launch entry {Key}", legacyAppKey);
+                            }
                         }
 
                         // Write the manifest with the real on-disk exe name so SteamVR auto-launch

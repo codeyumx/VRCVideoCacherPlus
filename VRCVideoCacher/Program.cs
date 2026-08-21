@@ -29,6 +29,15 @@ internal sealed class Program
     public const string Creator_Haxy = "Haxy";
     public const string Creator_Hauskaz = "Hauskaz";
     public const string Creator_DubyaDude = "DubyaDude";
+
+    // Single source of truth for this fork's identity. The updater downloads and swaps in a
+    // release asset from here, so pointing it at the wrong repo silently replaces the user's
+    // install with a different build — keep every repo reference derived from these two.
+    public const string RepoOwner = "Bluscream";
+    public const string RepoName = "VRCVideoCacherPlusPlus";
+    public const string RepoUrl = $"https://github.com/{RepoOwner}/{RepoName}";
+    public const string LatestReleaseUrl = $"{RepoUrl}/releases/latest";
+    public const string LatestReleaseApiUrl = $"https://api.github.com/repos/{RepoOwner}/{RepoName}/releases/latest";
     public static ILogger Logger = Log.ForContext("SourceContext", "Core");
     public static readonly string CurrentProcessPath = Path.GetDirectoryName(Environment.ProcessPath) ?? string.Empty;
     public static readonly string DataPath = Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "VRCVideoCacher");

@@ -168,7 +168,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private void OpenReleasesPage()
     {
         var url = _pendingRelease?.html_url
-                  ?? "https://github.com/codeyumx/VRCVideoCacherPlus/releases/latest";
+                  ?? Program.LatestReleaseUrl;
         try
         {
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
