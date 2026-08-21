@@ -54,6 +54,34 @@ public class YtdlManager
         Log.Debug("Using ytdl path: {YtdlPath}", YtdlPath);
     }
 
+    /// <summary>
+    /// Resolves an archive entry to a destination inside <see cref="Program.UtilsPath"/>,
+    /// flattening any directory component and refusing anything that still escapes.
+    ///
+    /// Entry names come from a remote archive, and joining one straight onto a destination
+    /// directory is the classic zip-slip: an entry called "../../something" writes wherever
+    /// the process can reach. Returns null when the entry should be skipped.
+    /// </summary>
+    private static string? ResolveUtilsDestination(string entryKey)
+    {
+        var fileName = Path.GetFileName(entryKey);
+        if (string.IsNullOrEmpty(fileName))
+            return null;
+
+        var utilsRoot = Path.GetFullPath(Program.UtilsPath);
+        var destination = Path.GetFullPath(Path.Join(utilsRoot, fileName));
+
+        // GetFileName already strips directories; this also catches an entry literally
+        // named "..", which would otherwise resolve to the parent directory.
+        if (!destination.StartsWith(utilsRoot + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+        {
+            Log.Warning("Rejecting archive entry {Entry}: resolves outside {UtilsPath}.", entryKey, utilsRoot);
+            return null;
+        }
+
+        return destination;
+    }
+
     public static string GenerateYtdlArgs(List<string> args, string urlArg)
     {
         var globalArgs = new List<string>
@@ -363,13 +391,19 @@ public class YtdlManager
                     continue;
 
                 Log.Debug("Extracting file {Name} ({Size} bytes)", reader.Entry.Key, reader.Entry.Size);
-                var path = Path.Join(Program.UtilsPath, reader.Entry.Key);
-                await using var outputStream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None);
-                await using var entryStream = await reader.OpenEntryStreamAsync();
-                await entryStream.CopyToAsync(outputStream);
+                var path = ResolveUtilsDestination(reader.Entry.Key);
+                if (path == null)
+                    continue;
+
+                await using (var outputStream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None))
+                await using (var entryStream = await reader.OpenEntryStreamAsync())
+                {
+                    await entryStream.CopyToAsync(outputStream);
+                }
+
+                FileTools.MarkFileExecutable(path);
                 Versions.CurrentVersion.Deno = json.tag_name;
                 Versions.Save();
-                FileTools.MarkFileExecutable(path);
                 Log.Information("Deno downloaded and extracted.");
                 return;
             }
@@ -410,13 +444,19 @@ public class YtdlManager
                     continue;
 
                 Log.Debug("Extracting file {Name} ({Size} bytes)", reader.Entry.Key, reader.Entry.Size);
-                var path = Path.Join(Program.UtilsPath, reader.Entry.Key);
-                await using var outputStream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None);
-                await using var entryStream = await reader.OpenEntryStreamAsync();
-                await entryStream.CopyToAsync(outputStream);
+                var path = ResolveUtilsDestination(reader.Entry.Key);
+                if (path == null)
+                    continue;
+
+                await using (var outputStream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None))
+                await using (var entryStream = await reader.OpenEntryStreamAsync())
+                {
+                    await entryStream.CopyToAsync(outputStream);
+                }
+
+                FileTools.MarkFileExecutable(path);
                 Versions.CurrentVersion.Deno = latestVersion;
                 Versions.Save();
-                FileTools.MarkFileExecutable(path);
                 Log.Information("Deno downloaded and extracted.");
                 return;
             }
@@ -538,12 +578,17 @@ public class YtdlManager
                 if (!reader.Entry.Key.Contains("/bin/"))
                     continue;
 
-                var fileName = Path.GetFileName(reader.Entry.Key);
-                Log.Debug("Extracting file {Name} ({Size} bytes)", fileName, reader.Entry.Size);
-                var path = Path.Join(Program.UtilsPath, fileName);
-                await using var outputStream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None);
-                await using var entryStream = await reader.OpenEntryStreamAsync();
-                await entryStream.CopyToAsync(outputStream);
+                Log.Debug("Extracting file {Name} ({Size} bytes)", reader.Entry.Key, reader.Entry.Size);
+                var path = ResolveUtilsDestination(reader.Entry.Key);
+                if (path == null)
+                    continue;
+
+                await using (var outputStream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None))
+                await using (var entryStream = await reader.OpenEntryStreamAsync())
+                {
+                    await entryStream.CopyToAsync(outputStream);
+                }
+
                 FileTools.MarkFileExecutable(path);
                 success = true;
             }
