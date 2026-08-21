@@ -67,7 +67,7 @@ public class ConfigManager
             return;
 
         Log.Information("Config changed, saving...");
-        File.WriteAllText(ConfigFilePath, newConfig);
+        AtomicFile.WriteAllText(ConfigFilePath, newConfig);
         Log.Information("Config saved.");
 
         // Nothing else is called from here on purpose. This used to also save the Plus

@@ -261,7 +261,7 @@ public class PlusConfigManager
             return;
 
         Log.Information("Plus config changed, saving...");
-        File.WriteAllText(ConfigFilePath, newConfig);
+        Utils.AtomicFile.WriteAllText(ConfigFilePath, newConfig);
         Log.Information("Plus config saved.");
         OnConfigChanged?.Invoke();
     }

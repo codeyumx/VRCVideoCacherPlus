@@ -30,7 +30,7 @@ public class Versions
 
     public static void Save()
     {
-        File.WriteAllText(VersionPath, JsonConvert.SerializeObject(CurrentVersion, Formatting.Indented));
+        Utils.AtomicFile.WriteAllText(VersionPath, JsonConvert.SerializeObject(CurrentVersion, Formatting.Indented));
     }
 }
 
