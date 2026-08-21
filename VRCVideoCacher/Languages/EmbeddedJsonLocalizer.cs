@@ -7,10 +7,17 @@ namespace VRCVideoCacher.Languages;
 
 public class EmbeddedJsonLocalizer : BaseLocalizer
 {
-    private FrozenDictionary<string, string> _languageStrings = new Dictionary<string, string>().ToFrozenDictionary();
+    private const string Prefix = "VRCVideoCacher.Languages.";
+    private const string Suffix = ".loc.json";
+    private const string FallbackLanguageCode = "en";
 
-    private const string prefix = "VRCVideoCacher.Languages.";
-    private const string suffix = ".loc.json";
+    private static readonly Serilog.ILogger Log = Program.Logger.ForContext<EmbeddedJsonLocalizer>();
+
+    private FrozenDictionary<string, string> _languageStrings = FrozenDictionary<string, string>.Empty;
+
+    // English stays loaded alongside the active language so that a key missing from a
+    // translation renders real text instead of surfacing the raw "ru:SomeKey" marker.
+    private FrozenDictionary<string, string> _fallbackStrings = FrozenDictionary<string, string>.Empty;
 
     public EmbeddedJsonLocalizer()
     {
@@ -21,16 +28,16 @@ public class EmbeddedJsonLocalizer : BaseLocalizer
 
     public override void Reload()
     {
-        var assembly = Assembly.GetExecutingAssembly();
-        var resources = assembly.GetManifestResourceNames()
-            .Where(r => r.StartsWith(prefix) && r.EndsWith(suffix))
-            .ToList();
-
-        foreach (var resourceName in resources)
+        foreach (var resourceName in GetLanguageResourceNames())
         {
-            var langId = resourceName[prefix.Length..^suffix.Length];
-            _languages.Add(langId);
+            var langId = resourceName[Prefix.Length..^Suffix.Length];
+            // Guard against duplicates: Get() calls Reload() whenever _hasLoaded is false,
+            // so this can run more than once over the same resource list.
+            if (!_languages.Contains(langId))
+                _languages.Add(langId);
         }
+
+        _fallbackStrings = LoadLanguage(FallbackLanguageCode) ?? FrozenDictionary<string, string>.Empty;
 
         ValidateLanguage();
         _hasLoaded = true;
@@ -39,17 +46,19 @@ public class EmbeddedJsonLocalizer : BaseLocalizer
 
     protected override void OnLanguageChanged()
     {
-        var assembly = Assembly.GetExecutingAssembly();
-        var resourceName = assembly.GetManifestResourceNames()
-            .First(r => r.Equals($"{prefix}{_language}{suffix}"));
+        // A config naming a language we no longer ship — hand-edited, or a translation
+        // dropped between releases — used to reach .First() here and throw
+        // InvalidOperationException out of App.InitializeLocalization, killing the app
+        // before the window ever appeared. Fall back to English instead.
+        var strings = LoadLanguage(_language);
+        if (strings == null)
+        {
+            Log.Warning("No embedded strings for language '{Language}'; falling back to '{Fallback}'.",
+                _language, FallbackLanguageCode);
+            strings = _fallbackStrings;
+        }
 
-        using var stream = assembly.GetManifestResourceStream(resourceName)!;
-        using var reader = new StreamReader(stream);
-        var json = JObject.Parse(reader.ReadToEnd());
-
-        _languageStrings = json.Properties()
-            .ToDictionary(k => k.Name, v => v.Value?.ToString() ?? v.Name)
-            .ToFrozenDictionary();
+        _languageStrings = strings;
     }
 
     public override string Get(string key)
@@ -59,11 +68,50 @@ public class EmbeddedJsonLocalizer : BaseLocalizer
             Reload();
         }
 
-        if (_languageStrings?.TryGetValue(key, out string? value) == true)
-        {
+        if (_languageStrings.TryGetValue(key, out var value))
             return value;
+
+        // Untranslated key: show the English text rather than "<lang>:<key>" at the user.
+        if (_fallbackStrings.TryGetValue(key, out var fallback))
+        {
+            Log.Debug("Missing '{Language}' translation for key '{Key}'; using English.", _language, key);
+            return fallback;
         }
 
-        return base.Language + ":" + key;
+        return key;
+    }
+
+    private static IEnumerable<string> GetLanguageResourceNames() =>
+        Assembly.GetExecutingAssembly()
+            .GetManifestResourceNames()
+            .Where(r => r.StartsWith(Prefix, StringComparison.Ordinal) &&
+                        r.EndsWith(Suffix, StringComparison.Ordinal));
+
+    /// <summary>
+    /// Loads one embedded language file, or null when there is no resource for it.
+    /// </summary>
+    private static FrozenDictionary<string, string>? LoadLanguage(string? languageId)
+    {
+        if (string.IsNullOrEmpty(languageId))
+            return null;
+
+        try
+        {
+            var assembly = Assembly.GetExecutingAssembly();
+            using var stream = assembly.GetManifestResourceStream($"{Prefix}{languageId}{Suffix}");
+            if (stream == null)
+                return null;
+
+            using var reader = new StreamReader(stream);
+            return JObject.Parse(reader.ReadToEnd())
+                .Properties()
+                .ToDictionary(k => k.Name, v => v.Value?.ToString() ?? v.Name)
+                .ToFrozenDictionary();
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to parse embedded language file for '{Language}'.", languageId);
+            return null;
+        }
     }
 }

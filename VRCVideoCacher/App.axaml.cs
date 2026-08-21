@@ -103,6 +103,16 @@ public partial class App : Application
 
         var configLang = ConfigManager.Config.Language;
         var lang = string.IsNullOrEmpty(configLang) ? "en" : configLang;
+
+        // The config can name a language we no longer ship. The localizer falls back on its
+        // own now, but correcting it here keeps Localizer.Language consistent with what is
+        // actually rendered, so the Settings dropdown doesn't show a blank selection.
+        if (!Localizer.Languages.Contains(lang))
+        {
+            ConfigManager.Config.Language = lang = "en";
+            ConfigManager.TrySaveConfig();
+        }
+
         Localizer.Language = lang;
     }
 
