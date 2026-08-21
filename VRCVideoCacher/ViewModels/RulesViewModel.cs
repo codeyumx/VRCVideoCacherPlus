@@ -21,6 +21,7 @@ public partial class RuleEntryViewModel : ObservableObject
     public RuleAction Action => Rule.Action;
     public string ActionSummary => Rule.GetActionSummary();
     public string? Integration => Rule.Integration;
+    public string IntegrationDisplay => string.IsNullOrEmpty(Rule.Integration) ? string.Empty : "*";
 
     [ObservableProperty]
     private bool _isMatched;
@@ -121,6 +122,7 @@ public partial class RuleEntryViewModel : ObservableObject
         OnPropertyChanged(nameof(ActionSummary));
         OnPropertyChanged(nameof(Enabled));
         OnPropertyChanged(nameof(Integration));
+        OnPropertyChanged(nameof(IntegrationDisplay));
     }
 }
 
