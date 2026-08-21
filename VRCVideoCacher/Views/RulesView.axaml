@@ -71,7 +71,7 @@
                 </DataGrid.Styles>
                 <DataGrid.Columns>
                     <!-- Enabled Toggle -->
-                    <DataGridCheckBoxColumn Header="Active" Binding="{Binding Enabled, Mode=TwoWay}" Width="70"/>
+                    <DataGridCheckBoxColumn Header="✔️" Binding="{Binding Enabled, Mode=TwoWay}" Width="35"/>
 
                     <!-- Rule Name -->
                     <DataGridTextColumn Header="Rule Name" Binding="{Binding Name}" Width="160"/>
