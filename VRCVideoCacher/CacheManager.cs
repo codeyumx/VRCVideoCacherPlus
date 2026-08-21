@@ -33,7 +33,23 @@ public class CacheManager
             CachePath = Path.Join(Program.CurrentProcessPath, ConfigManager.Config.CachedAssetPath);
 
         Log.Debug("Using cache path {CachePath}", CachePath);
-        BuildCache();
+
+        // Re-check the size budget whenever the config changes. ConfigManager used to call
+        // TryFlushCache directly at the end of its own initialiser, which re-entered this
+        // type before CachePath had been assigned.
+        ConfigManager.OnConfigChanged += TryFlushCache;
+
+        // A failure in here surfaces as a TypeInitializationException from whatever
+        // happened to touch CacheManager first, which is close to undebuggable. An
+        // unreadable cache directory should degrade to an empty index, not that.
+        try
+        {
+            BuildCache();
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to index the cache directory {CachePath}", CachePath);
+        }
     }
 
     private static string GetSystemCacheFolder()

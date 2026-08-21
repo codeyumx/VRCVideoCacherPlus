@@ -61,7 +61,6 @@ public class ConfigManager
 
     public static void TrySaveConfig()
     {
-        PlusConfigManager.TrySaveConfig();
         var newConfig = JsonConvert.SerializeObject(Config, Formatting.Indented);
         var oldConfig = File.Exists(ConfigFilePath) ? File.ReadAllText(ConfigFilePath) : string.Empty;
         if (newConfig == oldConfig)
@@ -70,8 +69,17 @@ public class ConfigManager
         Log.Information("Config changed, saving...");
         File.WriteAllText(ConfigFilePath, newConfig);
         Log.Information("Config saved.");
+
+        // Nothing else is called from here on purpose. This used to also save the Plus
+        // config and call CacheManager.TryFlushCache, which closed a static-initialisation
+        // loop: CacheManager's initialiser reads ConfigManager.Config, whose initialiser
+        // ends by calling TrySaveConfig, which called back into CacheManager while its
+        // CachePath was still null. It only ever worked because the asset dictionary was
+        // empty at that moment and TryFlushCache returned early.
+        //
+        // CacheManager subscribes to OnConfigChanged for the flush instead, and the Plus
+        // config is saved by the two view models that actually change it.
         OnConfigChanged?.Invoke();
-        CacheManager.TryFlushCache();
     }
 
     private static bool GetUserConfirmation(string prompt, bool defaultValue)
