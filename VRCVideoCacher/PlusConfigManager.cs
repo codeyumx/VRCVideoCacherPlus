@@ -95,29 +95,64 @@ public class PlusConfigManager
         }
     }
 
+    // The catch-all rule stays last; new defaults are inserted above it.
+    private const string CatchAllRuleName = "Everything else";
+
+    /// <summary>
+    /// Seeds default rules that this installation has not been offered before.
+    ///
+    /// The previous version re-added any default that was missing, every single launch —
+    /// so deleting a default rule was impossible: it silently reappeared on the next start.
+    /// Each default is now recorded once in SeededDefaultRules, and after that the user's
+    /// decision to remove it sticks.
+    /// </summary>
     public static void EnsureDefaultRules()
     {
+        var defaults = ConfigModel.GetDefaultRules();
+
         if (Config.UriRules == null || Config.UriRules.Count == 0)
         {
-            Config.UriRules = ConfigModel.GetDefaultRules();
+            Config.UriRules = defaults;
+            Config.SeededDefaultRules = defaults.Select(rule => rule.Name).ToList();
+            return;
         }
-        else
+
+        // Upgrading from a version with no seed tracking: everything the user already has
+        // has evidently been seeded. Anything missing is either a rule they deleted or a
+        // genuinely new default; both get offered exactly once here, and are then recorded.
+        if (Config.SeededDefaultRules.Count == 0)
         {
-            var defaultRules = ConfigModel.GetDefaultRules();
-            foreach (var defRule in defaultRules)
+            Config.SeededDefaultRules = defaults
+                .Where(d => Config.UriRules.Any(r => r.Name == d.Name || r.Pattern == d.Pattern))
+                .Select(d => d.Name)
+                .ToList();
+        }
+
+        foreach (var defRule in defaults)
+        {
+            if (Config.SeededDefaultRules.Contains(defRule.Name))
+                continue;
+
+            if (Config.UriRules.Any(r => r.Name == defRule.Name || r.Pattern == defRule.Pattern))
             {
-                if (!Config.UriRules.Any(r => r.Name == defRule.Name || r.Pattern == defRule.Pattern))
-                {
-                    var lastIndex = Config.UriRules.FindIndex(r => r.Name == "Everything else");
-                    if (lastIndex >= 0)
-                        Config.UriRules.Insert(lastIndex, defRule);
-                    else
-                        Config.UriRules.Add(defRule);
-                }
+                Config.SeededDefaultRules.Add(defRule.Name);
+                continue;
             }
 
-            Config.UriRules = Config.UriRules.DistinctBy(r => r.Name + "|" + r.Pattern).ToList();
+            var catchAllIndex = Config.UriRules.FindIndex(r => r.Name == CatchAllRuleName);
+            if (catchAllIndex >= 0)
+                Config.UriRules.Insert(catchAllIndex, defRule);
+            else
+                Config.UriRules.Add(defRule);
+
+            Config.SeededDefaultRules.Add(defRule.Name);
+            Log.Information("Added new default rule '{RuleName}'.", defRule.Name);
         }
+
+        // Defensive: an earlier version could insert the same rule more than once. Keyed on
+        // a tuple rather than the old "Name + \"|\" + Pattern" string, which could collide
+        // across differently-split name/pattern pairs.
+        Config.UriRules = Config.UriRules.DistinctBy(r => (r.Name, r.Pattern)).ToList();
     }
 
     /// <summary>
@@ -294,4 +329,11 @@ public class PlusConfigModel
     public int CacheDownloadIdleSeconds { get; set; } = 30; // 0 = disabled
     public bool CacheYouTubePreferVp9 { get; set; } = true; // VP9+aac in mp4 instead of h264+aac
     public List<UriRule> UriRules { get; set; } = PlusConfigManager.GetDefaultRules();
+
+    /// <summary>
+    /// Names of the default rules this installation has already been offered. A default is
+    /// seeded once; once it is in here, deleting the rule keeps it deleted instead of
+    /// having it reappear on the next launch.
+    /// </summary>
+    public List<string> SeededDefaultRules { get; set; } = [];
 }
