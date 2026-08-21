@@ -99,35 +99,48 @@
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
 
-                    <!-- Actions (Edit, Move Up, Move Down, Delete) -->
-                    <DataGridTemplateColumn Header="Actions" Width="160">
+                    <!-- Actions (Menu) -->
+                    <DataGridTemplateColumn Header="Actions" Width="80">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate x:DataType="vm:RuleEntryViewModel">
-                                <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center">
-                                    <!-- Edit Pen Button -->
-                                    <Button Command="{Binding $parent[DataGrid].((vm:RulesViewModel)DataContext).EditRuleCommand}"
-                                            CommandParameter="{Binding}" Padding="6" ToolTip.Tip="Edit Rule">
-                                        <mi:MaterialIcon Kind="Pencil" Width="16" Height="16"/>
-                                    </Button>
-
-                                    <!-- Move Up -->
-                                    <Button Command="{Binding $parent[DataGrid].((vm:RulesViewModel)DataContext).MoveRuleUpCommand}"
-                                            CommandParameter="{Binding}" Padding="6" ToolTip.Tip="Move Up">
-                                        <mi:MaterialIcon Kind="ArrowUp" Width="16" Height="16"/>
-                                    </Button>
-
-                                    <!-- Move Down -->
-                                    <Button Command="{Binding $parent[DataGrid].((vm:RulesViewModel)DataContext).MoveRuleDownCommand}"
-                                            CommandParameter="{Binding}" Padding="6" ToolTip.Tip="Move Down">
-                                        <mi:MaterialIcon Kind="ArrowDown" Width="16" Height="16"/>
-                                    </Button>
-
-                                    <!-- Delete -->
-                                    <Button Command="{Binding $parent[DataGrid].((vm:RulesViewModel)DataContext).DeleteRuleCommand}"
-                                            CommandParameter="{Binding}" Padding="6" ToolTip.Tip="Delete Rule">
-                                        <mi:MaterialIcon Kind="Delete" Width="16" Height="16" Foreground="#E57373"/>
-                                    </Button>
-                                </StackPanel>
+                                <Button HorizontalAlignment="Center" Padding="4" Background="Transparent" BorderThickness="0" ToolTip.Tip="Rule Actions">
+                                    <mi:MaterialIcon Kind="DotsVertical" Width="16" Height="16"/>
+                                    <Button.Flyout>
+                                        <MenuFlyout Placement="BottomEdgeAlignedRight">
+                                            <MenuItem Header="Edit" Command="{Binding $parent[DataGrid].((vm:RulesViewModel)DataContext).EditRuleCommand}" CommandParameter="{Binding}">
+                                                <MenuItem.Icon>
+                                                    <mi:MaterialIcon Kind="Pencil" Width="16" Height="16"/>
+                                                </MenuItem.Icon>
+                                            </MenuItem>
+                                            <MenuItem Header="Move to top" Command="{Binding $parent[DataGrid].((vm:RulesViewModel)DataContext).MoveRuleToTopCommand}" CommandParameter="{Binding}">
+                                                <MenuItem.Icon>
+                                                    <mi:MaterialIcon Kind="ArrowCollapseUp" Width="16" Height="16"/>
+                                                </MenuItem.Icon>
+                                            </MenuItem>
+                                            <MenuItem Header="Move up" Command="{Binding $parent[DataGrid].((vm:RulesViewModel)DataContext).MoveRuleUpCommand}" CommandParameter="{Binding}">
+                                                <MenuItem.Icon>
+                                                    <mi:MaterialIcon Kind="ArrowUp" Width="16" Height="16"/>
+                                                </MenuItem.Icon>
+                                            </MenuItem>
+                                            <MenuItem Header="Move down" Command="{Binding $parent[DataGrid].((vm:RulesViewModel)DataContext).MoveRuleDownCommand}" CommandParameter="{Binding}">
+                                                <MenuItem.Icon>
+                                                    <mi:MaterialIcon Kind="ArrowDown" Width="16" Height="16"/>
+                                                </MenuItem.Icon>
+                                            </MenuItem>
+                                            <MenuItem Header="Move to bottom" Command="{Binding $parent[DataGrid].((vm:RulesViewModel)DataContext).MoveRuleToBottomCommand}" CommandParameter="{Binding}">
+                                                <MenuItem.Icon>
+                                                    <mi:MaterialIcon Kind="ArrowCollapseDown" Width="16" Height="16"/>
+                                                </MenuItem.Icon>
+                                            </MenuItem>
+                                            <Separator/>
+                                            <MenuItem Header="Delete" Command="{Binding $parent[DataGrid].((vm:RulesViewModel)DataContext).DeleteRuleCommand}" CommandParameter="{Binding}" Foreground="#E57373">
+                                                <MenuItem.Icon>
+                                                    <mi:MaterialIcon Kind="Delete" Width="16" Height="16" Foreground="#E57373"/>
+                                                </MenuItem.Icon>
+                                            </MenuItem>
+                                        </MenuFlyout>
+                                    </Button.Flyout>
+                                </Button>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>

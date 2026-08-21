@@ -353,6 +353,34 @@ public partial class RulesViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private void MoveRuleToTop(RuleEntryViewModel? entry)
+    {
+        if (entry == null) return;
+        var index = Rules.IndexOf(entry);
+        if (index > 0)
+        {
+            Rules.RemoveAt(index);
+            Rules.Insert(0, entry);
+            EvaluateTestUrl();
+            SetHasChanges();
+        }
+    }
+
+    [RelayCommand]
+    private void MoveRuleToBottom(RuleEntryViewModel? entry)
+    {
+        if (entry == null) return;
+        var index = Rules.IndexOf(entry);
+        if (index >= 0 && index < Rules.Count - 1)
+        {
+            Rules.RemoveAt(index);
+            Rules.Add(entry);
+            EvaluateTestUrl();
+            SetHasChanges();
+        }
+    }
+
+    [RelayCommand]
     private void DeleteRule(RuleEntryViewModel? entry)
     {
         if (entry == null) return;
