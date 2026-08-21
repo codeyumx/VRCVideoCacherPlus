@@ -124,6 +124,47 @@ public class CacheManager
         TryFlushCache();
     }
 
+    private static readonly ConcurrentDictionary<string, int> PinnedFiles = new();
+
+    /// <summary>
+    /// Protects a cache file from eviction while it is being written or published. Dispose
+    /// the returned handle when done.
+    ///
+    /// Needed because a file can be evicted the instant it is added: LRU orders by mtime,
+    /// and a bulk pre-cache entry carries the timestamp from its manifest, which may be
+    /// years old — so it arrives as the least-recently-used thing in the cache and
+    /// AddToCache's own flush would delete what was just downloaded.
+    /// </summary>
+    public static IDisposable PinFile(string fileName)
+    {
+        PinnedFiles.AddOrUpdate(fileName, 1, static (_, count) => count + 1);
+        return new Pin(fileName);
+    }
+
+    private sealed class Pin(string fileName) : IDisposable
+    {
+        private int _disposed;
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) == 1)
+                return;
+
+            while (PinnedFiles.TryGetValue(fileName, out var count))
+            {
+                if (count <= 1)
+                {
+                    if (PinnedFiles.TryRemove(new KeyValuePair<string, int>(fileName, count)))
+                        return;
+                }
+                else if (PinnedFiles.TryUpdate(fileName, count - 1, count))
+                {
+                    return;
+                }
+            }
+        }
+    }
+
     public static void TryFlushCache()
     {
         if (ConfigManager.Config.CacheMaxSizeInGb <= 0f)
@@ -145,6 +186,12 @@ public class CacheManager
         {
             if (cacheSize < maxCacheSize)
                 break;
+
+            if (PinnedFiles.ContainsKey(kvp.Value.FileName))
+            {
+                Log.Debug("Not evicting {FileName}: currently in use.", kvp.Value.FileName);
+                continue;
+            }
 
             var videoId = Path.GetFileNameWithoutExtension(kvp.Value.FileName);
             var filePath = Path.Join(CachePath, kvp.Value.FileName);

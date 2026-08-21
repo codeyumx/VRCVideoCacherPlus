@@ -521,8 +521,13 @@ public class VideoDownloader
             return (false, "SkipReasonInvalidDownload");
         }
 
-        File.Move(sourceTemp, filePath, overwrite: true);
-        CacheManager.AddToCache(fileName);
+        // Pinned across the publish so AddToCache's own size-budget flush cannot evict the
+        // file it was just told about.
+        using (CacheManager.PinFile(fileName))
+        {
+            File.Move(sourceTemp, filePath, overwrite: true);
+            CacheManager.AddToCache(fileName);
+        }
         Log.Information("YouTube Video Downloaded: {URL}", $"{ConfigManager.Config.YtdlpWebServerUrl}/{fileName}");
         return (true, null);
     }
@@ -762,8 +767,11 @@ public class VideoDownloader
             return (false, "SkipReasonInvalidDownload");
         }
 
-        File.Move(tempMp4, filePath, overwrite: true);
-        CacheManager.AddToCache(fileName);
+        using (CacheManager.PinFile(fileName))
+        {
+            File.Move(tempMp4, filePath, overwrite: true);
+            CacheManager.AddToCache(fileName);
+        }
         Log.Information("Video Downloaded: {URL}", $"{ConfigManager.Config.YtdlpWebServerUrl}/{fileName}");
         return (true, null);
     }
@@ -876,8 +884,11 @@ public class VideoDownloader
             return (false, "SkipReasonInvalidDownload");
         }
 
-        File.Move(tempMp4, filePath, overwrite: true);
-        CacheManager.AddToCache(fileName);
+        using (CacheManager.PinFile(fileName))
+        {
+            File.Move(tempMp4, filePath, overwrite: true);
+            CacheManager.AddToCache(fileName);
+        }
         Log.Information("HLS Video Downloaded: {URL}", $"{ConfigManager.Config.YtdlpWebServerUrl}/{fileName}");
 
         // HLS has no remote thumbnail source — extract a frame from the cached MP4 so

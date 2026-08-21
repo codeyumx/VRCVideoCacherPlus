@@ -197,16 +197,23 @@ public class BulkPreCache
             throw;
         }
 
-        if (fileInfo.LastModified > 0)
+        // Pinned across the timestamp rewrite and the publish. These files deliberately
+        // carry the manifest's own mtime, which can be years old, so the moment they are
+        // indexed they are the least-recently-used entry in the cache — without the pin,
+        // AddToCache's size-budget flush would delete what was just downloaded.
+        using (CacheManager.PinFile(fileInfo.FileName))
         {
-            File.SetLastWriteTimeUtc(fileInfo.FilePath, fileInfo.LastModifiedDate);
-            File.SetCreationTimeUtc(fileInfo.FilePath, fileInfo.LastModifiedDate);
-            File.SetLastAccessTimeUtc(fileInfo.FilePath, fileInfo.LastModifiedDate);
-        }
+            if (fileInfo.LastModified > 0)
+            {
+                File.SetLastWriteTimeUtc(fileInfo.FilePath, fileInfo.LastModifiedDate);
+                File.SetCreationTimeUtc(fileInfo.FilePath, fileInfo.LastModifiedDate);
+                File.SetLastAccessTimeUtc(fileInfo.FilePath, fileInfo.LastModifiedDate);
+            }
 
-        // Register with the cache, so these files count against the size budget and take
-        // part in LRU eviction like every other cached video. They used to be invisible to
-        // CacheManager entirely until the next restart rebuilt the index.
-        CacheManager.AddToCache(fileInfo.FileName);
+            // Register with the cache, so these files count against the size budget and take
+            // part in LRU eviction like every other cached video. They used to be invisible to
+            // CacheManager entirely until the next restart rebuilt the index.
+            CacheManager.AddToCache(fileInfo.FileName);
+        }
     }
 }
