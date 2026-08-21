@@ -42,16 +42,37 @@ public class ElevatorManager
 
         string appPath = Environment.ProcessPath!;
 
-        ProcessStartInfo MakeStartInfo(string exe, string args) => launchClient != null
-            ? new ProcessStartInfo { FileName = launchClient, Arguments = $"--alongside-steam -- {exe} {args}", UseShellExecute = false }
-            : new ProcessStartInfo { FileName = exe, Arguments = args, UseShellExecute = false };
+        // ArgumentList rather than a formatted command line: appPath is an install location
+        // that routinely contains spaces (a Steam library on an external drive, say), and
+        // interpolating it unquoted split it into two arguments — so the elevated command
+        // either failed or, worse, ran against a truncated path.
+        ProcessStartInfo MakeStartInfo(string exe, params string[] args)
+        {
+            var psi = new ProcessStartInfo { UseShellExecute = false };
+            if (launchClient != null)
+            {
+                psi.FileName = launchClient;
+                psi.ArgumentList.Add("--alongside-steam");
+                psi.ArgumentList.Add("--");
+                psi.ArgumentList.Add(exe);
+            }
+            else
+            {
+                psi.FileName = exe;
+            }
+
+            foreach (var arg in args)
+                psi.ArgumentList.Add(arg);
+
+            return psi;
+        }
 
         // 1. Try pkexec
         var pkexec = FindHostBin("pkexec");
         if (pkexec != null)
         {
             Log.Debug("Using pkexec");
-            return new Process { StartInfo = MakeStartInfo(pkexec, $"{appPath} {flag}") };
+            return new Process { StartInfo = MakeStartInfo(pkexec, appPath, flag) };
         }
 
         // 2. Try sudo -A with a graphical askpass helper
@@ -67,7 +88,7 @@ public class ElevatorManager
             var check = InPressureVessel ? $"/run/host{askpass}" : askpass;
             if (!File.Exists(check)) continue;
             Log.Debug("Using sudo -A with askpass: {Askpass}", askpass);
-            var psi = MakeStartInfo("/usr/bin/sudo", $"-A {appPath} {flag}");
+            var psi = MakeStartInfo("/usr/bin/sudo", "-A", appPath, flag);
             psi.Environment["SUDO_ASKPASS"] = askpass;
             return new Process { StartInfo = psi };
         }
@@ -79,10 +100,9 @@ public class ElevatorManager
             var termPath = FindHostBin(term);
             if (termPath == null) continue;
             Log.Debug("Using terminal {Term} with sudo", termPath);
-            var termArgs = termPath.Contains("gnome-terminal")
-                ? $"-- /usr/bin/sudo {appPath} {flag}"
-                : $"-e /usr/bin/sudo {appPath} {flag}";
-            return new Process { StartInfo = MakeStartInfo(termPath, termArgs) };
+            // gnome-terminal wants "-- cmd args", the others "-e cmd args".
+            var termFlag = termPath.Contains("gnome-terminal") ? "--" : "-e";
+            return new Process { StartInfo = MakeStartInfo(termPath, termFlag, "/usr/bin/sudo", appPath, flag) };
         }
 
         Log.Error("No elevation method found. Please manually edit /etc/hosts.");
