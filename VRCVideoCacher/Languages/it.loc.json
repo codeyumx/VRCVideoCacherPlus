@@ -1,5 +1,7 @@
 {
   "Dashboard": "Dashboard",
+  "NowPlaying": "In riproduzione",
+  "ActiveConnections": "Connessioni attive",
   "Settings": "Impostazioni",
   "CacheBrowser": "Sfoglia Cache",
   "Downloads": "Download",

@@ -1,5 +1,7 @@
 {
   "Dashboard": "Панель управления",
+  "NowPlaying": "Сейчас играет",
+  "ActiveConnections": "Активные соединения",
   "Settings": "Настройки",
   "CacheBrowser": "Кэш браузера",
   "Downloads": "Загрузки",

@@ -1,5 +1,7 @@
 {
   "Dashboard": "Painel",
+  "NowPlaying": "Reproduzindo agora",
+  "ActiveConnections": "Conexões ativas",
   "Settings": "Preferências",
   "CacheBrowser": "Navegador em Cachê",
   "Downloads": "Transferências",

@@ -290,6 +290,7 @@ internal sealed class Program
         // because resolving each URL hits the network and must not delay startup.
         RunDetached(VideoPreCache.QueueConfiguredVideos(), "Video pre-cache");
         VRDancingSheetService.StartBackgroundSync();
+        VrcLogMonitor.Start();
 
         // run after init to avoid text spam blocking user input
         if (OperatingSystem.IsWindows())
@@ -454,6 +455,7 @@ internal sealed class Program
     private static void OnAppQuit()
     {
         SignalShutdown();
+        VrcLogMonitor.Stop();
         API.WebServer.Stop();
         FileTools.RestoreAllYtdl();
         Logger.Information("Exiting...");

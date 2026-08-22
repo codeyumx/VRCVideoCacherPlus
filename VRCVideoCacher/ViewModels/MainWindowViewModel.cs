@@ -44,6 +44,8 @@ public partial class MainWindowViewModel : ViewModelBase
     // The window binds CurrentView and picks the view by DataTemplate on type, so nothing
     // in XAML touches these properties; only the navigation commands do.
     private readonly Lazy<DashboardViewModel> _dashboard = new(() => new DashboardViewModel());
+    private readonly Lazy<NowPlayingViewModel> _nowPlaying = new(() => new NowPlayingViewModel());
+    private readonly Lazy<ActiveConnectionsViewModel> _activeConnections = new(() => new ActiveConnectionsViewModel());
     private readonly Lazy<RulesViewModel> _rules = new(() => new RulesViewModel());
     private readonly Lazy<SettingsViewModel> _settings = new(() => new SettingsViewModel());
     private readonly Lazy<CookiesViewModel> _cookies = new(() => new CookiesViewModel());
@@ -54,6 +56,8 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly Lazy<AboutViewModel> _about = new(() => new AboutViewModel());
 
     public DashboardViewModel Dashboard => _dashboard.Value;
+    public NowPlayingViewModel NowPlaying => _nowPlaying.Value;
+    public ActiveConnectionsViewModel ActiveConnections => _activeConnections.Value;
     public RulesViewModel Rules => _rules.Value;
     public SettingsViewModel Settings => _settings.Value;
     public CookiesViewModel Cookies => _cookies.Value;
@@ -113,6 +117,12 @@ public partial class MainWindowViewModel : ViewModelBase
 
     [RelayCommand]
     private async Task NavigateToDashboard() => await NavigateToAsync(Dashboard);
+
+    [RelayCommand]
+    private async Task NavigateToNowPlaying() => await NavigateToAsync(NowPlaying);
+
+    [RelayCommand]
+    private async Task NavigateToActiveConnections() => await NavigateToAsync(ActiveConnections);
 
     [RelayCommand]
     private async Task NavigateToRules() => await NavigateToAsync(Rules);

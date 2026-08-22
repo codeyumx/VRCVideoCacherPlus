@@ -1,0 +1,112 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:VRCVideoCacher.ViewModels"
+             xmlns:mi="using:Material.Icons.Avalonia"
+             xmlns:l="using:Jeek.Avalonia.Localization"
+             xmlns:utils="using:VRCVideoCacher.Utils"
+             x:Class="VRCVideoCacher.Views.ActiveConnectionsView"
+             x:DataType="vm:ActiveConnectionsViewModel">
+
+    <Grid RowDefinitions="Auto, *">
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,20">
+            <TextBlock Text="{l:Localize ActiveConnections}" FontSize="24" FontWeight="Bold" Foreground="White"/>
+            <TextBlock Text="List of active sockets used by VRChat/Unity processes" FontSize="12" Foreground="#888888" Margin="0,5,0,0"/>
+        </StackPanel>
+
+        <!-- No Connections Placeholder -->
+        <Border Grid.Row="1" Background="#252525" CornerRadius="8" Padding="40"
+                IsVisible="{Binding !HasConnections}"
+                VerticalAlignment="Center" HorizontalAlignment="Center" Width="400">
+            <StackPanel Spacing="15" HorizontalAlignment="Center">
+                <mi:MaterialIcon Kind="NetworkOff" Width="64" Height="64" Foreground="#444444" HorizontalAlignment="Center"/>
+                <TextBlock Text="No Connections Found" FontSize="18" FontWeight="SemiBold" Foreground="#aaaaaa" HorizontalAlignment="Center"/>
+                <TextBlock Text="No active network sockets for VRChat or Unity processes were detected on the system." 
+                           TextWrapping="Wrap" TextAlignment="Center" Foreground="#888888" FontSize="12"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Connections Table -->
+        <Border Grid.Row="1" Background="#2d2d2d" CornerRadius="8" Padding="10" IsVisible="{Binding HasConnections}">
+            <DataGrid ItemsSource="{Binding Connections}" AutoGenerateColumns="False" CanUserResizeColumns="True" GridLinesVisibility="Horizontal" SelectionMode="Single">
+                <DataGrid.Columns>
+                    <!-- Process Name -->
+                    <DataGridTextColumn Header="Process" Binding="{Binding ProcessName}" Width="100"/>
+
+                    <!-- PID -->
+                    <DataGridTextColumn Header="PID" Binding="{Binding OwningPid}" Width="60"/>
+
+                    <!-- Local Address -->
+                    <DataGridTemplateColumn Header="Local Socket" Width="140">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate x:DataType="utils:ActiveConnectionInfo">
+                                <StackPanel Orientation="Horizontal" Margin="10,0" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding LocalAddress}" Foreground="#bbbbbb" FontSize="12"/>
+                                    <TextBlock Text=":" Foreground="#666666" FontSize="12"/>
+                                    <TextBlock Text="{Binding LocalPort}" Foreground="#999999" FontSize="12" FontWeight="SemiBold"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <!-- Remote Address -->
+                    <DataGridTemplateColumn Header="Remote Socket" Width="160">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate x:DataType="utils:ActiveConnectionInfo">
+                                <StackPanel Orientation="Horizontal" Margin="10,0" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding RemoteAddress}" Foreground="#dddddd" FontSize="12" FontWeight="SemiBold"/>
+                                    <TextBlock Text=":" Foreground="#666666" FontSize="12"/>
+                                    <TextBlock Text="{Binding RemotePort}" Foreground="#42A5F5" FontSize="12" FontWeight="Bold"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <!-- Associated Title -->
+                    <DataGridTemplateColumn Header="Associated Video" Width="*">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate x:DataType="utils:ActiveConnectionInfo">
+                                <Grid Margin="10,0" VerticalAlignment="Center">
+                                    <!-- Display Title if available -->
+                                    <TextBlock Text="{Binding AssociatedTitle}" ToolTip.Tip="{Binding AssociatedUrl}" 
+                                               Foreground="White" FontWeight="SemiBold" FontSize="12"
+                                               TextTrimming="CharacterEllipsis"
+                                               IsVisible="{Binding AssociatedTitle, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                    
+                                    <!-- Fallback to URL -->
+                                    <TextBlock Text="{Binding AssociatedUrl}" ToolTip.Tip="{Binding AssociatedUrl}" 
+                                               Foreground="#888888" FontSize="12"
+                                               TextTrimming="CharacterEllipsis"
+                                               IsVisible="{Binding !AssociatedTitle, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                </Grid>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <!-- Action Column -->
+                    <DataGridTemplateColumn Header="" Width="110">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate x:DataType="utils:ActiveConnectionInfo">
+                                <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <Button Command="{Binding $parent[UserControl].((vm:ActiveConnectionsViewModel)DataContext).CopyAddressCommand}" 
+                                            CommandParameter="{Binding}" ToolTip.Tip="Copy IP or URL" Height="26" Width="26" Padding="0">
+                                        <mi:MaterialIcon Kind="ContentCopy" Width="14" Height="14"/>
+                                    </Button>
+                                    <Button Command="{Binding $parent[UserControl].((vm:ActiveConnectionsViewModel)DataContext).CreateRuleCommand}" 
+                                            CommandParameter="{Binding}" ToolTip.Tip="Create Block Rule" Height="26" Width="26" Padding="0">
+                                        <mi:MaterialIcon Kind="Tune" Width="14" Height="14"/>
+                                    </Button>
+                                    <Button Command="{Binding $parent[UserControl].((vm:ActiveConnectionsViewModel)DataContext).SeverConnectionCommand}" 
+                                            CommandParameter="{Binding}" ToolTip.Tip="Sever Socket Connection" 
+                                            Background="#e53935" Foreground="White" Height="26" Width="26" Padding="0">
+                                        <mi:MaterialIcon Kind="LinkOff" Width="14" Height="14"/>
+                                    </Button>
+                                </StackPanel>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                </DataGrid.Columns>
+            </DataGrid>
+        </Border>
+    </Grid>
+</UserControl>

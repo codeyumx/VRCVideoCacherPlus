@@ -263,11 +263,15 @@ public class ApiController : WebApiController
                     return;
 
                 case RuleAction.Direct:
+                    ActiveStreamTracker.TrackVideoUrl(evalResult.FinalUrl);
+                    ActiveStreamTracker.AssociateUrlInfo(evalResult.FinalUrl, requestUrl, requestUrl, null, null);
                     Log.Information("URL set to Direct (bypass caching) by rule '{RuleName}': {URL}", evalResult.MatchedRule.Name, evalResult.FinalUrl);
                     await HttpContext.SendStringAsync(string.Empty, "text/plain", Encoding.UTF8);
                     return;
 
                 case RuleAction.Redirect:
+                    ActiveStreamTracker.TrackVideoUrl(evalResult.RedirectUrl);
+                    ActiveStreamTracker.AssociateUrlInfo(evalResult.RedirectUrl, requestUrl, requestUrl, null, null);
                     Log.Information("URL redirected by rule '{RuleName}' to: {RedirectUrl}", evalResult.MatchedRule.Name, evalResult.RedirectUrl);
                     await HttpContext.SendStringAsync(evalResult.RedirectUrl, "text/plain", Encoding.UTF8);
                     return;
@@ -287,6 +291,7 @@ public class ApiController : WebApiController
             return;
         }
         DatabaseManager.AddPlayHistory(videoInfo);
+        var dbCache = DatabaseManager.GetVideoInfoCache(videoInfo.VideoId);
 
         if (source == "resonite")
         {
@@ -304,6 +309,7 @@ public class ApiController : WebApiController
             catch (Exception ex) { Log.Debug("Could not stamp {File}: {Err}", fileName, ex.Message); }
             DatabaseManager.UpdateVideoWatchStats(videoInfo.VideoId);
             var url = $"{ConfigManager.Config.YtdlpWebServerUrl}/{fileName}";
+            ActiveStreamTracker.AssociateUrlInfo(url, videoInfo.VideoUrl, dbCache?.Title ?? videoInfo.VideoUrl, videoInfo.VideoId, dbCache?.Duration);
             Log.Information("Responding with Cached URL: {URL}", url);
             await HttpContext.SendStringAsync(url, "text/plain", Encoding.UTF8);
             return;
@@ -311,6 +317,8 @@ public class ApiController : WebApiController
 
         if (string.IsNullOrEmpty(videoInfo.VideoId))
         {
+            ActiveStreamTracker.TrackVideoUrl(videoInfo.VideoUrl);
+            ActiveStreamTracker.AssociateUrlInfo(videoInfo.VideoUrl, videoInfo.VideoUrl, dbCache?.Title ?? videoInfo.VideoUrl, videoInfo.VideoId, dbCache?.Duration);
             Log.Information("Failed to get Video ID: Bypassing.");
             await HttpContext.SendStringAsync(string.Empty, "text/plain", Encoding.UTF8);
             return;
@@ -318,6 +326,8 @@ public class ApiController : WebApiController
 
         if (ConfigManager.Config.CacheOnly)
         {
+            ActiveStreamTracker.TrackVideoUrl(videoInfo.VideoUrl);
+            ActiveStreamTracker.AssociateUrlInfo(videoInfo.VideoUrl, videoInfo.VideoUrl, dbCache?.Title ?? videoInfo.VideoUrl, videoInfo.VideoId, dbCache?.Duration);
             Log.Information("Cache Only Mode Enabled: Bypassing.");
             await HttpContext.SendStringAsync(string.Empty, "text/plain", Encoding.UTF8);
             return;
@@ -328,9 +338,11 @@ public class ApiController : WebApiController
         // We still queue the download below so it gets cached in the background.
         if (videoInfo.UrlType == UrlType.Hls)
         {
+            ActiveStreamTracker.TrackVideoUrl(videoInfo.VideoUrl);
+            var hlsDuration = DatabaseManager.GetVideoInfoCache(videoInfo.VideoId)?.Duration;
+            ActiveStreamTracker.AssociateUrlInfo(videoInfo.VideoUrl, videoInfo.VideoUrl, dbCache?.Title ?? videoInfo.VideoUrl, videoInfo.VideoId, hlsDuration);
             Log.Information("HLS URL: passing through without yt-dlp resolution.");
             await HttpContext.SendStringAsync(string.Empty, "text/plain", Encoding.UTF8);
-            var hlsDuration = DatabaseManager.GetVideoInfoCache(videoInfo.VideoId)?.Duration;
             ActiveStreamTracker.RecordActivity(videoInfo.VideoId, hlsDuration);
             if (ConfigManager.Config.CacheHlsPlaylists && IsHlsCacheable(videoInfo, hlsDuration))
                 VideoDownloader.QueueDownload(videoInfo);
@@ -367,6 +379,10 @@ public class ApiController : WebApiController
             }
         }
 
+        var cachedDuration = DatabaseManager.GetVideoInfoCache(videoInfo.VideoId)?.Duration;
+        var finalUrl = string.IsNullOrEmpty(response) ? videoInfo.VideoUrl : response;
+        ActiveStreamTracker.TrackVideoUrl(finalUrl);
+        ActiveStreamTracker.AssociateUrlInfo(finalUrl, videoInfo.VideoUrl, dbCache?.Title ?? videoInfo.VideoUrl, videoInfo.VideoId, cachedDuration);
         Log.Information("Responding with URL: {URL}", response);
         await HttpContext.SendStringAsync(response, "text/plain", Encoding.UTF8);
 
@@ -376,7 +392,6 @@ public class ApiController : WebApiController
 
         // Record activity immediately with whatever duration we already have cached,
         // so download deferral and queueing are never blocked by a slow yt-dlp call.
-        var cachedDuration = DatabaseManager.GetVideoInfoCache(videoInfo.VideoId)?.Duration;
         ActiveStreamTracker.RecordActivity(videoInfo.VideoId, cachedDuration);
 
         // If we don't have duration yet for a YouTube video, fetch it in the background

@@ -79,6 +79,26 @@
                         </StackPanel>
                     </Button>
 
+                    <Button Command="{Binding NavigateToNowPlayingCommand}"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Left"
+                            Classes="nav-button">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <mi:MaterialIcon Kind="PlayCircleOutline" Width="20" Height="20"/>
+                            <TextBlock Text="{l:Localize NowPlaying}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Command="{Binding NavigateToActiveConnectionsCommand}"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Left"
+                            Classes="nav-button">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <mi:MaterialIcon Kind="Network" Width="20" Height="20"/>
+                            <TextBlock Text="{l:Localize ActiveConnections}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
                     <Button Command="{Binding NavigateToRulesCommand}"
                             HorizontalAlignment="Stretch"
                             HorizontalContentAlignment="Left"
@@ -166,6 +186,12 @@
                 <ContentControl.DataTemplates>
                     <DataTemplate DataType="{x:Type vm:DashboardViewModel}">
                         <views:DashboardView/>
+                    </DataTemplate>
+                    <DataTemplate DataType="{x:Type vm:NowPlayingViewModel}">
+                        <views:NowPlayingView/>
+                    </DataTemplate>
+                    <DataTemplate DataType="{x:Type vm:ActiveConnectionsViewModel}">
+                        <views:ActiveConnectionsView/>
                     </DataTemplate>
                     <DataTemplate DataType="{x:Type vm:RulesViewModel}">
                         <views:RulesView/>

@@ -1,5 +1,7 @@
 {
   "Dashboard": "Főoldal",
+  "NowPlaying": "Most játszott",
+  "ActiveConnections": "Aktív kapcsolatok",
   "Settings": "Beállítások",
   "CacheBrowser": "Gyorsítótár Böngésző",
   "Downloads": "Letöltések",

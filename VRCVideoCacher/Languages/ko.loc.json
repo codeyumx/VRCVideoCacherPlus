@@ -1,5 +1,7 @@
 {
   "Dashboard": "대시보드",
+  "NowPlaying": "현재 재생 중",
+  "ActiveConnections": "활성 연결",
   "Settings": "설정",
   "CacheBrowser": "캐시 브라우저",
   "Downloads": "다운로드",

@@ -301,6 +301,34 @@ public partial class RulesViewModel : ViewModelBase
         }
     }
 
+    public async Task AddRuleWithPattern(string pattern)
+    {
+        var rule = new UriRule
+        {
+            Name = "New Rule",
+            Pattern = pattern,
+            Action = RuleAction.Block,
+            Enabled = true
+        };
+        var editVm = new EditRuleViewModel(rule);
+        var window = new EditRuleWindow(editVm);
+
+        var lifetime = Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime;
+        var parentWindow = lifetime?.MainWindow;
+
+        var result = parentWindow != null
+            ? await window.ShowDialog<bool>(parentWindow)
+            : false;
+
+        if (result)
+        {
+            var newEntry = CreateEntry(editVm.RuleResult);
+            Rules.Add(newEntry);
+            EvaluateTestUrl();
+            SetHasChanges();
+        }
+    }
+
     [RelayCommand]
     private async Task EditRule(RuleEntryViewModel? entry)
     {

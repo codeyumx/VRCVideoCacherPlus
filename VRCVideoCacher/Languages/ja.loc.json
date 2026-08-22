@@ -1,5 +1,7 @@
 {
   "Dashboard": "ダッシュボード",
+  "NowPlaying": "再生中",
+  "ActiveConnections": "アクティブな接続",
   "Settings": "設定",
   "CacheBrowser": "キャッシュブラウザー",
   "Downloads": "ダウンロード",
