@@ -204,7 +204,7 @@ public partial class App : Application
             };
         }
 
-        _showItem = new NativeMenuItem(Localizer.Get("TrayShow"));
+        _showItem = new NativeMenuItem(Localizer.Get("Show"));
         _showItem.Click += (_, _) => ShowMainWindow();
 
         _openCacheItem = new NativeMenuItem(Localizer.Get("TrayOpenCacheFolder"));
@@ -219,7 +219,7 @@ public partial class App : Application
 
         Localizer.LanguageChanged += (_, _) =>
         {
-            if (_showItem != null) _showItem.Header = Localizer.Get("TrayShow");
+            if (_showItem != null) _showItem.Header = Localizer.Get("Show");
             if (_openCacheItem != null) _openCacheItem.Header = Localizer.Get("TrayOpenCacheFolder");
             if (_exitItem != null) _exitItem.Header = Localizer.Get("TrayExit");
         };

@@ -71,13 +71,13 @@
                 </DataGrid.Styles>
                 <DataGrid.Columns>
                     <!-- Enabled Toggle -->
-                    <DataGridCheckBoxColumn Header="✔️" Binding="{Binding Enabled, Mode=TwoWay}" Width="35"/>
+                    <DataGridCheckBoxColumn Header="" Binding="{Binding Enabled, Mode=TwoWay}" Width="35"/>
 
                     <!-- Rule Name -->
                     <DataGridTextColumn Header="Rule Name" Binding="{Binding Name}" Width="160"/>
 
                     <!-- Site Integration -->
-                    <DataGridTextColumn Header="I" Binding="{Binding IntegrationDisplay}" Width="35" IsReadOnly="True"/>
+                    <DataGridTextColumn Header="" Binding="{Binding IntegrationDisplay}" Width="35" IsReadOnly="True"/>
 
                     <!-- Regex Pattern -->
                     <DataGridTemplateColumn Header="Regex Pattern" Width="*">
@@ -100,7 +100,7 @@
                     </DataGridTemplateColumn>
 
                     <!-- Actions (Menu) -->
-                    <DataGridTemplateColumn Header="Actions" Width="80">
+                    <DataGridTemplateColumn Header="" Width="40">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate x:DataType="vm:RuleEntryViewModel">
                                 <Button HorizontalAlignment="Center" Padding="4" Background="Transparent" BorderThickness="0" ToolTip.Tip="Rule Actions">
