@@ -1,4 +1,3 @@
-using Newtonsoft.Json;
 using Serilog;
 using VRCVideoCacher.YTDL;
 
@@ -86,7 +85,7 @@ public class BulkPreCache
                 if (content == null)
                     continue;
 
-                files = JsonConvert.DeserializeObject<List<DownloadInfo>>(content);
+                files = Json.Deserialize<List<DownloadInfo>>(content);
             }
             catch (Exception ex)
             {

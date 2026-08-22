@@ -1,5 +1,4 @@
-using System.Text.RegularExpressions;
-using Newtonsoft.Json;
+using System.Text.Json;
 using Serilog;
 using VRCVideoCacher.Models;
 
@@ -26,7 +25,7 @@ public class PlusConfigManager
         try
         {
             if (File.Exists(ConfigFilePath))
-                loaded = JsonConvert.DeserializeObject<PlusConfigModel>(File.ReadAllText(ConfigFilePath));
+                loaded = Utils.Json.Deserialize<PlusConfigModel>(File.ReadAllText(ConfigFilePath));
         }
         catch (Exception ex)
         {
@@ -144,27 +143,33 @@ public class PlusConfigManager
 
         try
         {
-            var json = JsonConvert.DeserializeObject<Dictionary<string, object>>(File.ReadAllText(configPath));
-            if (json == null)
+            // Read as a document rather than into a model: these keys no longer exist on
+            // ConfigModel, so there is nothing to deserialize into. (This was
+            // Dictionary<string, object>, which under Newtonsoft yielded boxed primitives
+            // that Convert.ToInt32 accepted. System.Text.Json yields JsonElement instead,
+            // which Convert would throw on, so each value is read through its own accessor.)
+            using var document = JsonDocument.Parse(File.ReadAllText(configPath));
+            var root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object)
                 return;
 
-            if (json.TryGetValue("CacheDownloadRateLimitMBs", out var rate))
-                Config.CacheDownloadRateLimitMBs = Convert.ToInt32(rate);
-            if (json.TryGetValue("CacheDownloadIdleSeconds", out var idle))
-                Config.CacheDownloadIdleSeconds = Convert.ToInt32(idle);
-            if (json.TryGetValue("CacheYouTubePreferVp9", out var vp9))
-                Config.CacheYouTubePreferVp9 = Convert.ToBoolean(vp9);
-            if (json.TryGetValue("UriRules", out var rulesObj) && rulesObj != null)
+            if (root.TryGetProperty("CacheDownloadRateLimitMBs", out var rate) && rate.TryGetInt32(out var rateValue))
+                Config.CacheDownloadRateLimitMBs = rateValue;
+
+            if (root.TryGetProperty("CacheDownloadIdleSeconds", out var idle) && idle.TryGetInt32(out var idleValue))
+                Config.CacheDownloadIdleSeconds = idleValue;
+
+            if (root.TryGetProperty("CacheYouTubePreferVp9", out var vp9) &&
+                vp9.ValueKind is JsonValueKind.True or JsonValueKind.False)
+                Config.CacheYouTubePreferVp9 = vp9.GetBoolean();
+
+            if (root.TryGetProperty("UriRules", out var rules) && rules.ValueKind == JsonValueKind.Array)
             {
-                var rulesJson = rulesObj.ToString();
-                if (!string.IsNullOrWhiteSpace(rulesJson))
-                {
-                    var migratedRules = JsonConvert.DeserializeObject<List<UriRule>>(rulesJson);
-                    if (migratedRules != null && migratedRules.Count > 0)
-                        Config.UriRules = migratedRules;
-                }
+                var migratedRules = Utils.Json.Deserialize<List<UriRule>>(rules.GetRawText());
+                if (migratedRules is { Count: > 0 })
+                    Config.UriRules = migratedRules;
             }
-            MigrateLegacyRuleSettings(json, Config);
+
             Log.Information("Migrated Plus settings from main Config.json.");
         }
         catch (Exception ex)
@@ -173,89 +178,9 @@ public class PlusConfigManager
         }
     }
 
-    /// <summary>
-    /// One-time migration of the per-site settings the rule engine replaced. Those fields were
-    /// deleted from ConfigModel, so their JSON keys are ignored on load and erased on the next
-    /// save: without this, a user's BlockedUrls list disappears, their cache opt-outs
-    /// (CacheVrDancing / CachePyPyDance / CacheYouTube = false) are inverted into the seeded
-    /// rules' Cache = true, and RedirectVRDancing silently stops redirecting.
-    /// </summary>
-    internal static void MigrateLegacyRuleSettings(Dictionary<string, object> json, PlusConfigModel config)
-    {
-        var migrated = 0;
-
-        if (FindRule(config, "YouTube") is { } youTube)
-        {
-            if (TryRead(json, "CacheYouTubeMaxResolution", out var resolution))
-                youTube.MaxResolution = Convert.ToInt32(resolution);
-            if (TryRead(json, "CacheYouTubeMaxLength", out var length))
-                youTube.MaxDurationMinutes = Convert.ToInt32(length);
-            if (TryRead(json, "CacheYouTube", out var cacheYouTube))
-                youTube.Cache = Convert.ToBoolean(cacheYouTube);
-        }
-
-        if (FindRule(config, "PyPyDance") is { } pyPyDance && TryRead(json, "CachePyPyDance", out var cachePyPyDance))
-            pyPyDance.Cache = Convert.ToBoolean(cachePyPyDance);
-
-        if (FindRule(config, "VRDancing") is { } vrDancing && TryRead(json, "CacheVrDancing", out var cacheVrDancing))
-            vrDancing.Cache = Convert.ToBoolean(cacheVrDancing);
-
-        if (FindRule(config, "VRDancing EU to NA Redirect") is { } vrRedirect && TryRead(json, "RedirectVRDancing", out var redirectVrDancing))
-            vrRedirect.Enabled = Convert.ToBoolean(redirectVrDancing);
-
-        TryRead(json, "BlockRedirect", out var blockRedirect);
-        var redirectTarget = blockRedirect as string ?? string.Empty;
-
-        if (TryRead(json, "BlockedUrls", out var blockedUrls) && blockedUrls is Newtonsoft.Json.Linq.JArray entries)
-        {
-            foreach (var entry in entries)
-            {
-                var url = entry?.ToString();
-                if (string.IsNullOrWhiteSpace(url) || url == LegacySampleBlockedUrl)
-                    continue;
-
-                var pattern = "^" + Regex.Escape(url);
-                if (config.UriRules.Any(r => r.Pattern == pattern))
-                    continue;
-
-                // Pre-rules builds swapped a blocked URL for BlockRedirect and played that, so a
-                // configured redirect is preserved as a Redirect rule; without one the request is
-                // refused outright, which is what Block means in the engine.
-                var rule = new UriRule
-                {
-                    Name = $"Block {url}",
-                    Pattern = pattern,
-                    Enabled = true,
-                    Action = string.IsNullOrWhiteSpace(redirectTarget) ? RuleAction.Block : RuleAction.Redirect,
-                    RedirectTarget = redirectTarget
-                };
-
-                var catchAllIndex = config.UriRules.FindIndex(r => r.Name == CatchAllRuleName);
-                if (catchAllIndex >= 0)
-                    config.UriRules.Insert(catchAllIndex, rule);
-                else
-                    config.UriRules.Add(rule);
-
-                migrated++;
-                Log.Information("Migrated blocked URL '{Url}' into a {Action} rule.", url, rule.Action);
-            }
-        }
-
-        if (migrated > 0)
-            Log.Information("Migrated {Count} pre-rules setting(s) into rules.", migrated);
-    }
-
-    private static UriRule? FindRule(PlusConfigModel config, string name) => config.UriRules.FirstOrDefault(r => r.Name == name);
-
-    private static bool TryRead(Dictionary<string, object> json, string key, out object? value) =>
-        json.TryGetValue(key, out value) && value != null;
-
-    // The one entry every pre-rules Config.json ships with; blocking it would be noise.
-    private const string LegacySampleBlockedUrl = "https://na2.vrdancing.club/sampleurl.mp4";
-
     public static void TrySaveConfig()
     {
-        var newConfig = JsonConvert.SerializeObject(Config, Formatting.Indented);
+        var newConfig = Utils.Json.Serialize(Config);
         var oldConfig = File.Exists(ConfigFilePath) ? File.ReadAllText(ConfigFilePath) : string.Empty;
         if (newConfig == oldConfig)
             return;

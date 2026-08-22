@@ -1,7 +1,7 @@
 ﻿using System.Collections.Frozen;
 using System.Reflection;
+using System.Text.Json;
 using Jeek.Avalonia.Localization;
-using Newtonsoft.Json.Linq;
 
 namespace VRCVideoCacher.Languages;
 
@@ -102,10 +102,12 @@ public class EmbeddedJsonLocalizer : BaseLocalizer
             if (stream == null)
                 return null;
 
-            using var reader = new StreamReader(stream);
-            return JObject.Parse(reader.ReadToEnd())
-                .Properties()
-                .ToDictionary(k => k.Name, v => v.Value?.ToString() ?? v.Name)
+            using var document = JsonDocument.Parse(stream);
+            return document.RootElement
+                .EnumerateObject()
+                // A non-string value would be a mistake in the file; fall back to the key
+                // so the UI shows something identifiable rather than throwing.
+                .ToDictionary(p => p.Name, p => p.Value.GetString() ?? p.Name)
                 .ToFrozenDictionary();
         }
         catch (Exception ex)

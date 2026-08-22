@@ -21,8 +21,8 @@
         <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
         <PublishTrimmed>true</PublishTrimmed>
         <TrimMode>partial</TrimMode>
-        <!-- The remaining IL2026s are inherent to using EF Core and Newtonsoft at all;
-             our own types are protected by the TrimmerRootAssembly entry below. -->
+        <!-- Nine IL2026s remain, all understood: three from EF Core's DbContext, six from
+             the deliberate reflection fallback in Utils/Json. See TrimmerRootAssembly. -->
         <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
         <!-- IL2037: EF Core 10 DynamicDependency on ExecuteUpdate overload not resolvable by ILLink -->
         <NoWarn>$(NoWarn);IL2037</NoWarn>
@@ -36,8 +36,8 @@
         <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
         <PublishTrimmed>true</PublishTrimmed>
         <TrimMode>partial</TrimMode>
-        <!-- The remaining IL2026s are inherent to using EF Core and Newtonsoft at all;
-             our own types are protected by the TrimmerRootAssembly entry below. -->
+        <!-- Nine IL2026s remain, all understood: three from EF Core's DbContext, six from
+             the deliberate reflection fallback in Utils/Json. See TrimmerRootAssembly. -->
         <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
         <!-- IL2037: EF Core 10 DynamicDependency on ExecuteUpdate overload not resolvable by ILLink -->
         <NoWarn>$(NoWarn);IL2037</NoWarn>
@@ -50,14 +50,15 @@
     <!--
       Keep our own assembly out of the trimmer entirely.
 
-      Newtonsoft reflects over ConfigModel, PlusConfigModel, UriRule, VersionJson and
-      GitHubRelease; EF Core reflects over the entity types. None of that is visible to the
-      trimmer statically, so a trimmed build can drop members that only reflection uses —
-      and the result is config silently failing to load, or the database misbehaving, in
-      Release builds only. Debug never trims, so it would not reproduce during development.
+      Two things still reach members reflectively in a way the trimmer cannot follow:
+      EF Core over the entity types, and the DefaultJsonTypeInfoResolver fallback in
+      Utils/Json (a safety net for any type not registered in AppJsonContext). If the
+      trimmer removed a member only those reach, config would silently fail to load or the
+      database would misbehave — in Release builds only, since Debug never trims, so it
+      would not reproduce during development.
 
-      This is what SuppressTrimAnalysisWarnings below was hiding: all 33 IL2026 warnings
-      come from our own call sites into those two libraries. Rooting the assembly costs
+      Config serialisation itself is source-generated now and no longer needs this; moving
+      off Newtonsoft took the count from 33 IL2026 warnings to 9. Rooting the assembly costs
       little (it is small next to the framework) and leaves PublishTrimmed doing what it is
       actually there for, which is trimming the framework and the UI stack.
     -->
@@ -79,7 +80,6 @@
         <!-- Override vulnerable transitive SQLitePCLRaw (NU1903, GHSA-2m69-gcr7-jv3q) -->
         <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.12" />
         <PackageReference Include="EmbedIO" Version="3.5.2" />
-        <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
         <PackageReference Include="securifybv.ShellLink" Version="0.1.0" />
         <PackageReference Include="Semver" Version="3.0.0" />
         <PackageReference Include="Serilog" Version="4.3.1" />

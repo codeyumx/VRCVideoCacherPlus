@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using Newtonsoft.Json;
 using Semver;
 using Serilog;
 using VRCVideoCacher.Models;
@@ -66,7 +65,7 @@ public class Updater
             return null;
         }
 
-        var latestRelease = JsonConvert.DeserializeObject<GitHubRelease>(data);
+        var latestRelease = Json.Deserialize<GitHubRelease>(data);
         if (latestRelease == null)
         {
             Log.Warning("Failed to parse update response.");

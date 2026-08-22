@@ -1,5 +1,6 @@
-using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 using Serilog;
+using VRCVideoCacher.Utils;
 
 namespace VRCVideoCacher.Services;
 
@@ -25,7 +26,7 @@ public class VvcConfigService
             var req = await HttpClient.GetAsync("https://vvc.ellyvr.dev/api/v1/config");
             if (req.IsSuccessStatusCode)
             {
-                var deserialized = JsonConvert.DeserializeObject<VvcConfig>(await req.Content.ReadAsStringAsync());
+                var deserialized = Json.Deserialize<VvcConfig>(await req.Content.ReadAsStringAsync());
                 if (deserialized != null)
                 {
                     CurrentConfig = deserialized;
@@ -41,19 +42,14 @@ public class VvcConfigService
     }
 }
 
-// Deserialized with Newtonsoft, so the mapping attributes have to be Newtonsoft's.
-// These were [JsonPropertyName], which is System.Text.Json's and is ignored entirely by
-// JsonConvert — the properties only bound at all because Newtonsoft matches names
-// case-insensitively by default. Renaming either property would have silently stopped it
-// binding, with no error anywhere.
 public class VvcConfig
 {
-    [JsonProperty("motd")]
+    [JsonPropertyName("motd")]
     public string Motd { get; set; } = string.Empty;
 
     // Intentionally not consumed: ApiController pins the prefetch retry count locally
     // rather than taking it from an upstream server. Kept so the payload shape is
     // documented and an unknown-property change is visible here.
-    [JsonProperty("retryCount")]
+    [JsonPropertyName("retryCount")]
     public int RetryCount { get; set; } = 7;
 }

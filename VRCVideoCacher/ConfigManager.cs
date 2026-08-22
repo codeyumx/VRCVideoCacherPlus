@@ -1,6 +1,5 @@
 using System.Globalization;
 using Jeek.Avalonia.Localization;
-using Newtonsoft.Json;
 using Serilog;
 using VRCVideoCacher.Models;
 using VRCVideoCacher.Utils;
@@ -28,7 +27,7 @@ public class ConfigManager
         try
         {
             if (File.Exists(ConfigFilePath))
-                newConfig = JsonConvert.DeserializeObject<ConfigModel>(File.ReadAllText(ConfigFilePath));
+                newConfig = Json.Deserialize<ConfigModel>(File.ReadAllText(ConfigFilePath));
             if (newConfig != null)
                 Config = newConfig;
         }
@@ -61,7 +60,7 @@ public class ConfigManager
 
     public static void TrySaveConfig()
     {
-        var newConfig = JsonConvert.SerializeObject(Config, Formatting.Indented);
+        var newConfig = Json.Serialize(Config);
         var oldConfig = File.Exists(ConfigFilePath) ? File.ReadAllText(ConfigFilePath) : string.Empty;
         if (newConfig == oldConfig)
             return;

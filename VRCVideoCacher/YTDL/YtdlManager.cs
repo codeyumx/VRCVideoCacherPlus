@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using Newtonsoft.Json;
 using Serilog;
 using SharpCompress.Readers;
 using VRCVideoCacher.Models;
@@ -291,7 +290,7 @@ public class YtdlManager
                 return;
             }
             var data = await response.Content.ReadAsStringAsync();
-            var json = JsonConvert.DeserializeObject<GitHubRelease>(data);
+            var json = Json.Deserialize<GitHubRelease>(data);
             if (json == null)
             {
                 Log.Error("Failed to parse YT-DLP update response.");
@@ -422,7 +421,7 @@ public class YtdlManager
             return;
         }
         var data = await apiResponse.Content.ReadAsStringAsync();
-        var json = JsonConvert.DeserializeObject<GitHubRelease>(data);
+        var json = Json.Deserialize<GitHubRelease>(data);
         if (json == null)
         {
             Log.Error("Failed to parse deno release response.");
@@ -621,7 +620,7 @@ public class YtdlManager
             return;
         }
         var data = await apiResponse.Content.ReadAsStringAsync();
-        var json = JsonConvert.DeserializeObject<GitHubRelease>(data);
+        var json = Json.Deserialize<GitHubRelease>(data);
         if (json == null)
         {
             Log.Error("Failed to parse ffmpeg release response.");

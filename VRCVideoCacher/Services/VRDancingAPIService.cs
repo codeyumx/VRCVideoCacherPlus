@@ -1,5 +1,5 @@
-﻿using Newtonsoft.Json;
-using Serilog;
+﻿using Serilog;
+using VRCVideoCacher.Utils;
 using VRCVideoCacher.Database;
 using VRCVideoCacher.Database.Models;
 using VRCVideoCacher.Models;
@@ -28,7 +28,7 @@ public class VRDancingAPIService
                 (int)req.StatusCode, code, str.Length > 200 ? str[..200] : str);
             return null;
         }
-        return JsonConvert.DeserializeObject<VRDSongInfo>(str);
+        return Json.Deserialize<VRDSongInfo>(str);
     }
 
     public static async Task DownloadMetadata(string code, string videoId)
