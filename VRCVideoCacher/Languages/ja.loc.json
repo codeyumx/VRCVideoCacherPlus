@@ -209,5 +209,6 @@
   "UpdateDownloading": "更新をダウンロード中...",
   "UpdateFailed": "更新に失敗しました。ログを確認して再試行してください。",
   "SkipReasonInvalidDownload": "ダウンロードしたファイルの検証に失敗しました",
-  "SkipReasonTruncated": "ダウンロードが不完全でした"
+  "SkipReasonTruncated": "ダウンロードが不完全でした",
+  "DownloadTimeRemaining": "残り {0}"
 }

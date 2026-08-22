@@ -209,5 +209,6 @@
   "UpdateDownloading": "正在下载更新...",
   "UpdateFailed": "更新失败。请查看日志后重试。",
   "SkipReasonInvalidDownload": "下载的文件未通过校验",
-  "SkipReasonTruncated": "下载不完整"
+  "SkipReasonTruncated": "下载不完整",
+  "DownloadTimeRemaining": "剩余 {0}"
 }

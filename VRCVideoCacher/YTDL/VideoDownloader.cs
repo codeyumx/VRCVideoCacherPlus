@@ -56,7 +56,8 @@ public class VideoDownloader
     public static event Action<VideoInfo, bool, string?>? OnDownloadCompleted;
     public static event Action<VideoInfo>? OnDownloadPaused;
     public static event Action? OnQueueChanged;
-    public static event Action<double>? OnDownloadProgress; // 0.0 to 100.0
+    // Percent, plus transfer rate and time remaining where they are known.
+    public static event Action<DownloadProgress>? OnDownloadProgress;
 
     // Current state (read from UI thread via Get* methods — volatile for cross-thread visibility)
     private static volatile VideoInfo? _currentDownload;
@@ -548,16 +549,10 @@ public class VideoDownloader
 
     private static void ParseYtdlpProgress(string line)
     {
-        // yt-dlp progress lines look like: [download]  45.2% of 12.34MiB at 1.23MiB/s
-        if (!line.Contains('%')) return;
-        var idx = line.IndexOf('%');
-        if (idx < 1) return;
-        // Walk backwards to find the start of the number
-        var start = idx - 1;
-        while (start > 0 && (char.IsDigit(line[start - 1]) || line[start - 1] == '.'))
-            start--;
-        if (double.TryParse(line[start..idx], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var percent))
-            OnDownloadProgress?.Invoke(percent);
+        // yt-dlp reports rate and ETA itself, and it sees every byte — it writes the file.
+        // Taking its numbers beats re-deriving them from the lines we happen to sample.
+        if (YtdlpProgressParser.TryParse(line, out var progress))
+            OnDownloadProgress?.Invoke(progress);
     }
 
     /// <summary>
@@ -582,6 +577,13 @@ public class VideoDownloader
         long totalBytesRead = 0;
         var lastReportedPercent = -1.0;
 
+        // Rate is sampled over a moving window and smoothed, rather than averaged across the
+        // whole transfer: an average is dominated by however the connection behaved at the
+        // start, so the estimate stops responding to what is happening now.
+        var lastSampleAt = TimeSpan.Zero;
+        long lastSampleBytes = 0;
+        double? smoothedRate = null;
+
         while (true)
         {
             cts.CancelAfter(StallTimeout);
@@ -592,6 +594,16 @@ public class VideoDownloader
             await destination.WriteAsync(buffer.AsMemory(0, bytesRead), cts.Token);
             totalBytesRead += bytesRead;
 
+            var elapsed = stopwatch.Elapsed;
+            var windowSeconds = (elapsed - lastSampleAt).TotalSeconds;
+            if (windowSeconds >= 0.5)
+            {
+                var windowRate = (totalBytesRead - lastSampleBytes) / windowSeconds;
+                smoothedRate = smoothedRate is null ? windowRate : (smoothedRate * 0.7) + (windowRate * 0.3);
+                lastSampleAt = elapsed;
+                lastSampleBytes = totalBytesRead;
+            }
+
             if (totalBytes > 0)
             {
                 // Only raise the event when the rounded percentage actually moves: this
@@ -601,7 +613,16 @@ public class VideoDownloader
                 if (percent > lastReportedPercent)
                 {
                     lastReportedPercent = percent;
-                    OnDownloadProgress?.Invoke(percent);
+
+                    TimeSpan? eta = null;
+                    if (smoothedRate is > 0)
+                    {
+                        var remaining = totalBytes - (alreadyOnDisk + totalBytesRead);
+                        if (remaining > 0)
+                            eta = TimeSpan.FromSeconds(remaining / smoothedRate.Value);
+                    }
+
+                    OnDownloadProgress?.Invoke(new DownloadProgress(percent, smoothedRate, eta));
                 }
             }
 

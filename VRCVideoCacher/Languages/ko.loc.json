@@ -208,5 +208,6 @@
   "UpdateDownloading": "업데이트 다운로드 중...",
   "UpdateFailed": "업데이트에 실패했습니다. 로그를 확인한 후 다시 시도하세요.",
   "SkipReasonInvalidDownload": "다운로드한 파일이 검증에 실패했습니다",
-  "SkipReasonTruncated": "다운로드가 완료되지 않았습니다"
+  "SkipReasonTruncated": "다운로드가 완료되지 않았습니다",
+  "DownloadTimeRemaining": "{0} 남음"
 }

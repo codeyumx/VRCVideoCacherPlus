@@ -209,5 +209,6 @@
   "UpdateDownloading": "Baixando atualização...",
   "UpdateFailed": "Falha na atualização. Verifique os logs e tente novamente.",
   "SkipReasonInvalidDownload": "O arquivo baixado não passou na validação",
-  "SkipReasonTruncated": "O download ficou incompleto"
+  "SkipReasonTruncated": "O download ficou incompleto",
+  "DownloadTimeRemaining": "faltam {0}"
 }

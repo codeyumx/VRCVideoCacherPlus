@@ -209,5 +209,6 @@
   "UpdateDownloading": "Загрузка обновления...",
   "UpdateFailed": "Не удалось обновить. Проверьте журнал и повторите попытку.",
   "SkipReasonInvalidDownload": "Загруженный файл не прошёл проверку",
-  "SkipReasonTruncated": "Загрузка не завершена"
+  "SkipReasonTruncated": "Загрузка не завершена",
+  "DownloadTimeRemaining": "осталось {0}"
 }

@@ -72,6 +72,7 @@ public partial class DashboardViewModel : ViewModelBase
         CacheManager.OnCacheChanged += OnCacheChanged;
         VideoDownloader.OnDownloadStarted += OnDownloadStarted;
         VideoDownloader.OnDownloadCompleted += OnDownloadCompleted;
+        VideoDownloader.OnDownloadProgress += OnDownloadProgress;
         VideoDownloader.OnQueueChanged += OnQueueChanged;
         ConfigManager.OnConfigChanged += OnConfigChanged;
         Program.OnCookiesUpdated += OnCookiesUpdated;
@@ -99,14 +100,32 @@ public partial class DashboardViewModel : ViewModelBase
 
     private void OnDownloadStarted(Models.VideoInfo video)
     {
+        _currentDownloadLabel = $"{video.UrlType}: {video.VideoId}";
         Dispatcher.UIThread.InvokeAsync(() =>
         {
-            CurrentDownloadText = $"{video.UrlType}: {video.VideoId}";
+            CurrentDownloadText = _currentDownloadLabel;
         });
+    }
+
+    // Kept so a progress update can re-append to the same label without re-deriving it.
+    private string _currentDownloadLabel = string.Empty;
+
+    private void OnDownloadProgress(Models.DownloadProgress progress)
+    {
+        if (string.IsNullOrEmpty(_currentDownloadLabel))
+            return;
+
+        var eta = progress.FormatEta();
+        var suffix = eta != null
+            ? $" — {progress.Percent:F0}%, {string.Format(Localizer.Get("DownloadTimeRemaining"), eta)}"
+            : $" — {progress.Percent:F0}%";
+
+        Dispatcher.UIThread.InvokeAsync(() => CurrentDownloadText = _currentDownloadLabel + suffix);
     }
 
     private void OnDownloadCompleted(Models.VideoInfo video, bool success, string? failReason)
     {
+        _currentDownloadLabel = string.Empty;
         Dispatcher.UIThread.InvokeAsync(() =>
         {
             CurrentDownloadText = Localizer.Get("None");

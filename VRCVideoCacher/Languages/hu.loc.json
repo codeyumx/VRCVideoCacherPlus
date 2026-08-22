@@ -209,5 +209,6 @@
   "UpdateDownloading": "Frissítés letöltése...",
   "UpdateFailed": "A frissítés sikertelen. Ellenőrizd a naplót, és próbáld újra.",
   "SkipReasonInvalidDownload": "A letöltött fájl nem ment át az ellenőrzésen",
-  "SkipReasonTruncated": "A letöltés hiányos volt"
+  "SkipReasonTruncated": "A letöltés hiányos volt",
+  "DownloadTimeRemaining": "{0} van hátra"
 }
