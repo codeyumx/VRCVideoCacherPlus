@@ -182,7 +182,6 @@
   "RedownloadFailed": "Az újraletöltés sikertelen. A részletekért ellenőrizd a naplókat.",
   "PreCacheVideos": "Előre gyorsítótárazott videók",
   "PreCacheVideosHint": "Indításkor letöltött videó URL-ek, ha még nincsenek gyorsítótárazva. Többet is beilleszthet egyszerre, vesszővel, szóközökkel vagy új sorokkal elválasztva.",
-
   "Rules": "Szabályok",
   "AddRule": "Szabály hozzáadása",
   "RuleName": "Szabály neve",
@@ -214,7 +213,7 @@
   "SkipReasonTruncated": "A letöltés hiányos volt",
   "DownloadTimeRemaining": "{0} van hátra",
   "SharedConfigNoticeTitle": "A beállítások mostantól közösek",
-  "SharedConfigNotice": "A VRCVideoCacherPlusPlus mostantól ugyanabban a Config.json fájlban tárolja a beállításait, mint az eredeti VRCVideoCacher, külön fájl helyett.\n\nHa újra futtatod az eredeti VRCVideoCachert, az felülírja ezt a fájlt, és eltávolítja a PlusPlus beállításokat – beleértve az URL-szabályaidat is. Ezek visszaállnának az alapértelmezettre.\n\nA korábbi beállításaidról biztonsági másolat készült a PlusConfig.json.bak fájlba, a VRCVideoCacher mappában.",
+  "SharedConfigNotice": "A VRCVideoCacherPlusPlus a beállításait ugyanabban a Config.json fájlban tárolja, mint az eredeti VRCVideoCacher, nem külön fájlban.\n\nHa futtatod az eredeti VRCVideoCachert (vagy a Plus verziót), az felülírja ezt a fájlt, és eltávolítja a PlusPlus beállításokat – beleértve az URL-szabályaidat is. Ezek visszaállnának az alapértelmezettre.\n\nHa régebbi PlusPlus verzióról váltasz, a korábbi beállításaid továbbra is megtalálhatók a PlusConfig.json fájlban ugyanabban a mappában. Ezt a fájlt már nem olvassuk be, de a helyén hagyjuk, hogy bármit átmásolhass belőle.",
   "SeverSucceeded": "{0} kapcsolat leállítva.",
   "SeverNeedsPrivileges": "A gyorsítótárazott videók leálltak. A VRChat közvetlen kapcsolatainak lezárásához rendszergazda/root jogosultság kell, így a már futó stream a végéig játszódik.",
   "SeverUnsupported": "Ezen a platformon nem lehet lezárni a VRChat közvetlen kapcsolatait.",

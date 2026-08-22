@@ -73,7 +73,7 @@ public class SharedConfigMigrationTests
     }
 
     [Fact]
-    public void NoticeTextNamesTheBackupFileThatIsActuallyWritten()
+    public void NoticeTextNamesTheFileTheOldSettingsAreActuallyIn()
     {
         using var stream = typeof(ConfigModel).Assembly
             .GetManifestResourceStream("VRCVideoCacher.Languages.en.loc.json");
@@ -83,8 +83,39 @@ public class SharedConfigMigrationTests
         var notice = document.RootElement.GetProperty("SharedConfigNotice").GetString();
 
         Assert.NotNull(notice);
-        Assert.Contains("PlusConfig.json.bak", notice!);
+        // Migrations were removed deliberately, so nothing writes a .bak; the previous
+        // PlusConfig.json is simply left in place. The message must name that file, not
+        // a backup that never gets created.
+        Assert.Contains("PlusConfig.json", notice!);
+        Assert.DoesNotContain(".bak", notice!);
         Assert.Contains("Config.json", notice!);
+    }
+
+    [Fact]
+    public void EveryLanguageDefinesTheSameKeysAsEnglish()
+    {
+        // English is the fallback, so a key missing from a translation degrades gracefully —
+        // but it degrades silently, which is how ko.loc.json ended up one key short without
+        // anyone noticing. Comparing key sets makes that visible at build time.
+        var assembly = typeof(ConfigModel).Assembly;
+
+        HashSet<string> KeysOf(string resource)
+        {
+            using var stream = assembly.GetManifestResourceStream(resource);
+            using var document = System.Text.Json.JsonDocument.Parse(stream!);
+            return document.RootElement.EnumerateObject().Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
+        }
+
+        var english = KeysOf("VRCVideoCacher.Languages.en.loc.json");
+
+        foreach (var resource in assembly.GetManifestResourceNames()
+                     .Where(n => n.StartsWith("VRCVideoCacher.Languages.") && n.EndsWith(".loc.json")))
+        {
+            var keys = KeysOf(resource);
+            Assert.True(english.SetEquals(keys),
+                $"{resource} differs from English: missing [{string.Join(", ", english.Except(keys))}], " +
+                $"unexpected [{string.Join(", ", keys.Except(english))}]");
+        }
     }
 
     [Fact]

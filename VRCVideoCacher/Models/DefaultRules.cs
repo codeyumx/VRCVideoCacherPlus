@@ -6,9 +6,9 @@ namespace VRCVideoCacher;
 /// The rule list a fresh installation starts with.
 ///
 /// Deliberately a plain static class with no state and no static constructor: touching
-/// PlusConfigManager runs its initialiser, which reads and writes PlusConfig.json in the
-/// user's profile. Keeping the defaults here means they can be exercised by tests without
-/// any of that happening.
+/// PlusConfigManager reaches through to ConfigManager.Config, whose initialiser reads and
+/// writes Config.json in the user's profile. Keeping the defaults here means they can be
+/// exercised by tests without any of that happening.
 /// </summary>
 public static class DefaultRules
 {

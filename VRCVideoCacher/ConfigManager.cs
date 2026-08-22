@@ -55,9 +55,9 @@ public class ConfigManager
         if (Config.YtdlpWebServerUrl.EndsWith('/'))
             Config.YtdlpWebServerUrl = Config.YtdlpWebServerUrl.TrimEnd('/');
 
-        // Folds in a legacy PlusConfig.json, repairs and seeds the rule list. Called with
-        // the instance rather than reaching for ConfigManager.Config: PlusConfigManager has
-        // no static state of its own, so there is no initialiser to re-enter here.
+        // Repairs and seeds the rule list. Called with the instance rather than reaching
+        // for ConfigManager.Config: PlusConfigManager has no static state of its own, so
+        // there is no initialiser to re-enter here.
         PlusConfigManager.Initialize(Config);
 
         Log.Information("Loaded config.");

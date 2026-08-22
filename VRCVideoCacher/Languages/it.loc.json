@@ -182,7 +182,6 @@
   "RedownloadFailed": "Redownload failed. Check logs for details.",
   "PreCacheVideos": "Video pre-memorizzati nella cache",
   "PreCacheVideosHint": "URL video scaricati all’avvio se non già memorizzati nella cache. Puoi incollarne diversi contemporaneamente, separati da virgole, spazi o nuove righe.",
-
   "Rules": "Regole",
   "AddRule": "Aggiungi regola",
   "RuleName": "Nome regola",
@@ -214,7 +213,7 @@
   "SkipReasonTruncated": "Il download è incompleto",
   "DownloadTimeRemaining": "{0} rimanenti",
   "SharedConfigNoticeTitle": "Le impostazioni sono ora condivise",
-  "SharedConfigNotice": "VRCVideoCacherPlusPlus ora salva le impostazioni nello stesso Config.json del VRCVideoCacher originale, invece che in un file separato.\n\nSe esegui di nuovo il VRCVideoCacher originale, riscriverà quel file eliminando le impostazioni PlusPlus, incluse le tue regole URL, che torneranno ai valori predefiniti.\n\nLe impostazioni precedenti sono state conservate come backup in PlusConfig.json.bak, nella cartella VRCVideoCacher.",
+  "SharedConfigNotice": "VRCVideoCacherPlusPlus salva le impostazioni nello stesso Config.json del VRCVideoCacher originale, invece che in un file separato.\n\nSe esegui il VRCVideoCacher originale (o la versione Plus), riscriverà quel file eliminando le impostazioni PlusPlus, incluse le tue regole URL, che torneranno ai valori predefiniti.\n\nSe arrivi da una versione PlusPlus precedente, le tue impostazioni sono ancora in PlusConfig.json nella stessa cartella. Quel file non viene più letto, ma resta al suo posto per poterne recuperare ciò che vuoi.",
   "SeverSucceeded": "Interrotte {0} connessioni.",
   "SeverNeedsPrivileges": "I video in cache sono stati fermati. Chiudere le connessioni dirette di VRChat richiede privilegi di amministratore/root, quindi un video già in streaming continuerà fino alla fine.",
   "SeverUnsupported": "Questa piattaforma non permette di chiudere le connessioni dirette di VRChat.",

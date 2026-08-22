@@ -182,7 +182,6 @@
   "RedownloadFailed": "Redownload failed. Check logs for details.",
   "PreCacheVideos": "Pre-cached Videos",
   "PreCacheVideosHint": "Video URLs downloaded at startup if not already cached. You can paste several at once, separated by commas, spaces or new lines.",
-
   "Rules": "Rules",
   "AddRule": "Add Rule",
   "RuleName": "Rule Name",
@@ -214,7 +213,7 @@
   "SkipReasonTruncated": "Download was incomplete",
   "DownloadTimeRemaining": "{0} left",
   "SharedConfigNoticeTitle": "Settings are now shared",
-  "SharedConfigNotice": "VRCVideoCacherPlusPlus now keeps its settings in the same Config.json as the original VRCVideoCacher, instead of a separate file.\n\nIf you run the original VRCVideoCacher again, it will rewrite that file and drop the PlusPlus settings — including your URL rules. They would go back to defaults.\n\nYour previous settings have been kept as a backup in PlusConfig.json.bak, inside the VRCVideoCacher folder.",
+  "SharedConfigNotice": "VRCVideoCacherPlusPlus keeps its settings in the same Config.json as the original VRCVideoCacher, rather than a separate file.\n\nIf you run the original VRCVideoCacher (or the Plus version), it will rewrite that file and drop the PlusPlus settings — including your URL rules. They would go back to defaults.\n\nIf you are coming from an older PlusPlus build, your previous settings are still in PlusConfig.json in the same folder. That file is no longer read, but it is left in place so you can copy anything you want back out of it.",
   "SeverSucceeded": "Stopped {0} connection(s).",
   "SeverNeedsPrivileges": "Cached videos were stopped. Closing VRChat's direct connections needs administrator/root, so a video already streaming will keep playing until it ends.",
   "SeverUnsupported": "This platform has no way to close VRChat's direct connections.",
