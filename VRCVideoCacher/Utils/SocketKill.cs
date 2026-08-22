@@ -52,6 +52,10 @@ public static class SocketKill
         try
         {
             Log.Information("Attempting to sever active video player connections...");
+            int localClosed = API.ActiveStreamModule.CloseAllLocalStreams();
+            if (localClosed > 0)
+                Log.Information("Severed {Count} local HTTP video streams server-side.", localClosed);
+
             if (OperatingSystem.IsWindows())
             {
                 SeverConnectionsWindows();
@@ -73,6 +77,10 @@ public static class SocketKill
         try
         {
             Log.Information("Attempting to sever active video connection to IP: {Ip}...", ip);
+            int localClosed = API.ActiveStreamModule.CloseAllLocalStreams();
+            if (localClosed > 0)
+                Log.Information("Severed {Count} local HTTP video streams server-side.", localClosed);
+
             if (OperatingSystem.IsWindows())
             {
                 SeverConnectionsWindows(ip);
@@ -84,7 +92,7 @@ public static class SocketKill
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Failed to sever connection for IP: {Ip}", ip);
+            Log.Error(ex, "Failed to sever connection for IP {Ip}.", ip);
         }
     }
 

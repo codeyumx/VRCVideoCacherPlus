@@ -21,8 +21,6 @@ public class WebServer
 
         _server = CreateWebServer(ConfigManager.Config.YtdlpWebServerUrl);
 
-        // RunAsync returns a long-running task that completes when the server stops.
-        // Fire-and-forget, but observe faults so port-in-use errors get logged.
         _server.RunAsync().ContinueWith(t =>
         {
             if (t.IsFaulted)
@@ -50,13 +48,12 @@ public class WebServer
         var server = new EmbedIO.WebServer(o => o
                 .WithUrlPrefixes(urls)
                 .WithMode(HttpListenerMode.EmbedIO))
-            // First, we will configure our web server by adding Modules.
+            .WithModule(new ActiveStreamModule())
             .WithWebApi("/api", m => m
                 .WithController<ApiController>())
             .WithStaticFolder("/", CacheManager.CachePath, true, m => m
                 .WithContentCaching(true));
 
-        // Listen for state changes.
         server.StateChanged += (_, e) => $"WebServer State: {e.NewState}".Info();
         server.OnUnhandledException += OnUnhandledException;
         server.OnHttpException += OnHttpException;
@@ -85,6 +82,49 @@ public class WebServer
     private static Task OnUnhandledException(IHttpContext context, Exception exception)
     {
         Log.Information(exception, "OnUnhandledException Error Occured");
+        return Task.CompletedTask;
+    }
+}
+
+public class ActiveStreamModule : WebModuleBase
+{
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, IHttpContext> ActiveContexts = new();
+
+    public ActiveStreamModule() : base("/")
+    {
+    }
+
+    public override bool IsFinalHandler => false;
+
+    public static int CloseAllLocalStreams()
+    {
+        int count = 0;
+        foreach (var key in ActiveContexts.Keys.ToList())
+        {
+            if (ActiveContexts.TryRemove(key, out var ctx))
+            {
+                try
+                {
+                    ctx.Response.OutputStream.Close();
+                    count++;
+                }
+                catch { }
+            }
+        }
+        return count;
+    }
+
+    protected override Task OnRequestAsync(IHttpContext context)
+    {
+        var path = context.Request.Url.AbsolutePath;
+        if (path.EndsWith(".webm", StringComparison.OrdinalIgnoreCase) ||
+            path.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase) ||
+            path.EndsWith(".m3u8", StringComparison.OrdinalIgnoreCase) ||
+            path.EndsWith(".ts", StringComparison.OrdinalIgnoreCase))
+        {
+            var id = Guid.NewGuid().ToString();
+            ActiveContexts[id] = context;
+        }
         return Task.CompletedTask;
     }
 }
