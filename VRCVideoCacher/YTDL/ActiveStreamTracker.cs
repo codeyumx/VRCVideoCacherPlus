@@ -160,6 +160,38 @@ public static class ActiveStreamTracker
 
         TrackVideoUrl(resolvedUrl);
         TrackVideoUrl(originalUrl);
+
+        lock (SessionsLock)
+        {
+            var updated = false;
+            foreach (var session in _activeSessions)
+            {
+                if ((!string.IsNullOrEmpty(videoId) && session.VideoId == videoId) ||
+                    (!string.IsNullOrEmpty(originalUrl) && session.OriginalUrl == originalUrl) ||
+                    (!string.IsNullOrEmpty(resolvedUrl) && session.ResolvedUrl == resolvedUrl))
+                {
+                    if (!string.IsNullOrEmpty(title) && (session.Title == session.OriginalUrl || session.Title == session.ResolvedUrl || string.IsNullOrEmpty(session.Title)))
+                    {
+                        session.Title = title;
+                        updated = true;
+                    }
+                    if (duration.HasValue && !session.Duration.HasValue)
+                    {
+                        session.Duration = duration;
+                        updated = true;
+                    }
+                    if (!string.IsNullOrEmpty(videoId) && string.IsNullOrEmpty(session.VideoId))
+                    {
+                        session.VideoId = videoId;
+                        updated = true;
+                    }
+                }
+            }
+            if (updated)
+            {
+                OnSessionsChanged?.Invoke();
+            }
+        }
     }
 
     public static bool TryGetUrlInfo(string url, out (string Title, string OriginalUrl, string? VideoId, double? Duration) info)

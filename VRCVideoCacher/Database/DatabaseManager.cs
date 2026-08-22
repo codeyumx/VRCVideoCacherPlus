@@ -183,6 +183,10 @@ public static class DatabaseManager
             db.VideoInfoCache.Add(videoInfoCache);
         }
         db.SaveChanges();
+        if (!string.IsNullOrEmpty(videoInfoCache.Title))
+        {
+            YTDL.ActiveStreamTracker.AssociateUrlInfo(videoInfoCache.Id, videoInfoCache.Id, videoInfoCache.Title, videoInfoCache.Id, videoInfoCache.Duration);
+        }
         OnVideoInfoCacheUpdated?.Invoke();
     }
 

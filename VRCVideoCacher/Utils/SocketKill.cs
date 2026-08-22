@@ -200,13 +200,13 @@ public static class SocketKill
                 {
                     try
                     {
-                        var target = File.ResolveLinkTarget(fdFile, true);
-                        if (target == null) continue;
+                        var targetInfo = File.ResolveLinkTarget(fdFile, false);
+                        var target = targetInfo?.LinkTarget ?? targetInfo?.FullName ?? string.Empty;
+                        if (string.IsNullOrEmpty(target)) continue;
 
-                        var name = target.FullName;
-                        if (name.StartsWith("socket:[") && name.EndsWith("]"))
+                        if (target.StartsWith("socket:[") && target.EndsWith("]"))
                         {
-                            var inode = name.Substring(8, name.Length - 9);
+                            var inode = target.Substring(8, target.Length - 9);
                             inodes.Add(inode);
                         }
                     }
@@ -295,8 +295,8 @@ public static class SocketKill
                 var filter = $"dst {conn.RemoteIp} dport = :{conn.RemotePort} src {conn.LocalIp} sport = :{conn.LocalPort}";
                 var psi = new ProcessStartInfo
                 {
-                    FileName = "sudo",
-                    Arguments = $"-n ss -t -K {filter}",
+                    FileName = "ss",
+                    Arguments = $"-t -K {filter}",
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     UseShellExecute = false,
@@ -308,6 +308,28 @@ public static class SocketKill
                 {
                     proc.WaitForExit();
                     if (proc.ExitCode == 0)
+                    {
+                        killedCount++;
+                        continue;
+                    }
+                }
+
+                // Fallback to sudo -n if unprivileged ss fails
+                var sudoPsi = new ProcessStartInfo
+                {
+                    FileName = "sudo",
+                    Arguments = $"-n ss -t -K {filter}",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                using var sudoProc = Process.Start(sudoPsi);
+                if (sudoProc != null)
+                {
+                    sudoProc.WaitForExit();
+                    if (sudoProc.ExitCode == 0)
                         killedCount++;
                 }
             }
