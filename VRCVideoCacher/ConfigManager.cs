@@ -23,46 +23,11 @@ public class ConfigManager
         ConfigFilePath = Path.Join(Program.DataPath, "Config.json");
         Log.Debug("Using config file path: {ConfigFilePath}", ConfigFilePath);
 
-        string configText = string.Empty;
         ConfigModel? newConfig = null;
         try
         {
             if (File.Exists(ConfigFilePath))
-            {
-                configText = File.ReadAllText(ConfigFilePath);
-                var hasPlusKeys = configText.Contains("UriRules", StringComparison.OrdinalIgnoreCase);
-
-                newConfig = Json.Deserialize<ConfigModel>(configText);
-
-                if (!hasPlusKeys && newConfig != null)
-                {
-                    var backupPath = ConfigFilePath + ".bak";
-                    if (File.Exists(backupPath))
-                    {
-                        try
-                        {
-                            var backupText = File.ReadAllText(backupPath);
-                            var backupConfig = Json.Deserialize<ConfigModel>(backupText);
-                            if (backupConfig != null)
-                            {
-                                newConfig.CacheDownloadRateLimitMBs = backupConfig.CacheDownloadRateLimitMBs;
-                                newConfig.CacheDownloadIdleSeconds = backupConfig.CacheDownloadIdleSeconds;
-                                newConfig.CacheYouTubePreferVp9 = backupConfig.CacheYouTubePreferVp9;
-                                if (backupConfig.UriRules is { Count: > 0 })
-                                    newConfig.UriRules = backupConfig.UriRules;
-                                if (backupConfig.SeededDefaultRules is { Count: > 0 })
-                                    newConfig.SeededDefaultRules = backupConfig.SeededDefaultRules;
-
-                                Log.Information("Restored PlusPlus settings from Config.json.bak (Config.json was overwritten by upstream).");
-                            }
-                        }
-                        catch (Exception backupEx)
-                        {
-                            Log.Error(backupEx, "Failed to restore config from backup.");
-                        }
-                    }
-                }
-            }
+                newConfig = Json.Deserialize<ConfigModel>(File.ReadAllText(ConfigFilePath));
             if (newConfig != null)
                 Config = newConfig;
         }
@@ -92,7 +57,7 @@ public class ConfigManager
         // Folds in a legacy PlusConfig.json, repairs and seeds the rule list. Called with
         // the instance rather than reaching for ConfigManager.Config: PlusConfigManager has
         // no static state of its own, so there is no initialiser to re-enter here.
-        PlusConfigManager.Initialize(Config, configText);
+        PlusConfigManager.Initialize(Config);
 
         Log.Information("Loaded config.");
         TrySaveConfig();
@@ -108,21 +73,6 @@ public class ConfigManager
         Log.Information("Config changed, saving...");
         AtomicFile.WriteAllText(ConfigFilePath, newConfig);
         Log.Information("Config saved.");
-
-        // Write rolling backup
-        try
-        {
-            var backupPath = ConfigFilePath + ".bak";
-            if (!File.Exists(backupPath) || !PlusConfigManager.IsDefault(Config))
-            {
-                AtomicFile.WriteAllText(backupPath, newConfig);
-                Log.Debug("Config backup updated.");
-            }
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Failed to write config backup.");
-        }
 
         OnConfigChanged?.Invoke();
     }

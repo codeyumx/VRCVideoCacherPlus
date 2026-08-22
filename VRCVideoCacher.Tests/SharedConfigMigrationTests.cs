@@ -59,67 +59,45 @@ public class SharedConfigMigrationTests
         Assert.NotNull(config);
         Assert.Equal(30, config!.CacheDownloadIdleSeconds);
         
-        PlusConfigManager.Initialize(config, strippedByUpstream);
+        PlusConfigManager.Initialize(config);
         Assert.NotEmpty(config.UriRules);
     }
 
     [Fact]
-    public void ALegacyNestedPlusBlockMigratesToTopLevel()
+    public void TheSharedConfigNoticeFlagDefaultsToUnshown()
     {
-        const string legacyJson = """
-            {
-              "YtdlpWebServerUrl": "http://localhost:9696",
-              "Plus": {
-                "CacheDownloadRateLimitMBs": 50,
-                "CacheDownloadIdleSeconds": 15,
-                "CacheYouTubePreferVp9": false,
-                "UriRules": [
-                  { "Enabled": true, "Name": "Kept", "Pattern": "^https://kept/", "Action": 4 }
-                ],
-                "SeededDefaultRules": ["Kept"]
-              }
-            }
-            """;
-
-        var config = Json.Deserialize<ConfigModel>(legacyJson)!;
-        PlusConfigManager.Initialize(config, legacyJson);
-
-        Assert.Equal(50, config.CacheDownloadRateLimitMBs);
-        Assert.Equal(15, config.CacheDownloadIdleSeconds);
-        Assert.False(config.CacheYouTubePreferVp9);
-        Assert.Contains("Kept", config.SeededDefaultRules);
-
-        var rule = Assert.Single(config.UriRules, r => r.Name == "Kept");
-        Assert.Equal("Kept", rule.Name);
-        Assert.Equal(RuleAction.Block, rule.Action);
+        Assert.False(new ConfigModel().HasShownSharedConfigNotice);
+        var restored = Json.Deserialize<ConfigModel>(
+            Json.Serialize(new ConfigModel { HasShownSharedConfigNotice = true }))!;
+        Assert.True(restored.HasShownSharedConfigNotice);
     }
 
     [Fact]
-    public void IsDefaultReturnsTrueForDefaultConfigAndFalseForCustomized()
+    public void NoticeTextNamesTheBackupFileThatIsActuallyWritten()
     {
-        var config = new ConfigModel();
-        // Fresh config should be default (after rules seeding/initialization)
-        PlusConfigManager.Initialize(config, string.Empty);
-        Assert.True(PlusConfigManager.IsDefault(config));
+        using var stream = typeof(ConfigModel).Assembly
+            .GetManifestResourceStream("VRCVideoCacher.Languages.en.loc.json");
+        Assert.NotNull(stream);
 
-        // Change a primitive setting
-        config.CacheDownloadIdleSeconds = 45;
-        Assert.False(PlusConfigManager.IsDefault(config));
-        config.CacheDownloadIdleSeconds = 30; // Restore
-        Assert.True(PlusConfigManager.IsDefault(config));
+        using var document = System.Text.Json.JsonDocument.Parse(stream!);
+        var notice = document.RootElement.GetProperty("SharedConfigNotice").GetString();
 
-        config.CacheDownloadRateLimitMBs = 10;
-        Assert.False(PlusConfigManager.IsDefault(config));
-        config.CacheDownloadRateLimitMBs = 0; // Restore
-        Assert.True(PlusConfigManager.IsDefault(config));
+        Assert.NotNull(notice);
+        Assert.Contains("PlusConfig.json.bak", notice!);
+        Assert.Contains("Config.json", notice!);
+    }
 
-        config.CacheYouTubePreferVp9 = false;
-        Assert.False(PlusConfigManager.IsDefault(config));
-        config.CacheYouTubePreferVp9 = true; // Restore
-        Assert.True(PlusConfigManager.IsDefault(config));
+    [Fact]
+    public void EveryLanguageHasTheNoticeStrings()
+    {
+        foreach (var resource in typeof(ConfigModel).Assembly.GetManifestResourceNames()
+                     .Where(n => n.StartsWith("VRCVideoCacher.Languages.") && n.EndsWith(".loc.json")))
+        {
+            using var stream = typeof(ConfigModel).Assembly.GetManifestResourceStream(resource);
+            using var document = System.Text.Json.JsonDocument.Parse(stream!);
 
-        // Modify rules
-        config.UriRules[0].Enabled = !config.UriRules[0].Enabled;
-        Assert.False(PlusConfigManager.IsDefault(config));
+            Assert.True(document.RootElement.TryGetProperty("SharedConfigNotice", out _), $"{resource} is missing SharedConfigNotice");
+            Assert.True(document.RootElement.TryGetProperty("SharedConfigNoticeTitle", out _), $"{resource} is missing SharedConfigNoticeTitle");
+        }
     }
 }

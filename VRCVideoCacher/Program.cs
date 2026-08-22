@@ -272,7 +272,14 @@ internal sealed class Program
         // cache index and the download queue did not come up until every one had finished.
         RunDetached(BulkPreCache.DownloadFileList(), "Bulk pre-cache");
 
-
+        // Console mode has no window to put a dialog on, so the same one-time notice the UI
+        // shows goes to the log instead.
+        if (!LaunchArgs.HasGui && !ConfigManager.Config.HasShownSharedConfigNotice)
+        {
+            Logger.Warning("{Notice}", Jeek.Avalonia.Localization.Localizer.Get("SharedConfigNotice"));
+            ConfigManager.Config.HasShownSharedConfigNotice = true;
+            ConfigManager.TrySaveConfig();
+        }
 
         if (ConfigManager.Config.YtdlpUseCookies && !IsCookiesEnabledAndValid())
             Logger.Warning("No cookies found, please use the browser extension to send cookies or disable \"ytdlUseCookies\" in config.");

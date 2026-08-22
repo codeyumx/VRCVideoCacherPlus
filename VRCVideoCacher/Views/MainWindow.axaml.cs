@@ -32,7 +32,11 @@ public partial class MainWindow : Window
             Program.InitializeUIBackend();
         });
 
-
+        // Settings now share Config.json with the original VRCVideoCacher, which rewrites
+        // that file and drops what it doesn't recognise. Say so once — on a fresh install
+        // and on the first launch after migrating — before anything else competes for
+        // attention.
+        await ShowSharedConfigNoticeIfNeeded();
 
         // Check if we should show the cookie setup wizard
         // Show if: cookies are enabled, setup not completed, and cookies not already valid
@@ -50,6 +54,23 @@ public partial class MainWindow : Window
     }
 
 
+
+    private async Task ShowSharedConfigNoticeIfNeeded()
+    {
+        if (ConfigManager.Config.HasShownSharedConfigNotice)
+            return;
+
+        // Recorded before showing, so a crash in the dialog can't turn this into a prompt
+        // that reappears every launch.
+        ConfigManager.Config.HasShownSharedConfigNotice = true;
+        ConfigManager.TrySaveConfig();
+
+        var notice = new PopupWindow(Localizer.Get("SharedConfigNotice"))
+        {
+            Title = Localizer.Get("SharedConfigNoticeTitle")
+        };
+        await notice.ShowDialog(this);
+    }
 
     private async Task ShowCookieSetupDialog()
     {
