@@ -179,168 +179,111 @@ public static class SocketKill
 
     private static void SeverConnectionsLinux(string? filterIp = null)
     {
-        var targetPids = GetTargetPids();
-        if (targetPids.Count == 0)
+        Log.Information("SeverConnectionsLinux called with filterIp: {FilterIp}", filterIp ?? "(none)");
+
+        var targetIps = new List<string>();
+        if (!string.IsNullOrEmpty(filterIp))
         {
-            Log.Debug("No active VRChat/Unity processes found on Linux.");
+            targetIps.Add(filterIp);
+        }
+        else
+        {
+            var activeIps = YTDL.ActiveStreamTracker.GetActiveVideoIps();
+            targetIps.AddRange(activeIps);
+            Log.Information("SeverConnectionsLinux: Found {Count} active video IPs from tracker: {Ips}",
+                activeIps.Count, string.Join(", ", activeIps));
+        }
+
+        if (targetIps.Count == 0)
+        {
+            Log.Warning("SeverConnectionsLinux: No target IPs available to sever.");
             return;
         }
 
-        // Find inodes from /proc/<pid>/fd/
-        var inodes = new HashSet<string>();
-        foreach (var pid in targetPids)
+        int totalKilled = 0;
+        foreach (var ip in targetIps)
         {
-            var fdDir = $"/proc/{pid}/fd";
-            if (!Directory.Exists(fdDir))
-                continue;
+            if (string.IsNullOrWhiteSpace(ip)) continue;
 
-            try
+            Log.Information("Attempting direct socket kill for target IP: {IP}", ip);
+            if (TryKillSocketsForIp(ip))
             {
-                foreach (var fdFile in Directory.GetFiles(fdDir))
-                {
-                    try
-                    {
-                        var targetInfo = File.ResolveLinkTarget(fdFile, false);
-                        var target = targetInfo?.LinkTarget ?? targetInfo?.FullName ?? string.Empty;
-                        if (string.IsNullOrEmpty(target)) continue;
+                totalKilled++;
+            }
+        }
 
-                        if (target.StartsWith("socket:[") && target.EndsWith("]"))
-                        {
-                            var inode = target.Substring(8, target.Length - 9);
-                            inodes.Add(inode);
-                        }
-                    }
-                    catch { /* ignore individual file access errors */ }
+        var pids = GetTargetPids();
+        Log.Information("Target process PIDs for socket scan: {Pids}", string.Join(", ", pids));
+
+        if (totalKilled > 0)
+        {
+            Log.Information("Successfully severed {Count} active video connection targets on Linux.", totalKilled);
+        }
+        else
+        {
+            Log.Warning("No connections were severed by ss -t -K for target IPs: {Ips}", string.Join(", ", targetIps));
+        }
+    }
+
+    private static bool TryKillSocketsForIp(string ip)
+    {
+        try
+        {
+            var filter = $"dst {ip}";
+            var psi = new ProcessStartInfo
+            {
+                FileName = "ss",
+                Arguments = $"-t -K {filter}",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var proc = Process.Start(psi);
+            if (proc != null)
+            {
+                var stdout = proc.StandardOutput.ReadToEnd();
+                var stderr = proc.StandardError.ReadToEnd();
+                proc.WaitForExit();
+                Log.Information("ss -t -K dst {IP} exited with code {Code}. Output: {Out} | Stderr: {Err}",
+                    ip, proc.ExitCode, stdout.Trim(), stderr.Trim());
+
+                if (proc.ExitCode == 0 && !string.IsNullOrWhiteSpace(stdout))
+                {
+                    return true;
                 }
             }
-            catch { /* ignore folder access errors */ }
-        }
 
-        if (inodes.Count == 0)
-        {
-            Log.Debug("No socket inodes found for target processes.");
-            return;
-        }
-
-        // Parse /proc/net/tcp to match inodes to connections
-        var connectionsToKill = new List<(string LocalIp, int LocalPort, string RemoteIp, int RemotePort)>();
-        const string tcpPath = "/proc/net/tcp";
-        if (File.Exists(tcpPath))
-        {
-            try
+            var sudoPsi = new ProcessStartInfo
             {
-                var lines = File.ReadLines(tcpPath);
-                var activeIps = filterIp != null ? null : YTDL.ActiveStreamTracker.GetActiveVideoIps();
-                foreach (var line in lines)
-                {
-                    var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                    if (parts.Length < 10) continue;
+                FileName = "sudo",
+                Arguments = $"-n ss -t -K {filter}",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
 
-                    var inode = parts[9];
-                    if (!inodes.Contains(inode)) continue;
-
-                    // Parse local/remote addresses
-                    var localParts = parts[1].Split(':');
-                    var remoteParts = parts[2].Split(':');
-                    if (localParts.Length != 2 || remoteParts.Length != 2) continue;
-
-                    var localIp = ParseHexIp(localParts[0]);
-                    var localPort = int.Parse(localParts[1], System.Globalization.NumberStyles.HexNumber);
-                    var remoteIp = ParseHexIp(remoteParts[0]);
-                    var remotePort = int.Parse(remoteParts[1], System.Globalization.NumberStyles.HexNumber);
-
-                    bool shouldKill = false;
-                    if (localPort == 9696 || remotePort == 9696)
-                    {
-                        if (filterIp == null)
-                            shouldKill = true;
-                    }
-                    else if (remotePort == 80 || remotePort == 443)
-                    {
-                        if (filterIp != null)
-                        {
-                            if (remoteIp == filterIp)
-                                shouldKill = true;
-                        }
-                        else if (activeIps != null && activeIps.Contains(remoteIp))
-                        {
-                            shouldKill = true;
-                        }
-                    }
-
-                    if (shouldKill)
-                    {
-                        connectionsToKill.Add((localIp, localPort, remoteIp, remotePort));
-                    }
-                }
-            }
-            catch (Exception ex)
+            using var sudoProc = Process.Start(sudoPsi);
+            if (sudoProc != null)
             {
-                Log.Warning(ex, "Failed to read /proc/net/tcp.");
+                var stdout = sudoProc.StandardOutput.ReadToEnd();
+                var stderr = sudoProc.StandardError.ReadToEnd();
+                sudoProc.WaitForExit();
+                Log.Information("sudo -n ss -t -K dst {IP} exited with code {Code}. Output: {Out} | Stderr: {Err}",
+                    ip, sudoProc.ExitCode, stdout.Trim(), stderr.Trim());
+
+                if (sudoProc.ExitCode == 0 && !string.IsNullOrWhiteSpace(stdout))
+                    return true;
             }
         }
-
-        if (connectionsToKill.Count == 0)
+        catch (Exception ex)
         {
-            Log.Debug("No active target video connections found in /proc/net/tcp.");
-            return;
+            Log.Warning(ex, "Failed executing ss command for IP {IP}", ip);
         }
 
-        int killedCount = 0;
-        foreach (var conn in connectionsToKill)
-        {
-            try
-            {
-                // Run sudo -n ss -t -K dst <remote> dport = :<port> src <local> sport = :<port>
-                var filter = $"dst {conn.RemoteIp} dport = :{conn.RemotePort} src {conn.LocalIp} sport = :{conn.LocalPort}";
-                var psi = new ProcessStartInfo
-                {
-                    FileName = "ss",
-                    Arguments = $"-t -K {filter}",
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
-
-                using var proc = Process.Start(psi);
-                if (proc != null)
-                {
-                    proc.WaitForExit();
-                    if (proc.ExitCode == 0)
-                    {
-                        killedCount++;
-                        continue;
-                    }
-                }
-
-                // Fallback to sudo -n if unprivileged ss fails
-                var sudoPsi = new ProcessStartInfo
-                {
-                    FileName = "sudo",
-                    Arguments = $"-n ss -t -K {filter}",
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
-
-                using var sudoProc = Process.Start(sudoPsi);
-                if (sudoProc != null)
-                {
-                    sudoProc.WaitForExit();
-                    if (sudoProc.ExitCode == 0)
-                        killedCount++;
-                }
-            }
-            catch (Exception ex)
-            {
-                Log.Debug(ex, "Failed to execute ss -K for connection {Local} -> {Remote}", conn.LocalPort, conn.RemotePort);
-            }
-        }
-
-        if (killedCount > 0)
-            Log.Information("Severed {Count} active video connections on Linux.", killedCount);
+        return false;
     }
 
     private static string ParseHexIp(string hex)
