@@ -246,12 +246,7 @@ public class ApiController : WebApiController
 
         Log.Information("Request URL: {URL}", requestUrl);
 
-        if (!ConfigManager.Config.VideoPlayersEnabled)
-        {
-            Log.Warning("Video players are disabled via toggle. Blocking request: {URL}", requestUrl);
-            await SendBlockedAsync("Video players are disabled in VRCVideoCacher.");
-            return;
-        }
+
 
         // Evaluate URL against Rules Engine
         var evalResult = RuleEngine.EvaluateUrl(requestUrl);

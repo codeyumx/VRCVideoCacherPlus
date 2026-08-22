@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Linq;
 using Jeek.Avalonia.Localization;
 using Serilog;
 using VRCVideoCacher.Models;
@@ -75,6 +76,47 @@ public class ConfigManager
         Log.Information("Config saved.");
 
         OnConfigChanged?.Invoke();
+    }
+
+    public static void SetVideoPlayersEnabled(bool enabled)
+    {
+        Config.VideoPlayersEnabled = enabled;
+
+        var rule = Config.UriRules.FirstOrDefault(r => r.Name == "Block all Videos");
+        if (!enabled)
+        {
+            if (rule == null)
+            {
+                rule = new UriRule
+                {
+                    Name = "Block all Videos",
+                    Pattern = ".*",
+                    Action = RuleAction.Block,
+                    Enabled = true
+                };
+                Config.UriRules.Insert(0, rule);
+            }
+            else
+            {
+                rule.Enabled = true;
+                Config.UriRules.Remove(rule);
+                Config.UriRules.Insert(0, rule);
+            }
+        }
+        else
+        {
+            if (rule != null)
+            {
+                rule.Enabled = false;
+            }
+        }
+
+        TrySaveConfig();
+
+        if (!enabled)
+        {
+            SocketKill.SeverActiveVideoConnections();
+        }
     }
 
     private static bool GetUserConfirmation(string prompt, bool defaultValue)

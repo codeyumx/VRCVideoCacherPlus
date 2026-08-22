@@ -128,6 +128,7 @@ public partial class App : Application
     private bool _isExiting;
     private IClassicDesktopStyleApplicationLifetime? _desktop;
     private NativeMenuItem? _showItem;
+    private NativeMenuItem? _videoPlayersItem;
     private NativeMenuItem? _openCacheItem;
     private NativeMenuItem? _exitItem;
 
@@ -207,6 +208,10 @@ public partial class App : Application
         _showItem = new NativeMenuItem(Localizer.Get("Show"));
         _showItem.Click += (_, _) => ShowMainWindow();
 
+        _videoPlayersItem = new NativeMenuItem();
+        _videoPlayersItem.Click += (_, _) => ConfigManager.SetVideoPlayersEnabled(!ConfigManager.Config.VideoPlayersEnabled);
+        UpdateVideoPlayersTrayHeader();
+
         _openCacheItem = new NativeMenuItem(Localizer.Get("TrayOpenCacheFolder"));
         _openCacheItem.Click += (_, _) => OpenCacheFolder();
 
@@ -222,11 +227,16 @@ public partial class App : Application
             if (_showItem != null) _showItem.Header = Localizer.Get("Show");
             if (_openCacheItem != null) _openCacheItem.Header = Localizer.Get("TrayOpenCacheFolder");
             if (_exitItem != null) _exitItem.Header = Localizer.Get("TrayExit");
+            UpdateVideoPlayersTrayHeader();
         };
+
+        ConfigManager.OnConfigChanged += UpdateVideoPlayersTrayHeader;
 
         var menu = new NativeMenu
         {
             _showItem,
+            new NativeMenuItemSeparator(),
+            _videoPlayersItem,
             new NativeMenuItemSeparator(),
             _openCacheItem,
             new NativeMenuItemSeparator(),
@@ -242,6 +252,17 @@ public partial class App : Application
         };
 
         _trayIcon.Clicked += (_, _) => ShowMainWindow();
+    }
+
+    private void UpdateVideoPlayersTrayHeader()
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (_videoPlayersItem == null) return;
+            var enabled = ConfigManager.Config.VideoPlayersEnabled;
+            var actionText = enabled ? Localizer.Get("Disable") : Localizer.Get("Enable");
+            _videoPlayersItem.Header = $"{actionText} {Localizer.Get("VideoPlayers")}";
+        });
     }
 
     private async void HideToTray()

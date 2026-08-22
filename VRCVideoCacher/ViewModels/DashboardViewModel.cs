@@ -233,8 +233,7 @@ public partial class DashboardViewModel : ViewModelBase
     private void ToggleVideoPlayers()
     {
         VideoPlayersEnabled = !VideoPlayersEnabled;
-        ConfigManager.Config.VideoPlayersEnabled = VideoPlayersEnabled;
-        ConfigManager.TrySaveConfig();
+        ConfigManager.SetVideoPlayersEnabled(VideoPlayersEnabled);
     }
 
     [RelayCommand]
