@@ -148,7 +148,7 @@ public class YtdlManager
     /// route — the pre-cache list, playlist expansion, the UI — could close the quote and
     /// append flags of its own. yt-dlp has --exec, so that is arbitrary code execution.
     /// </summary>
-    public static List<string> GenerateYtdlArgs(List<string> args, IEnumerable<string> trailingArgs)
+    public static List<string> GenerateYtdlArgs(List<string> args, IEnumerable<string> trailingArgs, bool includeCookies = true)
     {
         args.AddRange([
             "--encoding", "utf-8",
@@ -179,7 +179,7 @@ public class YtdlManager
             Log.Error("Deno runtime not found at path: {DenoPath}", DenoPath);
         }
 
-        if (Program.IsCookiesEnabledAndValid())
+        if (includeCookies && Program.IsCookiesEnabledAndValid())
         {
             args.Add("--cookies");
             args.Add(CookiesPath);

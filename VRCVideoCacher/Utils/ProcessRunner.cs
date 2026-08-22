@@ -44,6 +44,15 @@ public static class ProcessRunner
         startInfo.StandardOutputEncoding ??= Encoding.UTF8;
         startInfo.StandardErrorEncoding ??= Encoding.UTF8;
 
+        if (OperatingSystem.IsLinux() && startInfo.EnvironmentVariables.ContainsKey("LD_PRELOAD"))
+        {
+            var ldPreload = startInfo.EnvironmentVariables["LD_PRELOAD"];
+            if (!string.IsNullOrEmpty(ldPreload) && ldPreload.Contains("libextest.so"))
+            {
+                startInfo.EnvironmentVariables.Remove("LD_PRELOAD");
+            }
+        }
+
         using var process = new Process { StartInfo = startInfo };
         process.Start();
 
@@ -64,6 +73,15 @@ public static class ProcessRunner
 
         var output = await outputTask;
         var error = await errorTask;
+
+        if (!string.IsNullOrEmpty(error))
+        {
+            var lines = error.Split('\n')
+                .Where(l => !l.Contains("wrong ELF class") && !l.Contains("libextest.so"))
+                .Select(l => l.TrimEnd('\r'));
+            error = string.Join("\n", lines);
+        }
+
         return new ProcessResult(output.Trim(), error.Trim(), process.ExitCode);
     }
 }

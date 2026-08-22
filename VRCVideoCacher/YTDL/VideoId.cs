@@ -29,10 +29,10 @@ public class VideoId
             .Replace("=", "");
     }
 
-    private static async Task<(string Output, string Error, int ExitCode)> RunYtdlpAsync(List<string> args, string url)
+    private static async Task<(string Output, string Error, int ExitCode)> RunYtdlpAsync(List<string> args, string url, bool includeCookies = true)
     {
         // "--" so a URL that happens to start with a dash is never taken for a flag.
-        var arguments = YtdlManager.GenerateYtdlArgs(args, ["--", url]);
+        var arguments = YtdlManager.GenerateYtdlArgs(args, ["--", url], includeCookies);
         Log.Information("Starting yt-dlp with args: {args:l}", string.Join(' ', arguments));
         var (output, error, exitCode) = await ProcessRunner.RunAsync(YtdlManager.YtdlPath, arguments);
         Log.Information("Finished yt-dlp");
@@ -86,7 +86,13 @@ public class VideoId
                 "--extractor-args", "youtube:player_client=web"
             };
 
-            var (rawData, error, exitCode) = await RunYtdlpAsync(args, url);
+            var (rawData, error, exitCode) = await RunYtdlpAsync(args, url, includeCookies: true);
+            if (exitCode != 0 || string.IsNullOrEmpty(rawData))
+            {
+                Log.Warning("Metadata fetch with cookies failed for {VideoId} ({Error}). Retrying without cookies...", videoId, error.Trim());
+                (rawData, error, exitCode) = await RunYtdlpAsync(args, url, includeCookies: false);
+            }
+
             if (exitCode != 0 || string.IsNullOrEmpty(rawData))
             {
                 Log.Warning("Failed to fetch metadata for {VideoId}: {Error}", videoId, error);
@@ -118,12 +124,19 @@ public class VideoId
 
     public static async Task<(string VideoId, string? SkipReason)> TryGetYouTubeVideoId(string url)
     {
-        var args = new List<string>();
-        args.Add("-j");
+        var args = new List<string> { "-j" };
 
-        var (rawData, error, exitCode) = await RunYtdlpAsync(args, url);
-        if (exitCode != 0)
-            throw new Exception($"yt-dlp metadata fetch failed: {error.Trim()}");
+        var (rawData, error, exitCode) = await RunYtdlpAsync(args, url, includeCookies: true);
+        if (exitCode != 0 || string.IsNullOrEmpty(rawData))
+        {
+            Log.Warning("TryGetYouTubeVideoId with cookies failed ({Error}). Retrying without cookies...", error.Trim());
+            var (fallbackData, fallbackError, fallbackExitCode) = await RunYtdlpAsync(new List<string> { "-j" }, url, includeCookies: false);
+            if (fallbackExitCode != 0 || string.IsNullOrEmpty(fallbackData))
+            {
+                throw new Exception($"yt-dlp metadata fetch failed: {fallbackError.Trim()}");
+            }
+            rawData = fallbackData;
+        }
 
         if (string.IsNullOrEmpty(rawData))
         {
