@@ -339,7 +339,7 @@ public class HlsHandler : ISiteHandler
         return (ms.ToArray(), truncated);
     }
 
-    private static (double? Duration, bool IsComplete) ParseMediaPlaylist(string body)
+    internal static (double? Duration, bool IsComplete) ParseMediaPlaylist(string body)
     {
         double total = 0;
         var any = false;
@@ -364,7 +364,7 @@ public class HlsHandler : ISiteHandler
     /// Parses an optional title out of #EXT-X-SESSION-DATA tags carrying
     /// DATA-ID="com.apple.hls.title" (rare but standard per RFC 8216 §4.3.4.4).
     /// </summary>
-    private static string? ParseSessionTitle(string body)
+    internal static string? ParseSessionTitle(string body)
     {
         foreach (var rawLine in body.Split('\n'))
         {
