@@ -3,13 +3,14 @@ using VRCVideoCacher.Utils;
 using VRCVideoCacher.Database;
 using VRCVideoCacher.Database.Models;
 using VRCVideoCacher.Models;
+using VRCVideoCacher.Services;
 
-namespace VRCVideoCacher.Services;
+namespace VRCVideoCacher.Integrations.VRDancing;
 
-public class VRDancingAPIService
+public class VRDancingApiService
 {
     private const string VRDancingAPIBaseURL = "https://dbapi.vrdancing.club/";
-    private static readonly ILogger Logger = Program.Logger.ForContext<VRDancingAPIService>();
+    private static readonly ILogger Logger = Program.Logger.ForContext<VRDancingApiService>();
     private static readonly HttpClient HttpClient = new()
     {
         BaseAddress = new Uri(VRDancingAPIBaseURL),

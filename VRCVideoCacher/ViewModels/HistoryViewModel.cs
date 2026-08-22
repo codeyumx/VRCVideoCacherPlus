@@ -8,6 +8,7 @@ using VRCVideoCacher.Database;
 using VRCVideoCacher.Database.Models;
 using VRCVideoCacher.Models;
 using VRCVideoCacher.Services;
+using VRCVideoCacher.Integrations.YouTube;
 using VRCVideoCacher.YTDL;
 
 namespace VRCVideoCacher.ViewModels;

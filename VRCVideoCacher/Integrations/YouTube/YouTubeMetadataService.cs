@@ -2,8 +2,9 @@ using System.Text.Json;
 using VRCVideoCacher.Database;
 using VRCVideoCacher.Database.Models;
 using VRCVideoCacher.Models;
+using VRCVideoCacher.Services;
 
-namespace VRCVideoCacher.Services;
+namespace VRCVideoCacher.Integrations.YouTube;
 
 public static class YouTubeMetadataService
 {

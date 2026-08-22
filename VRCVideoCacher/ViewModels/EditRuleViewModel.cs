@@ -53,7 +53,13 @@ public partial class EditRuleViewModel : ObservableObject
         RuleAction.Block
     ];
 
-    public string?[] AvailableIntegrations { get; } = [null, "YouTube", "PyPyDance", "VRDancing"];
+    /// <summary>
+    /// Taken from the registry rather than hardcoded, so adding an integration does not also
+    /// require remembering to list it here — and so a name can never drift out of sync with
+    /// the one the rules actually bind to. The leading null is "no integration".
+    /// </summary>
+    public string?[] AvailableIntegrations { get; } =
+        [null, .. Integrations.IntegrationRegistry.AvailableIntegrationNames()];
 
     public int[] ResolutionOptions { get; } = [0, 720, 1080, 1440, 2160];
 

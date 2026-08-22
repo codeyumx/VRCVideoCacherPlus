@@ -4,17 +4,19 @@ using Serilog;
 using VRCVideoCacher.Database;
 using VRCVideoCacher.Database.Models;
 using VRCVideoCacher.Models;
+using VRCVideoCacher.Utils;
+using VRCVideoCacher.YTDL;
 
-namespace VRCVideoCacher.YTDL.SiteHandlers.Sites;
+namespace VRCVideoCacher.Integrations.Hls;
 
 /// <summary>
 /// Handles HLS manifests regardless of URL shape. Detection is content-based:
 /// a GET on the URL is inspected for an HLS content-type or a #EXTM3U body
 /// prefix. Probe results are memoized briefly so GetVideoInfo doesn't refetch.
 /// </summary>
-public class HlsHandler : ISiteHandler
+public class HlsIntegration : Integration
 {
-    private static readonly ILogger Log = Program.Logger.ForContext<HlsHandler>();
+    private static readonly ILogger Log = Program.Logger.ForContext<HlsIntegration>();
 
     private static readonly HttpClient HttpClient = new(new SocketsHttpHandler
     {
@@ -23,7 +25,7 @@ public class HlsHandler : ISiteHandler
         AllowAutoRedirect = true,
         // Probes whatever URL a world hands us, and follows redirects while doing it, so
         // the address guard belongs at connect time where it also covers those redirects.
-        ConnectCallback = Utils.UrlPolicy.GuardedConnectAsync,
+        ConnectCallback = UrlPolicy.GuardedConnectAsync,
     })
     {
         DefaultRequestHeaders = { { "User-Agent", "VRCVideoCacher" } },
@@ -66,7 +68,7 @@ public class HlsHandler : ISiteHandler
         catch { return url; }
     }
 
-    public bool CanHandle(Uri uri)
+    public override bool CanHandle(Uri uri)
     {
         // Fast path: explicit .m3u8 extension — skip the probe entirely.
         return uri.AbsolutePath.EndsWith(".m3u8", StringComparison.OrdinalIgnoreCase);
@@ -115,7 +117,7 @@ public class HlsHandler : ISiteHandler
     private static TimeSpan EffectiveTtl(ProbeResult result) =>
         (result.IsHls || result.IsTransportStream) ? ProbeTtl : NegativeProbeTtl;
 
-    public async Task<VideoInfo?> GetVideoInfo(string url, Uri uri, bool avPro)
+    public override async Task<VideoInfo?> GetVideoInfo(string url, Uri uri, bool avPro)
     {
         // Hash the path-only form so signed CDN URLs (rotating query tokens per play)
         // resolve to a stable videoId — otherwise the cached MP4 is never re-served.
@@ -183,7 +185,6 @@ public class HlsHandler : ISiteHandler
         return null;
     }
 
-    public List<string> GetYtdlpArguments(Uri uri, bool avPro) => [];
 
     // Share-URL rewriting used to live here as well as in the default rules, gated on
     // CacheHlsPlaylists — a flag with nothing to do with Dropbox or Google Drive. Two
@@ -240,7 +241,7 @@ public class HlsHandler : ISiteHandler
             return new ProbeResult(false, null, false, null);
         }
 
-        if (!Utils.UrlPolicy.IsFetchableWebUrl(url))
+        if (!UrlPolicy.IsFetchableWebUrl(url))
         {
             Log.Debug("Skipping HLS probe for non-web URL {URL}", url);
             return new ProbeResult(false, null, false, null);

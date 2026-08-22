@@ -1,6 +1,6 @@
 using VRCVideoCacher.Models;
 using VRCVideoCacher.YTDL;
-using VRCVideoCacher.YTDL.SiteHandlers.Sites;
+using VRCVideoCacher.Integrations.YouTube;
 using Xunit;
 
 namespace VRCVideoCacher.Tests;
@@ -10,7 +10,7 @@ namespace VRCVideoCacher.Tests;
 public class VideoIdTests
 {
     private static Task<VideoInfo?> ResolveAsync(string url, bool avPro = false) =>
-        new YouTubeHandler().GetVideoInfo(url, new Uri(url), avPro);
+        new YouTubeIntegration().GetVideoInfo(url, new Uri(url), avPro);
 
     [Theory]
     [InlineData("https://www.youtube.com/watch?v=dQw4w9WgXcQ")]

@@ -9,6 +9,7 @@ using Serilog.Templates;
 using Serilog.Templates.Themes;
 using VRCVideoCacher.API;
 using VRCVideoCacher.Services;
+using VRCVideoCacher.Integrations.VRDancing;
 using VRCVideoCacher.Utils;
 using VRCVideoCacher.YTDL;
 #if STEAMRELEASE

@@ -6,7 +6,8 @@ using VRCVideoCacher.Database;
 using VRCVideoCacher.Models;
 using VRCVideoCacher.Services;
 using VRCVideoCacher.YTDL;
-using VRCVideoCacher.YTDL.SiteHandlers.Sites;
+using VRCVideoCacher.Integrations;
+using VRCVideoCacher.Integrations.Hls;
 
 namespace VRCVideoCacher.API;
 
@@ -422,7 +423,7 @@ public class ApiController : WebApiController
     // the equivalent "this is a complete video, not a live feed" signal.
     private static bool IsHlsCacheable(VideoInfo videoInfo, double? cachedDuration)
     {
-        var probe = HlsHandler.TryGetCachedProbe(videoInfo.VideoUrl);
+        var probe = HlsIntegration.TryGetCachedProbe(videoInfo.VideoUrl);
         if (probe is null)
         {
             Log.Information("HLS {VideoId}: skipping cache — probe result unavailable.", videoInfo.VideoId);

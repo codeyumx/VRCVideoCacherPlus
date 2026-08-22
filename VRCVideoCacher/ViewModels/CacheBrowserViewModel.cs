@@ -7,6 +7,7 @@ using Jeek.Avalonia.Localization;
 using VRCVideoCacher.Database;
 using VRCVideoCacher.Models;
 using VRCVideoCacher.Services;
+using VRCVideoCacher.Integrations.YouTube;
 
 namespace VRCVideoCacher.ViewModels;
 

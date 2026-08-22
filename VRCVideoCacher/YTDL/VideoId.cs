@@ -7,7 +7,7 @@ using VRCVideoCacher.Database;
 using VRCVideoCacher.Database.Models;
 using VRCVideoCacher.Models;
 using VRCVideoCacher.Utils;
-using VRCVideoCacher.YTDL.SiteHandlers;
+using VRCVideoCacher.Integrations;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace VRCVideoCacher.YTDL;
@@ -42,12 +42,12 @@ public class VideoId
     public static async Task<VideoInfo?> GetVideoId(string url, bool avPro)
     {
         url = url.Trim();
-        url = await SiteHandlerRegistry.ApplyRewrites(url);
+        url = await IntegrationRegistry.ApplyRewrites(url);
 
         var uri = ToUri(url);
         if (uri == null) return null;
 
-        var handler = await SiteHandlerRegistry.ResolveAsync(url, uri, Services.RuleEngine.EvaluateUrl(url).MatchedRule);
+        var handler = await IntegrationRegistry.ResolveAsync(url, uri, Services.RuleEngine.EvaluateUrl(url).MatchedRule);
         return handler == null ? null : await handler.GetVideoInfo(url, uri, avPro);
     }
 
@@ -191,8 +191,12 @@ public class VideoId
 
         var url = videoInfo.VideoUrl;
         var uri = ToUri(url);
-        var evalResult = Services.RuleEngine.EvaluateUrl(url);
-        var handler = uri != null ? SiteHandlerRegistry.Resolve(uri, evalResult.MatchedRule) : null;
+
+        // Select the handler from the type recorded on the VideoInfo rather than
+        // re-evaluating the rules against its URL. GetVideoInfo has already canonicalised
+        // that URL, so a second evaluation is both redundant and able to disagree with the
+        // handler that produced this record in the first place.
+        var handler = uri != null ? IntegrationRegistry.ResolveByUrlType(videoInfo.UrlType) : null;
         var args = handler?.GetYtdlpArguments(uri!, avPro) ?? [];
         args.Add("--get-url");
 

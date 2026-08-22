@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using VRCVideoCacher.Models;
+using VRCVideoCacher.Integrations.VRDancing;
 using VRCVideoCacher.Services;
 
 namespace VRCVideoCacher.Utils;

@@ -1,4 +1,4 @@
-using VRCVideoCacher.YTDL.SiteHandlers.Sites;
+using VRCVideoCacher.Integrations.Hls;
 using Xunit;
 
 namespace VRCVideoCacher.Tests;
@@ -34,7 +34,7 @@ public class HlsManifestTests
     [Fact]
     public void SumsSegmentDurationsAndSeesTheEndList()
     {
-        var (duration, isComplete) = HlsHandler.ParseMediaPlaylist(CompleteManifest);
+        var (duration, isComplete) = HlsIntegration.ParseMediaPlaylist(CompleteManifest);
 
         Assert.True(isComplete);
         Assert.NotNull(duration);
@@ -44,7 +44,7 @@ public class HlsManifestTests
     [Fact]
     public void ReportsALivePlaylistAsIncomplete()
     {
-        var (duration, isComplete) = HlsHandler.ParseMediaPlaylist(LiveManifest);
+        var (duration, isComplete) = HlsIntegration.ParseMediaPlaylist(LiveManifest);
 
         Assert.False(isComplete);
         // A duration is still parsed; it is the completeness flag that gates caching.
@@ -54,7 +54,7 @@ public class HlsManifestTests
     [Fact]
     public void ReturnsNoDurationWhenThereAreNoSegments()
     {
-        var (duration, isComplete) = HlsHandler.ParseMediaPlaylist("#EXTM3U\n#EXT-X-VERSION:3\n");
+        var (duration, isComplete) = HlsIntegration.ParseMediaPlaylist("#EXTM3U\n#EXT-X-VERSION:3\n");
 
         Assert.Null(duration);
         Assert.False(isComplete);
@@ -68,7 +68,7 @@ public class HlsManifestTests
         try
         {
             Thread.CurrentThread.CurrentCulture = new System.Globalization.CultureInfo("de-DE");
-            var (duration, _) = HlsHandler.ParseMediaPlaylist(CompleteManifest);
+            var (duration, _) = HlsIntegration.ParseMediaPlaylist(CompleteManifest);
             Assert.Equal(21.021, duration!.Value, precision: 3);
         }
         finally
@@ -80,7 +80,7 @@ public class HlsManifestTests
     [Fact]
     public void HandlesCrLfLineEndings()
     {
-        var (duration, isComplete) = HlsHandler.ParseMediaPlaylist(CompleteManifest.Replace("\n", "\r\n"));
+        var (duration, isComplete) = HlsIntegration.ParseMediaPlaylist(CompleteManifest.Replace("\n", "\r\n"));
 
         Assert.True(isComplete);
         Assert.Equal(21.021, duration!.Value, precision: 3);
@@ -97,12 +97,12 @@ public class HlsManifestTests
             #EXT-X-ENDLIST
             """;
 
-        Assert.Equal("Some Dance Video", HlsHandler.ParseSessionTitle(manifest));
+        Assert.Equal("Some Dance Video", HlsIntegration.ParseSessionTitle(manifest));
     }
 
     [Fact]
     public void ReturnsNoTitleWhenTheTagIsAbsent() =>
-        Assert.Null(HlsHandler.ParseSessionTitle(CompleteManifest));
+        Assert.Null(HlsIntegration.ParseSessionTitle(CompleteManifest));
 
     [Theory]
     [InlineData("https://cdn.example.com/v/clip.mp4", true)]
@@ -111,12 +111,12 @@ public class HlsManifestTests
     [InlineData("https://cdn.example.com/v/clip.m3u8", false)]
     [InlineData("https://cdn.example.com/v/stream", false)]
     public void LooksObviouslyNotHls_SkipsTheProbeForKnownMediaExtensions(string url, bool expected) =>
-        Assert.Equal(expected, HlsHandler.LooksObviouslyNotHls(new Uri(url)));
+        Assert.Equal(expected, HlsIntegration.LooksObviouslyNotHls(new Uri(url)));
 
     [Theory]
     [InlineData("https://cdn.example.com/v/clip.m3u8", true)]
     [InlineData("https://cdn.example.com/v/clip.M3U8", true)]
     [InlineData("https://cdn.example.com/v/clip.mp4", false)]
     public void CanHandle_FastPathsOnTheM3u8Extension(string url, bool expected) =>
-        Assert.Equal(expected, new HlsHandler().CanHandle(new Uri(url)));
+        Assert.Equal(expected, new HlsIntegration().CanHandle(new Uri(url)));
 }

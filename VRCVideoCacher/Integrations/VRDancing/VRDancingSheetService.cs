@@ -2,7 +2,7 @@ using Serilog;
 using VRCVideoCacher.Database;
 using VRCVideoCacher.Database.Models;
 
-namespace VRCVideoCacher.Services;
+namespace VRCVideoCacher.Integrations.VRDancing;
 
 public static class VRDancingSheetService
 {
