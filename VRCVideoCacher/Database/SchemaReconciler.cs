@@ -5,6 +5,8 @@ using Serilog;
 namespace VRCVideoCacher.Database;
 
 /// <summary>
+/// TODO: Remove later - Schema reconciler backfills missing database columns.
+///
 /// Adds columns that the EF model declares but the database on disk is missing.
 ///
 /// This exists because the schema is created with EnsureCreated() and there are no

@@ -25,12 +25,13 @@ public static class PlusConfigManager
     /// </summary>
     internal static void Initialize(ConfigModel config)
     {
+        // TODO: Remove later - Migrating/repairing broken Dropbox rule pattern for existing users
         MigrateBrokenDefaultRules(config);
         EnsureDefaultRules(config);
     }
 
     /// <summary>
-    /// Repairs default rules that shipped with a broken pattern.
+    /// TODO: Remove later - Repairs default rules that shipped with a broken pattern.
     /// </summary>
     private static void MigrateBrokenDefaultRules(ConfigModel config)
     {

@@ -75,7 +75,7 @@ public static class DatabaseManager
             )
             """);
 
-        // EnsureCreated above builds the schema only for a database that does not yet
+        // TODO: Remove later - EnsureCreated above builds the schema only for a database that does not yet
         // exist, and there are no migrations, so a property added to an existing entity
         // would be missing for every current user until they deleted their database.
         SchemaReconciler.Run(db);
