@@ -59,6 +59,17 @@ public class VideoId
     /// </summary>
     public static async Task<double?> FetchAndCacheYouTubeMetadataAsync(string videoId)
     {
+        // Fast oEmbed lookup for instant title/author resolution
+        try
+        {
+            var oembedInfo = await Integrations.YouTube.YouTubeMetadataService.GetVideoTitleAsync(videoId);
+            if (oembedInfo != null)
+            {
+                Log.Information("oEmbed title resolved for {VideoId}: {Title}", videoId, oembedInfo.Title);
+            }
+        }
+        catch { }
+
         // Check if we already have duration cached
         var existing = DatabaseManager.GetVideoInfoCache(videoId);
         if (existing?.Duration is > 0)
@@ -70,6 +81,7 @@ public class VideoId
             var args = new List<string>
             {
                 "-j",
+                "--skip-download",
                 "--impersonate", "safari",
                 "--extractor-args", "youtube:player_client=web"
             };

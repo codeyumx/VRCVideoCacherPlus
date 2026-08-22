@@ -388,9 +388,8 @@ public class ApiController : WebApiController
         // so download deferral and queueing are never blocked by a slow yt-dlp call.
         ActiveStreamTracker.RecordActivity(videoInfo.VideoId, cachedDuration);
 
-        // If we don't have duration yet for a YouTube video, fetch it in the background
-        // with a timeout so the tracker gets updated when it's available.
-        if (videoInfo.UrlType == UrlType.YouTube && cachedDuration is not > 0)
+        // Trigger background metadata resolution (fast oEmbed title & duration)
+        if (videoInfo.UrlType == UrlType.YouTube)
         {
             _ = Task.Run(async () =>
             {
