@@ -29,6 +29,39 @@ public class VideoId
             .Replace("=", "");
     }
 
+    /// <summary>
+    /// Errors that no alternative client, format or cookie state can fix.
+    ///
+    /// Every retry is another yt-dlp launch — a ~15 MB Python bundle with a second or two of
+    /// startup — and VRChat is blocked on the resolve the whole time. A failing video could
+    /// otherwise take four launches: the AVPro attempt, the non-AVPro retry, the android
+    /// fallback, and ApiController's own post-prefetch retry. For a deleted or private video
+    /// none of them was ever going to succeed.
+    /// </summary>
+    internal static bool IsTerminalFailure(string error)
+    {
+        if (string.IsNullOrWhiteSpace(error))
+            return false;
+
+        string[] markers =
+        [
+            "Video unavailable",
+            "Private video",
+            "This video has been removed",
+            "video has been removed",
+            "members-only",
+            "join this channel",
+            "does not exist",
+            "has been terminated",
+            "Incomplete YouTube ID",
+            "Unsupported URL",
+            "is not a valid URL",
+            "Video not available"
+        ];
+
+        return markers.Any(marker => error.Contains(marker, StringComparison.OrdinalIgnoreCase));
+    }
+
     private static async Task<(string Output, string Error, int ExitCode)> RunYtdlpAsync(List<string> args, string url, bool includeCookies = true)
     {
         // "--" so a URL that happens to start with a dash is never taken for a flag.
@@ -59,21 +92,16 @@ public class VideoId
     /// </summary>
     public static async Task<double?> FetchAndCacheYouTubeMetadataAsync(string videoId)
     {
-        // Fast oEmbed lookup for instant title/author resolution
-        try
-        {
-            var oembedInfo = await Integrations.YouTube.YouTubeMetadataService.GetVideoTitleAsync(videoId);
-            if (oembedInfo != null)
-            {
-                Log.Information("oEmbed title resolved for {VideoId}: {Title}", videoId, oembedInfo.Title);
-            }
-        }
-        catch { }
-
         // Check if we already have duration cached
         var existing = DatabaseManager.GetVideoInfoCache(videoId);
         if (existing?.Duration is > 0)
             return existing.Duration;
+
+        // Fast oEmbed lookup so a title appears immediately, ahead of the slower yt-dlp
+        // call below. Deliberately after the cache check: it used to run first, so every
+        // call made an HTTP round trip to YouTube even when the answer was already known.
+        // GetVideoTitleAsync caches what it finds and logs its own failures.
+        await Integrations.YouTube.YouTubeMetadataService.GetVideoTitleAsync(videoId);
 
         try
         {
@@ -87,8 +115,10 @@ public class VideoId
             };
 
             var (rawData, error, exitCode) = await RunYtdlpAsync(args, url, includeCookies: true);
-            if (exitCode != 0 || string.IsNullOrEmpty(rawData))
+            if ((exitCode != 0 || string.IsNullOrEmpty(rawData)) && !IsTerminalFailure(error))
             {
+                // Worth one retry: expired or rejected cookies make yt-dlp fail in a way a
+                // cookie-less request often survives. Pointless for a deleted video.
                 Log.Warning("Metadata fetch with cookies failed for {VideoId} ({Error}). Retrying without cookies...", videoId, error.Trim());
                 (rawData, error, exitCode) = await RunYtdlpAsync(args, url, includeCookies: false);
             }
@@ -127,6 +157,9 @@ public class VideoId
         var args = new List<string> { "-j" };
 
         var (rawData, error, exitCode) = await RunYtdlpAsync(args, url, includeCookies: true);
+        if ((exitCode != 0 || string.IsNullOrEmpty(rawData)) && IsTerminalFailure(error))
+            throw new Exception($"yt-dlp metadata fetch failed: {error.Trim()}");
+
         if (exitCode != 0 || string.IsNullOrEmpty(rawData))
         {
             Log.Warning("TryGetYouTubeVideoId with cookies failed ({Error}). Retrying without cookies...", error.Trim());
@@ -232,6 +265,14 @@ public class VideoId
 
         if (error.Contains("Sign in to confirm you’re not a bot")) // Exact Text, do not modify.
             Log.Error("Fix this error by running cookie setup.");
+
+        // Nothing below can help with a deleted, private or members-only video, and each
+        // step costs another yt-dlp launch that VRChat waits through.
+        if (IsTerminalFailure(error))
+        {
+            Log.Information("Not retrying {URL}: {Error}", url, error.Trim());
+            return new Tuple<string, bool>(error, false);
+        }
 
         if (avPro)
         {
