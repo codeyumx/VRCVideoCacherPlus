@@ -18,13 +18,13 @@ VRCVideoCacherPlus の拡張機能はアルファ版で未テストです。テ�
 VRCVideoCacherPlus は VRChat の動画再生をサポートします。YouTube は、ユーザーのクライアントがクッキーを提供しない場合、動画をブロックまたは制限することがあります。このアプリは VRChat をプレイ中に YouTube へクッキーを渡すことで、動画が高画質でスムーズに再生されるようにします。また、設定をオンにすれば動画をインテリジェントにダウンロードし、よく再生する動画（例: VRDancing）を毎回インターネットからダウンロードし直す必要がなくなります。動画キャッシュの管理、バックグラウンドのダウンロード速度の変更、動画ダウンロードの遅延（複数の動画ファイルを同時にダウンロードしないようにする）が可能です。
 VRCVideoCacherPlus は VRCVideoCacher をベースにしており、HLS やストリーミングプレイリスト（.m3u8）動画のサポートなど、多くの改善が加えられています。
 
-![メイン画面](docs/screenshots/main-info.png)
+![メイン画面](https://raw.githubusercontent.com/Bluscream/VRCVideoCacherPlusPlus/assets/main-info.png)
 *メイン画面 — 状態、キャッシュサイズ、アプリの現在の動作。*
 
-![ダウンロード速度とキャッシュ遅延の設定](docs/screenshots/download-settings.png)
+![ダウンロード速度とキャッシュ遅延の設定](https://raw.githubusercontent.com/Bluscream/VRCVideoCacherPlusPlus/assets/download-settings.png)
 *キャッシュ設定 — バックグラウンドのダウンロード速度を制限し、視聴中の動画と競合しないようにダウンロードを遅延させます。*
 
-![ベータ拡張機能によるクッキーの自動更新](docs/screenshots/cookie-refresh.png)
+![ベータ拡張機能によるクッキーの自動更新](https://raw.githubusercontent.com/Bluscream/VRCVideoCacherPlusPlus/assets/cookie-refresh.png)
 *クッキー — ベータ版のブラウザ拡張機能は、アプリからの要求に応じて YouTube のクッキーを自動で更新できます。*
 
 ### 機能

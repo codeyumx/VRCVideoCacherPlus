@@ -1,0 +1,10 @@
+# Keys whose value is legitimately identical to English in every language.
+# Brand names, product names and borrowed technical terms. The linter will not
+# report these as untranslated.
+#
+# This is not the place for a translation that simply has not been written yet —
+# that goes in locale-untranslated.txt, which is meant to shrink over time.
+
+Chrome
+Firefox
+VRCVideoCacherPlus

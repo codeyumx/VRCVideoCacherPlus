@@ -1,3 +1,5 @@
+using Avalonia;
+using Avalonia.Controls.ApplicationLifetimes;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Jeek.Avalonia.Localization;
@@ -6,7 +8,7 @@ using VRCVideoCacher.Utils;
 
 namespace VRCVideoCacher.ViewModels;
 
-public partial class MainWindowViewModel : ViewModelBase
+public partial class MainWindowViewModel : ViewModelBase, IDisposable
 {
     [ObservableProperty]
     private ViewModelBase _currentView;
@@ -34,26 +36,39 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private GitHubRelease? _pendingRelease;
 
-    public DashboardViewModel Dashboard { get; }
-    public SettingsViewModel Settings { get; }
-    public CookiesViewModel Cookies { get; }
-    public CacheBrowserViewModel CacheBrowser { get; }
-    public DownloadQueueViewModel DownloadQueue { get; }
-    public LogViewerViewModel LogViewer { get; }
-    public HistoryViewModel History { get; }
-    public AboutViewModel About { get; }
+    // Built on first navigation rather than up front. All nine used to be constructed in
+    // this constructor, on the UI thread, before the first frame was ever drawn — each one
+    // querying the database, scanning the cache directory or reading config. Only the
+    // dashboard is needed to show the window.
+    //
+    // The window binds CurrentView and picks the view by DataTemplate on type, so nothing
+    // in XAML touches these properties; only the navigation commands do.
+    private readonly Lazy<DashboardViewModel> _dashboard = new(() => new DashboardViewModel());
+    private readonly Lazy<NowPlayingViewModel> _nowPlaying = new(() => new NowPlayingViewModel());
+    private readonly Lazy<ActiveConnectionsViewModel> _activeConnections = new(() => new ActiveConnectionsViewModel());
+    private readonly Lazy<RulesViewModel> _rules = new(() => new RulesViewModel());
+    private readonly Lazy<SettingsViewModel> _settings = new(() => new SettingsViewModel());
+    private readonly Lazy<CookiesViewModel> _cookies = new(() => new CookiesViewModel());
+    private readonly Lazy<CacheBrowserViewModel> _cacheBrowser = new(() => new CacheBrowserViewModel());
+    private readonly Lazy<DownloadQueueViewModel> _downloadQueue = new(() => new DownloadQueueViewModel());
+    private readonly Lazy<LogViewerViewModel> _logViewer = new(() => new LogViewerViewModel());
+    private readonly Lazy<HistoryViewModel> _history = new(() => new HistoryViewModel());
+    private readonly Lazy<AboutViewModel> _about = new(() => new AboutViewModel());
+
+    public DashboardViewModel Dashboard => _dashboard.Value;
+    public NowPlayingViewModel NowPlaying => _nowPlaying.Value;
+    public ActiveConnectionsViewModel ActiveConnections => _activeConnections.Value;
+    public RulesViewModel Rules => _rules.Value;
+    public SettingsViewModel Settings => _settings.Value;
+    public CookiesViewModel Cookies => _cookies.Value;
+    public CacheBrowserViewModel CacheBrowser => _cacheBrowser.Value;
+    public DownloadQueueViewModel DownloadQueue => _downloadQueue.Value;
+    public LogViewerViewModel LogViewer => _logViewer.Value;
+    public HistoryViewModel History => _history.Value;
+    public AboutViewModel About => _about.Value;
 
     public MainWindowViewModel()
     {
-        Dashboard = new DashboardViewModel();
-        Settings = new SettingsViewModel();
-        Cookies = new CookiesViewModel();
-        CacheBrowser = new CacheBrowserViewModel();
-        DownloadQueue = new DownloadQueueViewModel();
-        LogViewer = new LogViewerViewModel();
-        History = new HistoryViewModel();
-        About = new AboutViewModel();
-
         _currentView = Dashboard;
 
         // Subscribe to cache changes for status bar
@@ -80,43 +95,63 @@ public partial class MainWindowViewModel : ViewModelBase
         }
     }
 
-    private static string FormatSize(long bytes)
+    // Second copy of this lived here; CacheStats.FormatSize is the one covered by tests.
+    private static string FormatSize(long bytes) => Utils.CacheStats.FormatSize(bytes);
+
+    private async Task NavigateToAsync(ViewModelBase targetView)
     {
-        string[] suffixes = ["B", "KB", "MB", "GB", "TB"];
-        if (bytes == 0) return "0 B";
-        var mag = Math.Min((int)Math.Log(bytes, 1024), suffixes.Length - 1);
-        var adjustedSize = bytes / Math.Pow(1024, mag);
-        return $"{adjustedSize:N2} {suffixes[mag]}";
+        if (CurrentView == targetView) return;
+
+        // Guard on IsValueCreated first: reading the Rules property would construct the
+        // view model purely to ask whether it has unsaved changes, which defeats the point
+        // of deferring it.
+        if (_rules.IsValueCreated && ReferenceEquals(CurrentView, _rules.Value) && _rules.Value.HasChanges)
+        {
+            var lifetime = Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime;
+            var parentWindow = lifetime?.MainWindow;
+            await _rules.Value.CheckUnsavedChangesAsync(parentWindow);
+        }
+
+        CurrentView = targetView;
     }
 
     [RelayCommand]
-    private void NavigateToDashboard() => CurrentView = Dashboard;
+    private async Task NavigateToDashboard() => await NavigateToAsync(Dashboard);
 
     [RelayCommand]
-    private void NavigateToSettings() => CurrentView = Settings;
+    private async Task NavigateToNowPlaying() => await NavigateToAsync(NowPlaying);
 
     [RelayCommand]
-    private void NavigateToCacheBrowser() => CurrentView = CacheBrowser;
+    private async Task NavigateToActiveConnections() => await NavigateToAsync(ActiveConnections);
 
     [RelayCommand]
-    private void NavigateToDownloadQueue() => CurrentView = DownloadQueue;
+    private async Task NavigateToRules() => await NavigateToAsync(Rules);
 
     [RelayCommand]
-    private void NavigateToCookies() => CurrentView = Cookies;
+    private async Task NavigateToSettings() => await NavigateToAsync(Settings);
 
     [RelayCommand]
-    private void NavigateToLogViewer() => CurrentView = LogViewer;
+    private async Task NavigateToCacheBrowser() => await NavigateToAsync(CacheBrowser);
 
     [RelayCommand]
-    private void NavigateToHistory() => CurrentView = History;
+    private async Task NavigateToDownloadQueue() => await NavigateToAsync(DownloadQueue);
 
     [RelayCommand]
-    public void NavigateToAbout() => CurrentView = About;
+    private async Task NavigateToCookies() => await NavigateToAsync(Cookies);
+
+    [RelayCommand]
+    private async Task NavigateToLogViewer() => await NavigateToAsync(LogViewer);
+
+    [RelayCommand]
+    private async Task NavigateToHistory() => await NavigateToAsync(History);
+
+    [RelayCommand]
+    public async Task NavigateToAbout() => await NavigateToAsync(About);
 
     public void ShowUpdate(UpdateInfo info)
     {
         _pendingRelease = info.Release;
-        UpdateVersionText = $"Version {info.Version} is available!";
+        UpdateVersionText = string.Format(Localizer.Get("UpdateAvailable"), info.Version);
         IsUpdateAvailable = true;
     }
 
@@ -125,14 +160,14 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         if (_pendingRelease == null) return;
         IsUpdatePending = true;
-        UpdateVersionText = "Downloading update...";
+        UpdateVersionText = Localizer.Get("UpdateDownloading");
         // ApplyUpdate exits the process on success, so the failure message only shows
         // when the swap or download legitimately failed.
         var ok = await Updater.ApplyUpdate(_pendingRelease);
         if (!ok)
         {
             IsUpdatePending = false;
-            UpdateVersionText = "Update failed. Check logs and try again.";
+            UpdateVersionText = Localizer.Get("UpdateFailed");
         }
     }
 
@@ -145,17 +180,28 @@ public partial class MainWindowViewModel : ViewModelBase
     [RelayCommand]
     private void OpenReleasesPage()
     {
-        var url = _pendingRelease?.html_url
-                  ?? "https://github.com/codeyumx/VRCVideoCacherPlus/releases/latest";
-        try
-        {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = url,
-                UseShellExecute = true
-            });
-        }
-        catch { /* ignore — best effort */ }
+        // Through OpenUrl rather than Process.Start: html_url comes from the GitHub API
+        // response, and OpenUrl is what enforces the http/https allowlist. Handing an
+        // arbitrary string to ShellExecute does not.
+        OpenUrl.Open(_pendingRelease?.html_url ?? Program.LatestReleaseUrl);
+    }
+
+    /// <summary>
+    /// Disposes the tab view models that own background work. Several of them implement
+    /// IDisposable and start timers or polling loops in their constructors; nothing used to
+    /// call this, so those kept running for the life of the process once their tab had been
+    /// opened even once.
+    /// </summary>
+    public void Dispose()
+    {
+        DisposeIfCreated(_activeConnections);
+        DisposeIfCreated(_nowPlaying);
+    }
+
+    private static void DisposeIfCreated<T>(Lazy<T> lazy) where T : class
+    {
+        if (lazy.IsValueCreated && lazy.Value is IDisposable disposable)
+            disposable.Dispose();
     }
 
     public void CheckDnsFailure()

@@ -7,7 +7,23 @@ namespace VRCVideoCacher.Utils;
 public class ElevatorManager
 {
     private static readonly ILogger Log = Program.Logger.ForContext<ElevatorManager>();
-    public static bool HasHostsLine = HostsManager.IsHostAdded();
+    // Reading /etc/hosts can throw (permissions, or the file simply being absent on a
+    // stripped-down system). A static field initialiser that throws surfaces as a
+    // TypeInitializationException from whatever first touched this class.
+    public static bool HasHostsLine = SafeIsHostAdded();
+
+    private static bool SafeIsHostAdded()
+    {
+        try
+        {
+            return HostsManager.IsHostAdded();
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Could not read the hosts file; assuming the entry is absent.");
+            return false;
+        }
+    }
 
     private static readonly bool InPressureVessel = Directory.Exists("/run/pressure-vessel");
 
@@ -35,23 +51,44 @@ public class ElevatorManager
         return null;
     }
 
-    private static Process? MakeLinuxElevatedProcess(string flag)
+    private static Process? MakeLinuxElevatedProcess(params string[] flags)
     {
         var launchClient = InPressureVessel ? FindLaunchClient() : null;
         Log.Debug("InPressureVessel={InPressureVessel} launch-client={LC}", InPressureVessel, launchClient ?? "n/a");
 
         string appPath = Environment.ProcessPath!;
 
-        ProcessStartInfo MakeStartInfo(string exe, string args) => launchClient != null
-            ? new ProcessStartInfo { FileName = launchClient, Arguments = $"--alongside-steam -- {exe} {args}", UseShellExecute = false }
-            : new ProcessStartInfo { FileName = exe, Arguments = args, UseShellExecute = false };
+        // ArgumentList rather than a formatted command line: appPath is an install location
+        // that routinely contains spaces (a Steam library on an external drive, say), and
+        // interpolating it unquoted split it into two arguments — so the elevated command
+        // either failed or, worse, ran against a truncated path.
+        ProcessStartInfo MakeStartInfo(string exe, string[] args)
+        {
+            var psi = new ProcessStartInfo { UseShellExecute = false };
+            if (launchClient != null)
+            {
+                psi.FileName = launchClient;
+                psi.ArgumentList.Add("--alongside-steam");
+                psi.ArgumentList.Add("--");
+                psi.ArgumentList.Add(exe);
+            }
+            else
+            {
+                psi.FileName = exe;
+            }
+
+            foreach (var arg in args)
+                psi.ArgumentList.Add(arg);
+
+            return psi;
+        }
 
         // 1. Try pkexec
         var pkexec = FindHostBin("pkexec");
         if (pkexec != null)
         {
             Log.Debug("Using pkexec");
-            return new Process { StartInfo = MakeStartInfo(pkexec, $"{appPath} {flag}") };
+            return new Process { StartInfo = MakeStartInfo(pkexec, [appPath, .. flags]) };
         }
 
         // 2. Try sudo -A with a graphical askpass helper
@@ -67,7 +104,7 @@ public class ElevatorManager
             var check = InPressureVessel ? $"/run/host{askpass}" : askpass;
             if (!File.Exists(check)) continue;
             Log.Debug("Using sudo -A with askpass: {Askpass}", askpass);
-            var psi = MakeStartInfo("/usr/bin/sudo", $"-A {appPath} {flag}");
+            var psi = MakeStartInfo("/usr/bin/sudo", ["-A", appPath, .. flags]);
             psi.Environment["SUDO_ASKPASS"] = askpass;
             return new Process { StartInfo = psi };
         }
@@ -79,25 +116,81 @@ public class ElevatorManager
             var termPath = FindHostBin(term);
             if (termPath == null) continue;
             Log.Debug("Using terminal {Term} with sudo", termPath);
-            var termArgs = termPath.Contains("gnome-terminal")
-                ? $"-- /usr/bin/sudo {appPath} {flag}"
-                : $"-e /usr/bin/sudo {appPath} {flag}";
-            return new Process { StartInfo = MakeStartInfo(termPath, termArgs) };
+            // gnome-terminal wants "-- cmd args", the others "-e cmd args".
+            var termFlag = termPath.Contains("gnome-terminal") ? "--" : "-e";
+            return new Process { StartInfo = MakeStartInfo(termPath, [termFlag, "/usr/bin/sudo", appPath, .. flags]) };
         }
 
-        Log.Error("No elevation method found. Please manually edit /etc/hosts.");
+        Log.Error("No elevation method found (tried pkexec, sudo with a graphical askpass, and a terminal).");
         return null;
     }
 
-    public static void ToggleHostLine()
+    /// <summary>
+    /// Result of asking the system for elevation and running ourselves with <paramref name="argument"/>.
+    /// </summary>
+    /// <returns>
+    /// The helper's exit code, or null when elevation was unavailable or the user dismissed
+    /// the prompt — those are not failures of the operation, they are the user declining it.
+    /// </returns>
+    public static async Task<int?> RunElevatedSelfAsync(string argument)
     {
-        if (HasHostsLine)
-            RemoveHostFile();
+        Process? proc;
+        if (OperatingSystem.IsWindows())
+        {
+            proc = new Process
+            {
+                StartInfo = { FileName = Environment.ProcessPath, Arguments = argument, UseShellExecute = true, Verb = "runas" }
+            };
+            try
+            {
+                proc.Start();
+            }
+            catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
+            {
+                Log.Information("User cancelled the UAC prompt.");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Failed to launch elevated helper.");
+                return null;
+            }
+        }
         else
-            AddHostFile();
+        {
+            proc = MakeLinuxElevatedProcess(argument);
+            if (proc == null)
+                return null;
+
+            try
+            {
+                proc.Start();
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Failed to launch privilege elevator.");
+                return null;
+            }
+        }
+
+        using (proc)
+        {
+            await proc.WaitForExitAsync();
+            return proc.ExitCode;
+        }
     }
 
-    private static void AddHostFile()
+    /// <summary>
+    /// Adds or removes the hosts entry, elevating as required.
+    ///
+    /// Async because the elevation prompt is modal to the *system*, not to us: the previous
+    /// synchronous WaitForExit ran on the UI thread, so the whole window froze — no repaint,
+    /// no tray, no response — for as long as the UAC or polkit dialog stayed open.
+    /// </summary>
+    public static Task ToggleHostLineAsync() =>
+        HasHostsLine ? RemoveHostFileAsync() : AddHostFileAsync();
+
+    private static async Task AddHostFileAsync()
     {
         Process? proc;
         if (OperatingSystem.IsWindows())
@@ -122,7 +215,7 @@ public class ElevatorManager
             }
         }
 
-        proc.WaitForExit();
+        await proc.WaitForExitAsync();
 
         if (HostsManager.IsHostAdded())
         {
@@ -138,7 +231,7 @@ public class ElevatorManager
         }
     }
 
-    private static void RemoveHostFile()
+    private static async Task RemoveHostFileAsync()
     {
         Process? proc;
         if (OperatingSystem.IsWindows())
@@ -163,7 +256,7 @@ public class ElevatorManager
             }
         }
 
-        proc.WaitForExit();
+        await proc.WaitForExitAsync();
 
         if (!HostsManager.IsHostAdded())
         {

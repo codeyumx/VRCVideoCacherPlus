@@ -48,6 +48,18 @@
                              IsVisible="{Binding IsDownloading}"
                              Foreground="#1a73e8" Background="#444"/>
 
+                <!-- Percentage on the left, rate and time remaining on the right. Hidden
+                     entirely when neither is known rather than showing a placeholder. -->
+                <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding IsDownloading}">
+                    <TextBlock Grid.Column="0"
+                               Text="{Binding DownloadProgress, StringFormat={}{0:F1}%}"
+                               Foreground="#888888" FontSize="12"/>
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding DownloadRateText}"
+                               HorizontalAlignment="Right"
+                               Foreground="#888888" FontSize="12"/>
+                </Grid>
+
                 <TextBlock Text="{l:Localize NoActiveDownload}"
                            IsVisible="{Binding CurrentDownload, Converter={x:Static ObjectConverters.IsNull}}"
                            Foreground="#888888"/>

@@ -21,10 +21,27 @@ public class VideoDownloader
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) " +
         "Chrome/124.0.0.0 Safari/537.36";
 
-    private static readonly HttpClient HttpClient = new()
+    // A cache download is an arbitrarily large file over an arbitrarily slow link, so the
+    // operation as a whole must not be time-boxed. HttpClient.Timeout covers reading the
+    // body as well as the headers even with ResponseHeadersRead, so the 100s default was
+    // cancelling any transfer that ran longer than that. Liveness is enforced per-read
+    // instead, via the stall watchdog in CopyWithStallGuardAsync.
+    private static readonly HttpClient HttpClient = new(new SocketsHttpHandler
     {
-        DefaultRequestHeaders = { { "User-Agent", DownloadUserAgent } }
+        PooledConnectionLifetime = TimeSpan.FromMinutes(2),
+        ConnectTimeout = TimeSpan.FromSeconds(30),
+        // Downloads whatever URL the resolver settled on, which ultimately came from a
+        // world; same address guard as the probe path.
+        ConnectCallback = Utils.UrlPolicy.GuardedConnectAsync,
+    })
+    {
+        DefaultRequestHeaders = { { "User-Agent", DownloadUserAgent } },
+        Timeout = Timeout.InfiniteTimeSpan
     };
+
+    // How long a transfer may deliver no bytes at all before we give up on it. Generous
+    // enough to survive a CDN hiccup, short enough that a dead socket can't wedge the queue.
+    private static readonly TimeSpan StallTimeout = TimeSpan.FromSeconds(60);
 
     // Per-videoId temp paths so a leftover from one download can never be glued onto
     // a different video's resume request. Format: _tempVideo.<videoId>.<ext>
@@ -39,7 +56,8 @@ public class VideoDownloader
     public static event Action<VideoInfo, bool, string?>? OnDownloadCompleted;
     public static event Action<VideoInfo>? OnDownloadPaused;
     public static event Action? OnQueueChanged;
-    public static event Action<double>? OnDownloadProgress; // 0.0 to 100.0
+    // Percent, plus transfer rate and time remaining where they are known.
+    public static event Action<DownloadProgress>? OnDownloadProgress;
 
     // Current state (read from UI thread via Get* methods — volatile for cross-thread visibility)
     private static volatile VideoInfo? _currentDownload;
@@ -53,10 +71,25 @@ public class VideoDownloader
     private static Process? _currentProcess;
     private static CancellationTokenSource? _downloadCts;
 
+    private static int _started;
+
     static VideoDownloader()
     {
         SweepStaleTempFiles();
         ActiveStreamTracker.OnStreamingActivity += OnStreamingActivity;
+    }
+
+    /// <summary>
+    /// Starts the download loop. Called once from startup rather than from the static
+    /// constructor: a type initialiser that spawns a background worker means merely
+    /// subscribing to one of the events on this class — which the dashboard view model does
+    /// while building the UI — silently starts the queue running.
+    /// </summary>
+    public static void Start()
+    {
+        if (Interlocked.Exchange(ref _started, 1) == 1)
+            return;
+
         Task.Run(DownloadThread);
     }
 
@@ -95,9 +128,18 @@ public class VideoDownloader
 
     private static async Task DownloadThread()
     {
-        while (true)
+        var shutdown = Program.ShutdownToken;
+
+        while (!shutdown.IsCancellationRequested)
         {
-            await Task.Delay(500);
+            try
+            {
+                await Task.Delay(500, shutdown);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
 
             var idleSeconds = PlusConfigManager.Config.CacheDownloadIdleSeconds;
 
@@ -344,7 +386,10 @@ public class VideoDownloader
 
         var rateLimitMBs = PlusConfigManager.Config.CacheDownloadRateLimitMBs;
         if (rateLimitMBs > 0)
-            args.Add($"--limit-rate {rateLimitMBs}M");
+        {
+            args.Add("--limit-rate");
+            args.Add($"{rateLimitMBs}M");
+        }
 
         using var process = new Process
         {
@@ -360,36 +405,46 @@ public class VideoDownloader
             }
         };
 
+        var evalResult = Services.RuleEngine.EvaluateUrl(videoInfo.VideoUrl);
+        var maxRes = evalResult.MaxResolution ?? 1080;
+
         if (videoInfo.DownloadFormat == DownloadFormat.Webm)
         {
             var audioArg = string.IsNullOrEmpty(ConfigManager.Config.YtdlpDubLanguage)
                 ? "+ba[acodec=opus][ext=webm]"
                 : $"+(ba[acodec=opus][ext=webm][language={ConfigManager.Config.YtdlpDubLanguage}]/ba[acodec=opus][ext=webm])";
-            args.Add($"-o \"{tempWebm}\"");
-            args.Add($"-f \"bv*[height<={ConfigManager.Config.CacheYouTubeMaxResolution}][vcodec~='^av01'][ext=mp4][dynamic_range='SDR']{audioArg}/bv*[height<={ConfigManager.Config.CacheYouTubeMaxResolution}][vcodec~='vp9'][ext=webm][dynamic_range='SDR']{audioArg}\"");
+            args.Add("-o");
+            args.Add(tempWebm);
+            args.Add("-f");
+            args.Add($"bv*[height<={maxRes}][vcodec~='^av01'][ext=mp4][dynamic_range='SDR']{audioArg}/bv*[height<={maxRes}][vcodec~='vp9'][ext=webm][dynamic_range='SDR']{audioArg}");
         }
         else
         {
-            var maxRes = ConfigManager.Config.CacheYouTubeMaxResolution;
             var audioArgPotato = string.IsNullOrEmpty(ConfigManager.Config.YtdlpDubLanguage)
                 ? "+ba[ext=m4a]"
                 : $"+(ba[ext=m4a][language={ConfigManager.Config.YtdlpDubLanguage}]/ba[ext=m4a])";
-            args.Add($"-o \"{tempMp4}\"");
+            args.Add("-o");
+            args.Add(tempMp4);
+            args.Add("-f");
             if (PlusConfigManager.Config.CacheYouTubePreferVp9)
             {
                 // VP9+aac in mp4 — best compression, universal compatibility (20-50% smaller than h264)
-                args.Add($"-f \"bv*[height<={maxRes}][vcodec~='^vp9']{audioArgPotato}/bv*[height<={maxRes}][vcodec~='^(avc|h264)']{audioArgPotato}/bv*[height<={maxRes}][vcodec~='^av01'][dynamic_range='SDR']\"");
+                args.Add($"bv*[height<={maxRes}][vcodec~='^vp9']{audioArgPotato}/bv*[height<={maxRes}][vcodec~='^(avc|h264)']{audioArgPotato}/bv*[height<={maxRes}][vcodec~='^av01'][dynamic_range='SDR']");
             }
             else
             {
                 // h264+aac — fastest decode, widest hardware support
-                args.Add($"-f \"bv*[height<={maxRes}][vcodec~='^(avc|h264)']{audioArgPotato}/bv*[height<={maxRes}][vcodec~='^av01'][dynamic_range='SDR']\"");
+                args.Add($"bv*[height<={maxRes}][vcodec~='^(avc|h264)']{audioArgPotato}/bv*[height<={maxRes}][vcodec~='^av01'][dynamic_range='SDR']");
             }
-            args.Add("--remux-video mp4");
+            args.Add("--remux-video");
+            args.Add("mp4");
         }
 
-        process.StartInfo.Arguments = YtdlManager.GenerateYtdlArgs(args, $"-- \"{videoId}\"");
-        Log.Information("Downloading YouTube Video: {Args}", process.StartInfo.Arguments);
+        // "--" so a video id starting with a dash can never be read as a flag.
+        var arguments = YtdlManager.GenerateYtdlArgs(args, ["--", videoId]);
+        foreach (var argument in arguments)
+            process.StartInfo.ArgumentList.Add(argument);
+        Log.Information("Downloading YouTube Video: {Args}", string.Join(' ', arguments));
 
         lock (StateLock) { _currentProcess = process; }
 
@@ -447,7 +502,11 @@ public class VideoDownloader
             Log.Error("Failed to download YouTube Video: {exitCode} {URL} {error}", process.ExitCode, url, error);
             return (false, $"yt-dlp exited with code {process.ExitCode}");
         }
-        Thread.Sleep(100);
+
+        // Let yt-dlp's final rename settle before looking for the output file. Was
+        // Thread.Sleep, which blocks a thread-pool thread for no reason in an async method
+        // — the sibling HLS path already used Task.Delay here.
+        await Task.Delay(100);
 
         var fileName = $"{videoId}.{videoInfo.DownloadFormat.ToString().ToLower()}";
         var filePath = Path.Join(CacheManager.CachePath, fileName);
@@ -477,46 +536,119 @@ public class VideoDownloader
             return (false, "SkipReasonInvalidDownload");
         }
 
-        File.Move(sourceTemp, filePath, overwrite: true);
-        CacheManager.AddToCache(fileName);
+        // Pinned across the publish so AddToCache's own size-budget flush cannot evict the
+        // file it was just told about.
+        using (CacheManager.PinFile(fileName))
+        {
+            File.Move(sourceTemp, filePath, overwrite: true);
+            CacheManager.AddToCache(fileName);
+        }
         Log.Information("YouTube Video Downloaded: {URL}", $"{ConfigManager.Config.YtdlpWebServerUrl}/{fileName}");
         return (true, null);
     }
 
     private static void ParseYtdlpProgress(string line)
     {
-        // yt-dlp progress lines look like: [download]  45.2% of 12.34MiB at 1.23MiB/s
-        if (!line.Contains('%')) return;
-        var idx = line.IndexOf('%');
-        if (idx < 1) return;
-        // Walk backwards to find the start of the number
-        var start = idx - 1;
-        while (start > 0 && (char.IsDigit(line[start - 1]) || line[start - 1] == '.'))
-            start--;
-        if (double.TryParse(line[start..idx], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var percent))
-            OnDownloadProgress?.Invoke(percent);
+        // yt-dlp reports rate and ETA itself, and it sees every byte — it writes the file.
+        // Taking its numbers beats re-deriving them from the lines we happen to sample.
+        if (YtdlpProgressParser.TryParse(line, out var progress))
+            OnDownloadProgress?.Invoke(progress);
     }
 
-    private static async Task ThrottledCopyAsync(Stream source, Stream destination, long bytesPerSecond, long totalBytes, CancellationToken ct)
+    /// <summary>
+    /// Copies the response body to disk, optionally rate-limited, under a stall watchdog.
+    /// The deadline is pushed forward on every read, so a transfer that keeps making
+    /// progress runs as long as it needs to while one that goes silent for
+    /// <see cref="StallTimeout"/> is cancelled. HttpClient.Timeout is disabled for this
+    /// client, so this is the only thing between a dead socket and a wedged queue.
+    /// </summary>
+    /// <param name="bytesPerSecond">Rate limit, or 0 for unlimited.</param>
+    /// <param name="totalBytes">Expected final size on disk, including any resumed prefix.</param>
+    /// <param name="alreadyOnDisk">
+    /// Bytes already present from a previous attempt. Progress is reported against the file
+    /// as a whole, so this has to be counted: without it a download resuming at 90% restarted
+    /// its progress bar from 0 and crept back up, which reads as the transfer having reset.
+    /// </param>
+    private static async Task CopyWithStallGuardAsync(
+        Stream source, Stream destination, long bytesPerSecond, long totalBytes, long alreadyOnDisk, CancellationTokenSource cts)
     {
         var buffer = new byte[81920];
         var stopwatch = Stopwatch.StartNew();
         long totalBytesRead = 0;
+        var lastReportedPercent = -1.0;
 
-        int bytesRead;
-        while ((bytesRead = await source.ReadAsync(buffer, ct)) > 0)
+        // Rate is sampled over a moving window and smoothed, rather than averaged across the
+        // whole transfer: an average is dominated by however the connection behaved at the
+        // start, so the estimate stops responding to what is happening now.
+        var lastSampleAt = TimeSpan.Zero;
+        long lastSampleBytes = 0;
+        double? smoothedRate = null;
+
+        while (true)
         {
-            await destination.WriteAsync(buffer.AsMemory(0, bytesRead), ct);
+            cts.CancelAfter(StallTimeout);
+            var bytesRead = await source.ReadAsync(buffer, cts.Token);
+            if (bytesRead <= 0)
+                break;
+
+            await destination.WriteAsync(buffer.AsMemory(0, bytesRead), cts.Token);
             totalBytesRead += bytesRead;
 
+            var elapsed = stopwatch.Elapsed;
+            var windowSeconds = (elapsed - lastSampleAt).TotalSeconds;
+            if (windowSeconds >= 0.5)
+            {
+                var windowRate = (totalBytesRead - lastSampleBytes) / windowSeconds;
+                smoothedRate = smoothedRate is null ? windowRate : (smoothedRate * 0.7) + (windowRate * 0.3);
+                lastSampleAt = elapsed;
+                lastSampleBytes = totalBytesRead;
+            }
+
             if (totalBytes > 0)
-                OnDownloadProgress?.Invoke((double)totalBytesRead / totalBytes * 100.0);
+            {
+                // Only raise the event when the rounded percentage actually moves: this
+                // fired once per 80 KiB chunk, so a large file pushed thousands of
+                // redundant updates at the UI thread.
+                var percent = Math.Round((alreadyOnDisk + totalBytesRead) / (double)totalBytes * 100.0, 1);
+                if (percent > lastReportedPercent)
+                {
+                    lastReportedPercent = percent;
+
+                    TimeSpan? eta = null;
+                    if (smoothedRate is > 0)
+                    {
+                        var remaining = totalBytes - (alreadyOnDisk + totalBytesRead);
+                        if (remaining > 0)
+                            eta = TimeSpan.FromSeconds(remaining / smoothedRate.Value);
+                    }
+
+                    OnDownloadProgress?.Invoke(new DownloadProgress(percent, smoothedRate, eta));
+                }
+            }
+
+            if (bytesPerSecond <= 0)
+                continue;
 
             var expectedMs = (double)totalBytesRead / bytesPerSecond * 1000;
             var elapsedMs = stopwatch.Elapsed.TotalMilliseconds;
             if (elapsedMs < expectedMs)
-                await Task.Delay(TimeSpan.FromMilliseconds(expectedMs - elapsedMs), ct);
+                await Task.Delay(TimeSpan.FromMilliseconds(expectedMs - elapsedMs), cts.Token);
         }
+
+        // Disarm, so the validation and move that follow can't trip the watchdog.
+        cts.CancelAfter(Timeout.InfiniteTimeSpan);
+    }
+
+    // A cancelled transfer is either the user's pause — which the caller reports as a pause,
+    // with no error — or the stall watchdog firing, which is a genuine failure and needs to
+    // reach the queue's status line instead of masquerading as a pause.
+    private static (bool Success, string? FailReason) CancelledOutcome(string url)
+    {
+        if (_pauseRequested)
+            return (false, null);
+
+        Log.Warning("Download for {URL} stalled for {Seconds}s with no data; giving up.", url, StallTimeout.TotalSeconds);
+        return (false, "SkipReasonStalled");
     }
 
 
@@ -554,10 +686,14 @@ public class VideoDownloader
             request.Headers.Add("Accept", "video/*");
             if (resumeFrom > 0)
                 request.Headers.Range = new RangeHeaderValue(resumeFrom, null);
-            
+
+            // Arm the watchdog for the headers too: ConnectTimeout only covers the TCP
+            // handshake, so a server that accepts and then says nothing would hang here.
+            cts.CancelAfter(StallTimeout);
             response = await HttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token);
+            cts.CancelAfter(Timeout.InfiniteTimeSpan);
         }
-        catch (OperationCanceledException) { return (false, null); }
+        catch (OperationCanceledException) { return CancelledOutcome(url); }
         catch (HttpRequestException ex)
         {
             Log.Error(ex, "Failed to start download for {URL}", url);
@@ -566,65 +702,63 @@ public class VideoDownloader
 
         // HttpClient follows redirects automatically by default; manual handling is unnecessary.
 
-        // 416 = server says our range is beyond the file — treat as already complete
         long expectedTotalBytes = 0;
         string? responseContentType = null;
-        if (response.StatusCode != HttpStatusCode.RequestedRangeNotSatisfiable)
+
+        // Scoped `using` rather than a Dispose call on each of the six exit paths — one of
+        // which had to be added every time a new early return appeared.
+        using (response)
         {
-            if (!response.IsSuccessStatusCode && response.StatusCode != HttpStatusCode.PartialContent)
+            // 416 = server says our range is beyond the file — treat as already complete
+            if (response.StatusCode != HttpStatusCode.RequestedRangeNotSatisfiable)
             {
-                Log.Warning("Failed to download video: {URL} {Status}", url, response.StatusCode);
-                response.Dispose();
-                return (false, $"HTTP {(int)response.StatusCode}");
-            }
+                if (!response.IsSuccessStatusCode && response.StatusCode != HttpStatusCode.PartialContent)
+                {
+                    Log.Warning("Failed to download video: {URL} {Status}", url, response.StatusCode);
+                    return (false, $"HTTP {(int)response.StatusCode}");
+                }
 
-            // Reject obvious non-video bodies (HTML error pages, JSON errors served as 200, etc.)
-            // before they ever hit disk. The magic-byte check after download catches the rest.
-            responseContentType = response.Content.Headers.ContentType?.MediaType;
-            if (!VideoFileValidator.IsAcceptableContentType(responseContentType))
-            {
-                Log.Warning("Skipping cache for {URL}: unexpected Content-Type {Ct}", url, responseContentType);
-                response.Dispose();
-                VideoFileValidator.TryDelete(tempMp4);
-                return (false, $"unexpected content-type {responseContentType}");
-            }
+                // Reject obvious non-video bodies (HTML error pages, JSON errors served as 200, etc.)
+                // before they ever hit disk. The magic-byte check after download catches the rest.
+                responseContentType = response.Content.Headers.ContentType?.MediaType;
+                if (!VideoFileValidator.IsAcceptableContentType(responseContentType))
+                {
+                    Log.Warning("Skipping cache for {URL}: unexpected Content-Type {Ct}", url, responseContentType);
+                    VideoFileValidator.TryDelete(tempMp4);
+                    return (false, $"unexpected content-type {responseContentType}");
+                }
 
-            var contentLength = response.Content.Headers.ContentLength ?? 0;
-            if (contentLength > 0)
-                expectedTotalBytes = resumeFrom + contentLength;
+                var contentLength = response.Content.Headers.ContentLength ?? 0;
+                if (contentLength > 0)
+                    expectedTotalBytes = resumeFrom + contentLength;
 
-            try
-            {
-                await using var stream = await response.Content.ReadAsStreamAsync(cts.Token);
-                var fileMode = resumeFrom > 0 ? FileMode.Append : FileMode.Create;
-                await using var fileStream = new FileStream(tempMp4, fileMode, FileAccess.Write, FileShare.None);
+                try
+                {
+                    await using var stream = await response.Content.ReadAsStreamAsync(cts.Token);
+                    var fileMode = resumeFrom > 0 ? FileMode.Append : FileMode.Create;
+                    await using var fileStream = new FileStream(tempMp4, fileMode, FileAccess.Write, FileShare.None);
 
-                var rateLimitMBs = PlusConfigManager.Config.CacheDownloadRateLimitMBs;
-                if (rateLimitMBs > 0)
-                    await ThrottledCopyAsync(stream, fileStream, rateLimitMBs * 1024L * 1024L, expectedTotalBytes, cts.Token);
-                else
-                    await stream.CopyToAsync(fileStream, cts.Token);
-            }
-            catch (OperationCanceledException)
-            {
-                response.Dispose();
-                return (false, null);
-            }
-            catch (IOException ex)
-            {
-                response.Dispose();
-                Log.Warning("Download stream failed for {URL}: {Err}", url, ex.Message);
-                return (false, "network error");
-            }
-            catch (HttpRequestException ex)
-            {
-                response.Dispose();
-                Log.Warning("Download stream failed for {URL}: {Err}", url, ex.Message);
-                return (false, "network error");
+                    var rateLimitMBs = PlusConfigManager.Config.CacheDownloadRateLimitMBs;
+                    var bytesPerSecond = rateLimitMBs > 0 ? rateLimitMBs * 1024L * 1024L : 0L;
+                    await CopyWithStallGuardAsync(stream, fileStream, bytesPerSecond, expectedTotalBytes, resumeFrom, cts);
+                }
+                catch (OperationCanceledException)
+                {
+                    return CancelledOutcome(url);
+                }
+                catch (IOException ex)
+                {
+                    Log.Warning("Download stream failed for {URL}: {Err}", url, ex.Message);
+                    return (false, "network error");
+                }
+                catch (HttpRequestException ex)
+                {
+                    Log.Warning("Download stream failed for {URL}: {Err}", url, ex.Message);
+                    return (false, "network error");
+                }
             }
         }
 
-        response.Dispose();
         await Task.Delay(10);
 
         var fileName = $"{videoInfo.VideoId}.{videoInfo.DownloadFormat.ToString().ToLower()}";
@@ -668,8 +802,11 @@ public class VideoDownloader
             return (false, "SkipReasonInvalidDownload");
         }
 
-        File.Move(tempMp4, filePath, overwrite: true);
-        CacheManager.AddToCache(fileName);
+        using (CacheManager.PinFile(fileName))
+        {
+            File.Move(tempMp4, filePath, overwrite: true);
+            CacheManager.AddToCache(fileName);
+        }
         Log.Information("Video Downloaded: {URL}", $"{ConfigManager.Config.YtdlpWebServerUrl}/{fileName}");
         return (true, null);
     }
@@ -692,20 +829,23 @@ public class VideoDownloader
         var args = new List<string>
         {
             "--newline",
-            $"-o \"{tempMp4}\"",
-            "--remux-video mp4",
+            "-o", tempMp4,
+            "--remux-video", "mp4",
             // Let yt-dlp pick native vs. ffmpeg HLS downloader — native chokes on
             // fMP4/CMAF (#EXT-X-MAP) playlists, ffmpeg handles those.
-            "--concurrent-fragments 4",
+            "--concurrent-fragments", "4",
             // CDN segment fetches can be flaky; retry the manifest a few times and
             // each individual segment more aggressively before giving up.
-            "--retries 3",
-            "--fragment-retries 5"
+            "--retries", "3",
+            "--fragment-retries", "5"
         };
 
         var rateLimitMBs = PlusConfigManager.Config.CacheDownloadRateLimitMBs;
         if (rateLimitMBs > 0)
-            args.Add($"--limit-rate {rateLimitMBs}M");
+        {
+            args.Add("--limit-rate");
+            args.Add($"{rateLimitMBs}M");
+        }
 
         using var process = new Process
         {
@@ -721,8 +861,10 @@ public class VideoDownloader
             },
         };
 
-        process.StartInfo.Arguments = YtdlManager.GenerateYtdlArgs(args, $"\"{videoInfo.VideoUrl}\"");
-        Log.Information("Downloading HLS Video: {Args}", process.StartInfo.Arguments);
+        var arguments = YtdlManager.GenerateYtdlArgs(args, ["--", videoInfo.VideoUrl]);
+        foreach (var argument in arguments)
+            process.StartInfo.ArgumentList.Add(argument);
+        Log.Information("Downloading HLS Video: {Args}", string.Join(' ', arguments));
 
         lock (StateLock) { _currentProcess = process; }
 
@@ -782,8 +924,11 @@ public class VideoDownloader
             return (false, "SkipReasonInvalidDownload");
         }
 
-        File.Move(tempMp4, filePath, overwrite: true);
-        CacheManager.AddToCache(fileName);
+        using (CacheManager.PinFile(fileName))
+        {
+            File.Move(tempMp4, filePath, overwrite: true);
+            CacheManager.AddToCache(fileName);
+        }
         Log.Information("HLS Video Downloaded: {URL}", $"{ConfigManager.Config.YtdlpWebServerUrl}/{fileName}");
 
         // HLS has no remote thumbnail source — extract a frame from the cached MP4 so

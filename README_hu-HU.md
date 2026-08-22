@@ -18,13 +18,13 @@ A VRCVideoCacherPlus bővítmények alfa állapotúak és teszteletlenek — hag
 A VRCVideoCacherPlus segít a VRChat videók lejátszásában. A YouTube néha blokkolja vagy fojtja a videókat, ha a felhasználó kliense nem ad meg cookie-kat. Ez az alkalmazás átadja a YouTube-nak a cookie-kat, miközben VRChatezel, így a videók simán és nagy felbontásban játszódnak le. Az alkalmazás emellett intelligensen letölti a videókat, ha bekapcsolod ezt a beállítást, így a gyakran lejátszott videókat (pl. VRDancing) nem kell újra letölteni az internetről. Kezelheted a videó-gyorsítótárat, módosíthatod a háttérben futó letöltési sebességet, és késleltetheted a videó letöltését (hogy ne tölts le egyszerre két vagy több videófájlt).
 A VRCVideoCacherPlus a VRCVideoCacher-en alapul, és számos fejlesztést tartalmaz, mint például a HLS és a streaming lejátszási lista (.m3u8) videók támogatása.
 
-![Főképernyő](docs/screenshots/main-info.png)
+![Főképernyő](https://raw.githubusercontent.com/Bluscream/VRCVideoCacherPlusPlus/assets/main-info.png)
 *Főképernyő — állapot, gyorsítótár mérete és az alkalmazás aktuális tevékenysége.*
 
-![Letöltési sebesség és gyorsítótár-késleltetés beállításai](docs/screenshots/download-settings.png)
+![Letöltési sebesség és gyorsítótár-késleltetés beállításai](https://raw.githubusercontent.com/Bluscream/VRCVideoCacherPlusPlus/assets/download-settings.png)
 *Gyorsítótár-beállítások — korlátozd a háttérben futó letöltési sebességet, és késleltesd a letöltéseket, hogy ne versenyezzenek az éppen nézett videóval.*
 
-![Automatikus cookie-frissítés a béta bővítménnyel](docs/screenshots/cookie-refresh.png)
+![Automatikus cookie-frissítés a béta bővítménnyel](https://raw.githubusercontent.com/Bluscream/VRCVideoCacherPlusPlus/assets/cookie-refresh.png)
 *Cookie-k — a béta böngészőbővítmény az alkalmazás kérésére automatikusan frissítheti a YouTube cookie-jaidat.*
 
 ### Funkciók

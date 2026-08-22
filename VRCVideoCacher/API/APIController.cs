@@ -6,7 +6,8 @@ using VRCVideoCacher.Database;
 using VRCVideoCacher.Models;
 using VRCVideoCacher.Services;
 using VRCVideoCacher.YTDL;
-using VRCVideoCacher.YTDL.SiteHandlers.Sites;
+using VRCVideoCacher.Integrations;
+using VRCVideoCacher.Integrations.Hls;
 
 namespace VRCVideoCacher.API;
 
@@ -43,15 +44,6 @@ public class ApiController : WebApiController
         HttpContext.Request.Headers[NewExtensionHeader] == NewExtensionId;
 
     private static readonly Serilog.ILogger Log = Program.Logger.ForContext<ApiController>();
-    private static readonly HttpClient HttpClient = new(new SocketsHttpHandler
-    {
-        PooledConnectionLifetime = TimeSpan.FromMinutes(2),
-        ConnectTimeout = TimeSpan.FromSeconds(10),
-    })
-    {
-        DefaultRequestHeaders = { { "User-Agent", "VRCVideoCacher" } },
-        Timeout = TimeSpan.FromSeconds(30),
-    };
 
     // [OLD + NEW EXTENSION] CORS preflight for the youtube-cookies POST. Used by BOTH the
     // old/upstream (EllyVR) extension and the new one — do not gate this behind IsNewExtension.
@@ -60,6 +52,8 @@ public class ApiController : WebApiController
     // Without this OPTIONS handler the preflight is rejected and the extension never sends
     // cookies, regardless of which Chromium-based browser the user has the extension in.
     [Route(HttpVerbs.Options, "/youtube-cookies")]
+    [Route(HttpVerbs.Options, "/youtube-cookies/refresh-wait")]
+    [Route(HttpVerbs.Options, "/youtube-cookies/refresh-needed")]
     public Task ReceiveYoutubeCookiesOptions()
     {
         ApplyCorsHeaders();
@@ -145,14 +139,36 @@ public class ApiController : WebApiController
             Log.Warning("Config is NOT set to use cookies from browser extension.");
     }
 
+    // Origins that legitimately talk to the cookie endpoints: a YouTube page (where the
+    // extension's content script runs) or an extension context. Note that an extension
+    // holding host_permissions for localhost bypasses CORS entirely, so the extension
+    // schemes here are belt-and-braces for the ones that don't.
+    private static readonly string[] AllowedCookieOrigins =
+    [
+        "https://www.youtube.com",
+        "https://youtube.com",
+        "https://m.youtube.com",
+        "https://music.youtube.com",
+        "https://studio.youtube.com"
+    ];
+
+    private static bool IsAllowedCookieOrigin(string origin) =>
+        AllowedCookieOrigins.Contains(origin, StringComparer.OrdinalIgnoreCase) ||
+        origin.StartsWith("chrome-extension://", StringComparison.OrdinalIgnoreCase) ||
+        origin.StartsWith("moz-extension://", StringComparison.OrdinalIgnoreCase);
+
     private void ApplyCorsHeaders()
     {
         var requestOrigin = HttpContext.Request.Headers["Origin"] ?? string.Empty;
-        // Always echo back the origin so any browser visiting YouTube can reach us.
-        // The endpoint only accepts cookies and has no sensitive side-effects on GET,
-        // so broad CORS is intentional here.
-        if (!string.IsNullOrEmpty(requestOrigin))
-            HttpContext.Response.Headers["Access-Control-Allow-Origin"] = requestOrigin;
+
+        // Previously echoed back whatever Origin arrived, so any page the user happened to
+        // be visiting could POST a cookie file at us and overwrite the real one. Only the
+        // origins that actually host the extension are answered now.
+        if (string.IsNullOrEmpty(requestOrigin) || !IsAllowedCookieOrigin(requestOrigin))
+            return;
+
+        HttpContext.Response.Headers["Access-Control-Allow-Origin"] = requestOrigin;
+        HttpContext.Response.Headers["Vary"] = "Origin";
 
         // Required for Chromium's Private Network Access (PNA) policy: allows a
         // public origin (youtube.com) to POST to a private address (localhost).
@@ -173,11 +189,53 @@ public class ApiController : WebApiController
         return string.Join('\n', filtered);
     }
 
+    // An empty 200 means "nothing to resolve, play the URL as-is" — which is precisely what
+    // the Direct and bypass paths want, and precisely wrong for a block: the game happily
+    // plays a direct .mp4 without any help from us, so an empty body blocks nothing. Only a
+    // non-2xx makes yt-dlp-stub exit non-zero, which is the signal that actually stops
+    // playback. Callers that mean "bypass" must keep sending an empty 200.
+    private async Task SendBlockedAsync(string reason)
+    {
+        HttpContext.Response.StatusCode = 403;
+        await HttpContext.SendStringAsync(reason, "text/plain", Encoding.UTF8);
+    }
+
+    /// <summary>
+    /// The only legitimate caller of /getvideo is yt-dlp-stub, a plain HTTP client with no
+    /// browser context. A cross-origin GET from a web page needs no preflight, so without
+    /// this check any site the user visits could drive the resolver: make the application
+    /// fetch arbitrary URLs, queue downloads and write into the cache. It could not read
+    /// the responses, but it would not need to.
+    ///
+    /// Sec-Fetch-Site: none means the user typed the URL themselves, which is deliberate
+    /// and cannot be triggered by a third party, so that case is allowed through.
+    /// </summary>
+    private bool IsBrowserOriginatedRequest()
+    {
+        if (!string.IsNullOrEmpty(HttpContext.Request.Headers["Origin"]))
+            return true;
+
+        var fetchSite = HttpContext.Request.Headers["Sec-Fetch-Site"];
+        return !string.IsNullOrEmpty(fetchSite) &&
+               !string.Equals(fetchSite, "none", StringComparison.OrdinalIgnoreCase);
+    }
+
     [Route(HttpVerbs.Get, "/getvideo")]
     public async Task GetVideo()
     {
-        // escape double quotes for our own safety
-        var requestUrl = Request.QueryString["url"]?.Replace("\"", "%22").Trim();
+        if (IsBrowserOriginatedRequest())
+        {
+            Log.Warning("Rejecting browser-originated request to /getvideo.");
+            HttpContext.Response.StatusCode = 403;
+            await HttpContext.SendStringAsync("This endpoint is not callable from a browser.", "text/plain", Encoding.UTF8);
+            return;
+        }
+
+        // No quote-mangling here any more: yt-dlp arguments go through ArgumentList, so a
+        // quote in a URL can no longer break out of the command line. The old
+        // Replace("\"", "%22") was the single guard for the whole application and it also
+        // corrupted any URL that legitimately contained one.
+        var requestUrl = Request.QueryString["url"]?.Trim();
         var avPro = string.Compare(Request.QueryString["avpro"], "true", StringComparison.OrdinalIgnoreCase) == 0;
         var source = Request.QueryString["source"];
 
@@ -190,42 +248,40 @@ public class ApiController : WebApiController
 
         Log.Information("Request URL: {URL}", requestUrl);
 
-        if (requestUrl.StartsWith("https://eu2.vrdancing.club/weekend/") && ConfigManager.Config.RedirectVRDancing)
-        {
-            await HttpContext.SendStringAsync(requestUrl.Replace("eu2", "na2"), "text/plain", Encoding.UTF8);
-            return;
-        }
 
-        if (ConfigManager.Config.BlockedUrls.Any(blockedUrl => requestUrl.StartsWith(blockedUrl)))
-        {
-            Log.Warning("URL Is Blocked: {URL}", requestUrl);
-            requestUrl = ConfigManager.Config.BlockRedirect;
-        }
 
-        if (requestUrl.StartsWith("https://mightygymcdn.nyc3.cdn.digitaloceanspaces.com"))
+        // Evaluate URL against Rules Engine
+        var evalResult = RuleEngine.EvaluateUrl(requestUrl);
+        if (evalResult.MatchedRule != null)
         {
-            Log.Information("URL Is Mighty Gym: Bypassing.");
-            await HttpContext.SendStringAsync(string.Empty, "text/plain", Encoding.UTF8);
-            return;
-        }
+            Log.Information("Rule matched '{RuleName}' -> Action: {Action}, FinalURL: '{FinalUrl}'",
+                evalResult.MatchedRule.Name, evalResult.Action, evalResult.FinalUrl);
 
-        // pls no villager
-        if (requestUrl.StartsWith("https://anime.illumination.media"))
-            avPro = true;
-        else if (requestUrl.Contains(".imvrcdn.com") ||
-                 (requestUrl.Contains(".illumination.media") && !requestUrl.StartsWith("https://yt.illumination.media")))
-        {
-            Log.Information("URL Is Illumination media: Bypassing.");
-            await HttpContext.SendStringAsync(string.Empty, "text/plain", Encoding.UTF8);
-            return;
-        }
+            switch (evalResult.Action)
+            {
+                case RuleAction.Block:
+                    Log.Warning("URL blocked by rule '{RuleName}': {URL}", evalResult.MatchedRule.Name, requestUrl);
+                    await SendBlockedAsync($"Blocked by VRCVideoCacher rule '{evalResult.MatchedRule.Name}'.");
+                    return;
 
-        // bypass vfi - cinema
-        if (requestUrl.StartsWith("https://virtualfilm.institute"))
-        {
-            Log.Information("URL Is VFI - Cinema: Bypassing.");
-            await HttpContext.SendStringAsync(string.Empty, "text/plain", Encoding.UTF8);
-            return;
+                case RuleAction.Direct:
+                    ActiveStreamTracker.AssociateUrlInfo(evalResult.FinalUrl, requestUrl, requestUrl, null, null);
+                    Log.Information("URL set to Direct (bypass caching) by rule '{RuleName}': {URL}", evalResult.MatchedRule.Name, evalResult.FinalUrl);
+                    await HttpContext.SendStringAsync(string.Empty, "text/plain", Encoding.UTF8);
+                    return;
+
+                case RuleAction.Redirect:
+                    ActiveStreamTracker.AssociateUrlInfo(evalResult.RedirectUrl, requestUrl, requestUrl, null, null);
+                    Log.Information("URL redirected by rule '{RuleName}' to: {RedirectUrl}", evalResult.MatchedRule.Name, evalResult.RedirectUrl);
+                    await HttpContext.SendStringAsync(evalResult.RedirectUrl, "text/plain", Encoding.UTF8);
+                    return;
+
+                case RuleAction.Resolve:
+                case RuleAction.Rewrite:
+                default:
+                    requestUrl = evalResult.FinalUrl;
+                    break;
+            }
         }
 
         var videoInfo = await VideoId.GetVideoId(requestUrl, avPro);
@@ -235,6 +291,7 @@ public class ApiController : WebApiController
             return;
         }
         DatabaseManager.AddPlayHistory(videoInfo);
+        var dbCache = DatabaseManager.GetVideoInfoCache(videoInfo.VideoId);
 
         if (source == "resonite")
         {
@@ -246,9 +303,13 @@ public class ApiController : WebApiController
         var (isCached, filePath, fileName) = GetCachedFile(videoInfo.VideoId, avPro);
         if (isCached)
         {
-            File.SetLastWriteTimeUtc(filePath, DateTime.UtcNow);
+            // LRU bookkeeping only — the file may be open for serving or mid-eviction, and
+            // failing to stamp it is not a reason to fail the request.
+            try { File.SetLastWriteTimeUtc(filePath, DateTime.UtcNow); }
+            catch (Exception ex) { Log.Debug("Could not stamp {File}: {Err}", fileName, ex.Message); }
             DatabaseManager.UpdateVideoWatchStats(videoInfo.VideoId);
             var url = $"{ConfigManager.Config.YtdlpWebServerUrl}/{fileName}";
+            ActiveStreamTracker.AssociateUrlInfo(url, videoInfo.VideoUrl, dbCache?.Title ?? videoInfo.VideoUrl, videoInfo.VideoId, dbCache?.Duration);
             Log.Information("Responding with Cached URL: {URL}", url);
             await HttpContext.SendStringAsync(url, "text/plain", Encoding.UTF8);
             return;
@@ -256,6 +317,7 @@ public class ApiController : WebApiController
 
         if (string.IsNullOrEmpty(videoInfo.VideoId))
         {
+            ActiveStreamTracker.AssociateUrlInfo(videoInfo.VideoUrl, videoInfo.VideoUrl, dbCache?.Title ?? videoInfo.VideoUrl, videoInfo.VideoId, dbCache?.Duration);
             Log.Information("Failed to get Video ID: Bypassing.");
             await HttpContext.SendStringAsync(string.Empty, "text/plain", Encoding.UTF8);
             return;
@@ -263,6 +325,7 @@ public class ApiController : WebApiController
 
         if (ConfigManager.Config.CacheOnly)
         {
+            ActiveStreamTracker.AssociateUrlInfo(videoInfo.VideoUrl, videoInfo.VideoUrl, dbCache?.Title ?? videoInfo.VideoUrl, videoInfo.VideoId, dbCache?.Duration);
             Log.Information("Cache Only Mode Enabled: Bypassing.");
             await HttpContext.SendStringAsync(string.Empty, "text/plain", Encoding.UTF8);
             return;
@@ -273,9 +336,10 @@ public class ApiController : WebApiController
         // We still queue the download below so it gets cached in the background.
         if (videoInfo.UrlType == UrlType.Hls)
         {
+            var hlsDuration = DatabaseManager.GetVideoInfoCache(videoInfo.VideoId)?.Duration;
+            ActiveStreamTracker.AssociateUrlInfo(videoInfo.VideoUrl, videoInfo.VideoUrl, dbCache?.Title ?? videoInfo.VideoUrl, videoInfo.VideoId, hlsDuration);
             Log.Information("HLS URL: passing through without yt-dlp resolution.");
             await HttpContext.SendStringAsync(string.Empty, "text/plain", Encoding.UTF8);
-            var hlsDuration = DatabaseManager.GetVideoInfoCache(videoInfo.VideoId)?.Duration;
             ActiveStreamTracker.RecordActivity(videoInfo.VideoId, hlsDuration);
             if (ConfigManager.Config.CacheHlsPlaylists && IsHlsCacheable(videoInfo, hlsDuration))
                 VideoDownloader.QueueDownload(videoInfo);
@@ -296,8 +360,9 @@ public class ApiController : WebApiController
             response = string.Empty;
         }
 
+        // The StartsWith("https://manifest.googlevideo.com") that used to sit here was
+        // subsumed by the Contains check on the same line.
         if (videoInfo.UrlType == UrlType.YouTube ||
-            videoInfo.VideoUrl.StartsWith("https://manifest.googlevideo.com") ||
             videoInfo.VideoUrl.Contains("googlevideo.com"))
         {
             var isPrefetchSuccessful = await VideoTools.Prefetch(response, YoutubePrefetchMaxRetries);
@@ -311,6 +376,9 @@ public class ApiController : WebApiController
             }
         }
 
+        var cachedDuration = DatabaseManager.GetVideoInfoCache(videoInfo.VideoId)?.Duration;
+        var finalUrl = string.IsNullOrEmpty(response) ? videoInfo.VideoUrl : response;
+        ActiveStreamTracker.AssociateUrlInfo(finalUrl, videoInfo.VideoUrl, dbCache?.Title ?? videoInfo.VideoUrl, videoInfo.VideoId, cachedDuration);
         Log.Information("Responding with URL: {URL}", response);
         await HttpContext.SendStringAsync(response, "text/plain", Encoding.UTF8);
 
@@ -320,12 +388,10 @@ public class ApiController : WebApiController
 
         // Record activity immediately with whatever duration we already have cached,
         // so download deferral and queueing are never blocked by a slow yt-dlp call.
-        var cachedDuration = DatabaseManager.GetVideoInfoCache(videoInfo.VideoId)?.Duration;
         ActiveStreamTracker.RecordActivity(videoInfo.VideoId, cachedDuration);
 
-        // If we don't have duration yet for a YouTube video, fetch it in the background
-        // with a timeout so the tracker gets updated when it's available.
-        if (videoInfo.UrlType == UrlType.YouTube && cachedDuration is not > 0)
+        // Trigger background metadata resolution (fast oEmbed title & duration)
+        if (videoInfo.UrlType == UrlType.YouTube)
         {
             _ = Task.Run(async () =>
             {
@@ -350,10 +416,7 @@ public class ApiController : WebApiController
 
         // check if file is cached again to handle race condition
         (isCached, _, _) = GetCachedFile(videoInfo.VideoId, avPro);
-        if (!isCached && (
-                (videoInfo.UrlType == UrlType.YouTube && ConfigManager.Config.CacheYouTube) ||
-                (videoInfo.UrlType == UrlType.PyPyDance && ConfigManager.Config.CachePyPyDance) ||
-                (videoInfo.UrlType == UrlType.VRDancing && ConfigManager.Config.CacheVrDancing)))
+        if (!isCached && evalResult.MatchedRule?.Cache == true)
         {
             VideoDownloader.QueueDownload(videoInfo);
         }
@@ -365,7 +428,7 @@ public class ApiController : WebApiController
     // the equivalent "this is a complete video, not a live feed" signal.
     private static bool IsHlsCacheable(VideoInfo videoInfo, double? cachedDuration)
     {
-        var probe = HlsHandler.TryGetCachedProbe(videoInfo.VideoUrl);
+        var probe = HlsIntegration.TryGetCachedProbe(videoInfo.VideoUrl);
         if (probe is null)
         {
             Log.Information("HLS {VideoId}: skipping cache — probe result unavailable.", videoInfo.VideoId);

@@ -50,6 +50,14 @@ public partial class DownloadQueueViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isDownloading;
 
+    /// <summary>
+    /// "1.2 MB/s · 3m 20s left", or just the rate when no estimate is available, or empty
+    /// when neither is known yet. Deliberately blank rather than showing a placeholder:
+    /// early in a transfer yt-dlp genuinely reports "Unknown".
+    /// </summary>
+    [ObservableProperty]
+    private string _downloadRateText = string.Empty;
+
     public ObservableCollection<DownloadItemViewModel> QueuedDownloads { get; } = [];
 
     public DownloadQueueViewModel()
@@ -84,6 +92,7 @@ public partial class DownloadQueueViewModel : ViewModelBase
             };
             CurrentStatus = $"Downloading {CurrentDownload.DisplayTitle}...";
             DownloadProgress = 0;
+            DownloadRateText = string.Empty;
             IsDownloading = true;
             RefreshQueue();
         });
@@ -120,6 +129,7 @@ public partial class DownloadQueueViewModel : ViewModelBase
             else
                 StatusMessage = string.Format(Localizer.Get("DownloadFailed"), displayName);
             DownloadProgress = 0;
+            DownloadRateText = string.Empty;
             IsDownloading = false;
             RefreshQueue();
         });
@@ -127,17 +137,37 @@ public partial class DownloadQueueViewModel : ViewModelBase
 
     private DateTime _lastProgressUpdate;
 
-    private void OnDownloadProgressUpdate(double percent)
+    private void OnDownloadProgressUpdate(DownloadProgress progress)
     {
         var now = DateTime.UtcNow;
-        if ((now - _lastProgressUpdate).TotalMilliseconds < 250 && percent < 99.9)
+        if ((now - _lastProgressUpdate).TotalMilliseconds < 250 && progress.Percent < 99.9)
             return;
         _lastProgressUpdate = now;
 
+        var detail = FormatProgressDetail(progress);
+
         Dispatcher.UIThread.InvokeAsync(() =>
         {
-            DownloadProgress = percent;
+            DownloadProgress = progress.Percent;
+            DownloadRateText = detail;
         });
+    }
+
+    /// <summary>
+    /// Joins whichever of rate and time-remaining are actually known.
+    /// </summary>
+    private static string FormatProgressDetail(DownloadProgress progress)
+    {
+        var rate = progress.FormatRate();
+        var eta = progress.FormatEta();
+
+        if (eta != null)
+        {
+            var remaining = string.Format(Localizer.Get("DownloadTimeRemaining"), eta);
+            return rate != null ? $"{rate} · {remaining}" : remaining;
+        }
+
+        return rate ?? string.Empty;
     }
 
     private void OnDownloadPaused(VideoInfo video)

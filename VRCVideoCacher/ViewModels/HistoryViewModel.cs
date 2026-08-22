@@ -8,6 +8,7 @@ using VRCVideoCacher.Database;
 using VRCVideoCacher.Database.Models;
 using VRCVideoCacher.Models;
 using VRCVideoCacher.Services;
+using VRCVideoCacher.Integrations.YouTube;
 using VRCVideoCacher.YTDL;
 
 namespace VRCVideoCacher.ViewModels;
@@ -180,18 +181,10 @@ public partial class HistoryItemViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void OpenUrl()
-    {
-        try
-        {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = Url,
-                UseShellExecute = true
-            });
-        }
-        catch { /* Ignore errors */ }
-    }
+    // Url is a history entry, so it originated from a VRChat world. Handing that to
+    // ShellExecute unchecked would launch whatever scheme it happened to name;
+    // Utils.OpenUrl.Open allows only http and https.
+    private void OpenUrl() => Utils.OpenUrl.Open(Url);
 
     [RelayCommand]
     private async Task CopyUrl()

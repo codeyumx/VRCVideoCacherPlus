@@ -33,7 +33,23 @@ public class CacheManager
             CachePath = Path.Join(Program.CurrentProcessPath, ConfigManager.Config.CachedAssetPath);
 
         Log.Debug("Using cache path {CachePath}", CachePath);
-        BuildCache();
+
+        // Re-check the size budget whenever the config changes. ConfigManager used to call
+        // TryFlushCache directly at the end of its own initialiser, which re-entered this
+        // type before CachePath had been assigned.
+        ConfigManager.OnConfigChanged += TryFlushCache;
+
+        // A failure in here surfaces as a TypeInitializationException from whatever
+        // happened to touch CacheManager first, which is close to undebuggable. An
+        // unreadable cache directory should degrade to an empty index, not that.
+        try
+        {
+            BuildCache();
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to index the cache directory {CachePath}", CachePath);
+        }
     }
 
     private static string GetSystemCacheFolder()
@@ -53,6 +69,15 @@ public class CacheManager
         TryFlushCache();
     }
 
+    // The only file names this directory ever owns are "<videoId>.mp4" and "<videoId>.webm".
+    // Anything else in there belongs to someone else — the web server writes index.html into
+    // it, and users put things in it — so it must not be treated as a cache entry, validated
+    // as a video, or deleted.
+    private static readonly string[] CacheFileExtensions = [".mp4", ".webm"];
+
+    private static bool IsCacheFile(string fileName) =>
+        CacheFileExtensions.Contains(Path.GetExtension(fileName), StringComparer.OrdinalIgnoreCase);
+
     private static void BuildCache()
     {
         CachedAssets.Clear();
@@ -64,6 +89,13 @@ public class CacheManager
 
             // Skip the downloader's per-videoId scratch files; the downloader sweeps these.
             if (file.StartsWith("_tempVideo.", StringComparison.Ordinal))
+                continue;
+
+            // Previously every file here was validated as a video and deleted if it failed,
+            // which meant index.html was destroyed and recreated on every single launch —
+            // with a "Removed invalid cache entry" warning each time — and anything a user
+            // had put in the folder was deleted without asking.
+            if (!IsCacheFile(file))
                 continue;
 
             // Self-heal: if a previous session committed a tiny error body or otherwise
@@ -83,7 +115,53 @@ public class CacheManager
                 continue;
             }
 
-            AddToCache(file);
+            // Index without flushing per file: AddToCache calls TryFlushCache, which walks
+            // and sorts the whole dictionary, so using it here made startup quadratic in
+            // the number of cached videos. One flush at the end does the same job.
+            IndexCacheFile(file);
+        }
+
+        TryFlushCache();
+    }
+
+    private static readonly ConcurrentDictionary<string, int> PinnedFiles = new();
+
+    /// <summary>
+    /// Protects a cache file from eviction while it is being written or published. Dispose
+    /// the returned handle when done.
+    ///
+    /// Needed because a file can be evicted the instant it is added: LRU orders by mtime,
+    /// and a bulk pre-cache entry carries the timestamp from its manifest, which may be
+    /// years old — so it arrives as the least-recently-used thing in the cache and
+    /// AddToCache's own flush would delete what was just downloaded.
+    /// </summary>
+    public static IDisposable PinFile(string fileName)
+    {
+        PinnedFiles.AddOrUpdate(fileName, 1, static (_, count) => count + 1);
+        return new Pin(fileName);
+    }
+
+    private sealed class Pin(string fileName) : IDisposable
+    {
+        private int _disposed;
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) == 1)
+                return;
+
+            while (PinnedFiles.TryGetValue(fileName, out var count))
+            {
+                if (count <= 1)
+                {
+                    if (PinnedFiles.TryRemove(new KeyValuePair<string, int>(fileName, count)))
+                        return;
+                }
+                else if (PinnedFiles.TryUpdate(fileName, count - 1, count))
+                {
+                    return;
+                }
+            }
         }
     }
 
@@ -109,19 +187,43 @@ public class CacheManager
             if (cacheSize < maxCacheSize)
                 break;
 
+            if (PinnedFiles.ContainsKey(kvp.Value.FileName))
+            {
+                Log.Debug("Not evicting {FileName}: currently in use.", kvp.Value.FileName);
+                continue;
+            }
+
             var videoId = Path.GetFileNameWithoutExtension(kvp.Value.FileName);
             var filePath = Path.Join(CachePath, kvp.Value.FileName);
             if (File.Exists(filePath))
             {
-                File.Delete(filePath);
-                cacheSize -= kvp.Value.Size;
+                // A cache file can be open for serving or being written by the downloader.
+                // ClearCache already tolerated that; eviction did not, and the exception
+                // propagated out through AddToCache into the download-completion path.
+                try
+                {
+                    File.Delete(filePath);
+                    cacheSize -= kvp.Value.Size;
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning("Could not evict {FileName}: {Error}", kvp.Value.FileName, ex.Message);
+                    continue;
+                }
 
                 // delete thumbnail if not in recent history
                 if (recentPlayHistory.All(h => h.Id != videoId))
                 {
                     var thumbnailPath = ThumbnailManager.GetThumbnailPath(videoId);
-                    if (File.Exists(thumbnailPath))
-                        File.Delete(thumbnailPath);
+                    try
+                    {
+                        if (File.Exists(thumbnailPath))
+                            File.Delete(thumbnailPath);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Debug("Could not delete thumbnail {Path}: {Error}", thumbnailPath, ex.Message);
+                    }
                 }
             }
             CachedAssets.TryRemove(kvp.Key, out _);
@@ -130,9 +232,23 @@ public class CacheManager
 
     public static void AddToCache(string fileName)
     {
+        if (!IndexCacheFile(fileName))
+            return;
+
+        OnCacheChanged?.Invoke(fileName, CacheChangeType.Added);
+        TryFlushCache();
+    }
+
+    /// <summary>
+    /// Records a file's size and timestamp in the index. Returns false if it has gone.
+    /// Split out from <see cref="AddToCache"/> so bulk indexing can skip the per-file
+    /// event and size-budget check.
+    /// </summary>
+    private static bool IndexCacheFile(string fileName)
+    {
         var filePath = Path.Join(CachePath, fileName);
         if (!File.Exists(filePath))
-            return;
+            return false;
 
         var fileInfo = new FileInfo(filePath);
         var videoCache = new VideoCache
@@ -145,9 +261,7 @@ public class CacheManager
         var existingCache = CachedAssets.GetOrAdd(videoCache.FileName, videoCache);
         existingCache.Size = fileInfo.Length;
         existingCache.LastModified = fileInfo.LastWriteTimeUtc;
-
-        OnCacheChanged?.Invoke(fileName, CacheChangeType.Added);
-        TryFlushCache();
+        return true;
     }
 
     private static long GetCacheSize()
@@ -175,7 +289,18 @@ public class CacheManager
         if (!File.Exists(filePath))
             return;
 
-        File.Delete(filePath);
+        try
+        {
+            File.Delete(filePath);
+        }
+        catch (Exception ex)
+        {
+            // Reached from the request path via EnsureValidOrEvict, where the file may
+            // still be open. Leave the entry in place and try again on the next read.
+            Log.Warning("Could not delete cached video {FileName}: {Error}", fileName, ex.Message);
+            return;
+        }
+
         CachedAssets.TryRemove(fileName, out _);
         OnCacheChanged?.Invoke(fileName, CacheChangeType.Removed);
         Log.Information("Deleted cached video: {FileName}", fileName);

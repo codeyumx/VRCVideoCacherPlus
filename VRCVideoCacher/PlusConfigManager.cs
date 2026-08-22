@@ -1,98 +1,111 @@
-using Newtonsoft.Json;
 using Serilog;
+using VRCVideoCacher.Models;
 
 namespace VRCVideoCacher;
 
 /// <summary>
-/// Manages Plus-specific settings in a separate file so they don't get
-/// overwritten when the upstream VRCVideoCacher opens the shared Config.json.
+/// The PlusPlus-only settings, and the rule seeding that goes with them.
+///
+/// These live as flat top-level fields inside the main ConfigModel.
 /// </summary>
-public class PlusConfigManager
+public static class PlusConfigManager
 {
-    public static PlusConfigModel Config { get; private set; }
-    private static readonly ILogger Log = Program.Logger.ForContext<PlusConfigManager>();
-    private static readonly string ConfigFilePath;
+    private static readonly ILogger Log = Program.Logger.ForContext(typeof(PlusConfigManager));
 
-    public static event Action? OnConfigChanged;
+    public static ConfigModel Config => ConfigManager.Config;
 
-    static PlusConfigManager()
+    /// <summary>Saves config via ConfigManager.</summary>
+    public static void TrySaveConfig() => ConfigManager.TrySaveConfig();
+
+    public static List<UriRule> GetDefaultRules() => DefaultRules.Create();
+
+    /// <summary>
+    /// Runs once from ConfigManager's initialiser, after the file is loaded and before it
+    /// is saved back.
+    /// </summary>
+    internal static void Initialize(ConfigModel config)
     {
-        ConfigFilePath = Path.Join(Program.DataPath, "PlusConfig.json");
-        Log.Information("Loading Plus config from {Path}...", ConfigFilePath);
-
-        PlusConfigModel? loaded = null;
-        try
-        {
-            if (File.Exists(ConfigFilePath))
-                loaded = JsonConvert.DeserializeObject<PlusConfigModel>(File.ReadAllText(ConfigFilePath));
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Failed to load Plus config, creating new one...");
-        }
-
-        if (loaded != null)
-        {
-            Config = loaded;
-            Log.Information("Plus config loaded successfully.");
-        }
-        else
-        {
-            Log.Information("No Plus config found, creating new one...");
-            Config = new PlusConfigModel();
-            MigrateFromMainConfig();
-        }
-
-        TrySaveConfig();
+        // TODO: Remove later - Migrating/repairing broken Dropbox rule pattern for existing users
+        MigrateBrokenDefaultRules(config);
+        EnsureDefaultRules(config);
     }
 
     /// <summary>
-    /// On first run, pull any existing Plus-specific values from the main Config.json
-    /// so the user doesn't lose their settings.
+    /// TODO: Remove later - Repairs default rules that shipped with a broken pattern.
     /// </summary>
-    private static void MigrateFromMainConfig()
+    private static void MigrateBrokenDefaultRules(ConfigModel config)
     {
-        var configPath = Path.Join(Program.DataPath, "Config.json");
-        if (!File.Exists(configPath))
+        if (config.UriRules == null)
             return;
 
-        try
+        foreach (var rule in config.UriRules)
         {
-            var json = JsonConvert.DeserializeObject<Dictionary<string, object>>(File.ReadAllText(configPath));
-            if (json == null)
-                return;
+            if (rule.Pattern != DefaultRules.LegacyDropboxPattern)
+                continue;
 
-            if (json.TryGetValue("CacheDownloadRateLimitMBs", out var rate))
-                Config.CacheDownloadRateLimitMBs = Convert.ToInt32(rate);
-            if (json.TryGetValue("CacheDownloadIdleSeconds", out var idle))
-                Config.CacheDownloadIdleSeconds = Convert.ToInt32(idle);
-            if (json.TryGetValue("CacheYouTubePreferVp9", out var vp9))
-                Config.CacheYouTubePreferVp9 = Convert.ToBoolean(vp9);
-            Log.Information("Migrated Plus settings from main Config.json.");
-        }
-        catch (Exception ex)
-        {
-            Log.Warning(ex, "Failed to migrate Plus settings from main Config.json, using defaults.");
+            Log.Information("Repairing broken default rule '{RuleName}' (Dropbox share rewrite).", rule.Name);
+            rule.Pattern = DefaultRules.DropboxForceDownloadPattern;
+            rule.RedirectTarget = DefaultRules.DropboxForceDownloadTarget;
         }
     }
 
-    public static void TrySaveConfig()
+    // The catch-all rule stays last; new defaults are inserted above it.
+    private const string CatchAllRuleName = "Everything else";
+
+    public static void EnsureDefaultRules() => EnsureDefaultRules(Config);
+
+    /// <summary>
+    /// Seeds default rules that this installation has not been offered before.
+    /// </summary>
+    private static void EnsureDefaultRules(ConfigModel config)
     {
-        var newConfig = JsonConvert.SerializeObject(Config, Formatting.Indented);
-        var oldConfig = File.Exists(ConfigFilePath) ? File.ReadAllText(ConfigFilePath) : string.Empty;
-        if (newConfig == oldConfig)
+        var defaults = DefaultRules.Create();
+
+        if (config.UriRules == null || config.UriRules.Count == 0)
+        {
+            config.UriRules = defaults;
+            config.SeededDefaultRules = defaults.Select(rule => rule.Name).ToList();
             return;
+        }
 
-        Log.Information("Plus config changed, saving...");
-        File.WriteAllText(ConfigFilePath, newConfig);
-        Log.Information("Plus config saved.");
-        OnConfigChanged?.Invoke();
+        if (config.SeededDefaultRules == null)
+            config.SeededDefaultRules = [];
+
+        // Upgrading from a version with no seed tracking: everything the user already has
+        // has evidently been seeded. Anything missing is either a rule they deleted or a
+        // genuinely new default; both get offered exactly once here, and are then recorded.
+        if (config.SeededDefaultRules.Count == 0)
+        {
+            config.SeededDefaultRules = defaults
+                .Where(d => config.UriRules.Any(r => r.Name == d.Name || r.Pattern == d.Pattern))
+                .Select(d => d.Name)
+                .ToList();
+        }
+
+        foreach (var defRule in defaults)
+        {
+            if (config.SeededDefaultRules.Contains(defRule.Name))
+                continue;
+
+            if (config.UriRules.Any(r => r.Name == defRule.Name || r.Pattern == defRule.Pattern))
+            {
+                config.SeededDefaultRules.Add(defRule.Name);
+                continue;
+            }
+
+            var catchAllIndex = config.UriRules.FindIndex(r => r.Name == CatchAllRuleName);
+            if (catchAllIndex >= 0)
+                config.UriRules.Insert(catchAllIndex, defRule);
+            else
+                config.UriRules.Add(defRule);
+
+            config.SeededDefaultRules.Add(defRule.Name);
+            Log.Information("Added new default rule '{RuleName}'.", defRule.Name);
+        }
+
+        // Defensive: an earlier version could insert the same rule more than once. Keyed on
+        // a tuple rather than a "Name + \"|\" + Pattern" string, which could collide across
+        // differently-split name/pattern pairs.
+        config.UriRules = config.UriRules.DistinctBy(r => (r.Name, r.Pattern)).ToList();
     }
-}
-
-public class PlusConfigModel
-{
-    public int CacheDownloadRateLimitMBs { get; set; } // 0 = unlimited
-    public int CacheDownloadIdleSeconds { get; set; } = 30; // 0 = disabled
-    public bool CacheYouTubePreferVp9 { get; set; } = true; // VP9+aac in mp4 instead of h264+aac
 }

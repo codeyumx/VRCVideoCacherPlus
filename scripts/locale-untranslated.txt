@@ -1,0 +1,64 @@
+# Known translation debt: values still identical to English, as lang:Key.
+#
+# Generated with:  scripts/lint-locales.py --list-identical
+#
+# This file exists so the build fails on *new* untranslated strings without being
+# blocked by the ones already here. It is meant to shrink, never grow: translate a
+# string, delete its line. The linter fails on a stale entry, so finishing a
+# translation forces the line to go.
+
+it:Cache
+it:CacheDownloadIdleSeconds
+it:CacheDownloadIdleSecondsTooltip
+it:CacheDownloadRateLimit
+it:CacheDownloadRateLimitTooltip
+it:CacheHlsPlaylists
+it:ConfirmClearCacheFormat
+it:ConfirmClearCacheTitle
+it:CookiesDisabledWarning
+it:CookiesHelpBeta
+it:CookiesHelpLegacy
+it:CookiesRefreshHeader
+it:CookiesRequestRefresh
+it:CookiesRequestRefreshTooltip
+it:CookiesStatusDisabled
+it:CookiesStatusMissing
+it:CookiesStatusPresent
+it:CookiesStatusVerifying
+it:CookiesStatusWorking
+it:CookiesVerifyNow
+it:Dashboard
+it:Debug
+it:DownloadCompleted
+it:DownloadFailed
+it:DownloadSkipped
+it:Info
+it:Logs
+it:ManualCookiesExpired
+it:ManualCookiesWrongFormat
+it:No
+it:OpenUtilsFolder
+it:OpenYouTubeWith
+it:PasteCookiesManually
+it:PatchResonite
+it:PatchVRChat
+it:RedownloadComplete
+it:RedownloadFailed
+it:RedownloadUtils
+it:RedownloadingUtils
+it:SaveCookies
+it:SkipReasonBotCheck
+it:SkipReasonFileExists
+it:SkipReasonFileNotFound
+it:SkipReasonFormatUnavailable
+it:SkipReasonLiveStream
+it:SkipReasonNoMetadata
+it:SkipReasonParseFailed
+it:SkipReasonPrivateVideo
+it:SkipReasonTooLong
+it:SkipReasonUnsupportedUrl
+it:SkipReasonVideoUnavailable
+it:TrayMinimizeNotice
+it:UseBetaExtension
+it:UseBetaExtensionTooltip
+it:Yes

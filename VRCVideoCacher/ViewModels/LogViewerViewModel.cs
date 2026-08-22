@@ -134,10 +134,8 @@ public partial class LogViewerViewModel : ViewModelBase
         var lines = LogEntries.Select(e => $"[{e.Timestamp:HH:mm:ss} {e.Level} {e.Source}] {e.Message}");
         await File.WriteAllLinesAsync(logPath, lines);
 
-        // Open file location
-        if (OperatingSystem.IsWindows())
-        {
-            System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{logPath}\"");
-        }
+        // Open file location. Went through explorer.exe directly and so did nothing at all
+        // on Linux, where the export silently appeared to do nothing.
+        VRCVideoCacher.Utils.OpenUrl.RevealFile(logPath);
     }
 }

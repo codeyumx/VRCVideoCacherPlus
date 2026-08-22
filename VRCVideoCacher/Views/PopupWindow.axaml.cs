@@ -41,10 +41,7 @@ public partial class PopupWindow : Window
     private void FolderPathButton_Click(object? sender, RoutedEventArgs e)
     {
         if (string.IsNullOrEmpty(_folderPath)) return;
-        if (OperatingSystem.IsWindows())
-            System.Diagnostics.Process.Start("explorer.exe", _folderPath);
-        else if (OperatingSystem.IsLinux())
-            System.Diagnostics.Process.Start("xdg-open", _folderPath);
+        Utils.OpenUrl.OpenFolder(_folderPath);
     }
 
     private void OkButton_Click(object? sender, RoutedEventArgs e)

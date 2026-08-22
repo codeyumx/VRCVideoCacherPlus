@@ -1,9 +1,9 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <OutputType>WinExe</OutputType>
         <TargetFramework>net10.0</TargetFramework>
-        <Version>2026.8.14</Version>
+        <Version>2026.8.22</Version>
         <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
@@ -21,7 +21,8 @@
         <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
         <PublishTrimmed>true</PublishTrimmed>
         <TrimMode>partial</TrimMode>
-        <!-- Suppress trim warnings from third-party libraries -->
+        <!-- Nine IL2026s remain, all understood: three from EF Core's DbContext, six from
+             the deliberate reflection fallback in Utils/Json. See TrimmerRootAssembly. -->
         <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
         <!-- IL2037: EF Core 10 DynamicDependency on ExecuteUpdate overload not resolvable by ILLink -->
         <NoWarn>$(NoWarn);IL2037</NoWarn>
@@ -35,7 +36,8 @@
         <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
         <PublishTrimmed>true</PublishTrimmed>
         <TrimMode>partial</TrimMode>
-        <!-- Suppress trim warnings from third-party libraries -->
+        <!-- Nine IL2026s remain, all understood: three from EF Core's DbContext, six from
+             the deliberate reflection fallback in Utils/Json. See TrimmerRootAssembly. -->
         <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
         <!-- IL2037: EF Core 10 DynamicDependency on ExecuteUpdate overload not resolvable by ILLink -->
         <NoWarn>$(NoWarn);IL2037</NoWarn>
@@ -43,6 +45,25 @@
 
     <ItemGroup Condition="'$(Configuration)' == 'SteamRelease'">
         <PackageReference Include="Steamworks.NET.AnyCPU" Version="2026.163.0-a" />
+    </ItemGroup>
+
+    <!--
+      Keep our own assembly out of the trimmer entirely.
+
+      Two things still reach members reflectively in a way the trimmer cannot follow:
+      EF Core over the entity types, and the DefaultJsonTypeInfoResolver fallback in
+      Utils/Json (a safety net for any type not registered in AppJsonContext). If the
+      trimmer removed a member only those reach, config would silently fail to load or the
+      database would misbehave — in Release builds only, since Debug never trims, so it
+      would not reproduce during development.
+
+      Config serialisation itself is source-generated now and no longer needs this; moving
+      off Newtonsoft took the count from 33 IL2026 warnings to 9. Rooting the assembly costs
+      little (it is small next to the framework) and leaves PublishTrimmed doing what it is
+      actually there for, which is trimming the framework and the UI stack.
+    -->
+    <ItemGroup Condition="'$(Configuration)' == 'Release' Or '$(Configuration)' == 'SteamRelease'">
+        <TrimmerRootAssembly Include="VRCVideoCacher" />
     </ItemGroup>
 
     <ItemGroup>
@@ -59,7 +80,6 @@
         <!-- Override vulnerable transitive SQLitePCLRaw (NU1903, GHSA-2m69-gcr7-jv3q) -->
         <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.12" />
         <PackageReference Include="EmbedIO" Version="3.5.2" />
-        <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
         <PackageReference Include="securifybv.ShellLink" Version="0.1.0" />
         <PackageReference Include="Semver" Version="3.0.0" />
         <PackageReference Include="Serilog" Version="4.3.1" />
@@ -69,11 +89,13 @@
         <PackageReference Include="SharpCompress" Version="0.48.1" />
         <PackageReference Include="ValveKeyValue" Version="0.20.0.417" />
         <!--Condition below is needed to remove Avalonia.Diagnostics package from build output in Release configuration.-->
-        <!-- Avalonia.Diagnostics has no 12.x release on NuGet; omitted until upstream publishes it -->
+        <!-- Avalonia.Diagnostics has no 12.x release on NuGet (re-checked 2026-08-22: latest
+             published is 11.3.20), so the Debug-only DevTools inspector stays unavailable. -->
         <!-- <PackageReference Condition="'$(Configuration)' == 'Debug'" Include="Avalonia.Diagnostics" Version="12.0.3" /> -->
         <PackageReference Include="Jeek.Avalonia.Localization" Version="12.0.2" />
         <!-- Pin transitive dependency to fix GHSA-xrw6-gwf8-vvr9 (high severity) -->
         <PackageReference Include="Tmds.DBus.Protocol" Version="0.92.0" />
+        <PackageReference Include="Vanara.PInvoke.IpHlpApi" Version="5.0.7" />
     </ItemGroup>
 
     <ItemGroup>

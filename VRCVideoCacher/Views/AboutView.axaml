@@ -4,6 +4,7 @@
              xmlns:l="using:Jeek.Avalonia.Localization"
              xmlns:vm="clr-namespace:VRCVideoCacher.ViewModels"
              xmlns:views="clr-namespace:VRCVideoCacher.Views"
+             xmlns:controls="clr-namespace:VRCVideoCacher.Controls"
              x:Class="VRCVideoCacher.Views.AboutView"
              x:DataType="vm:AboutViewModel">
 

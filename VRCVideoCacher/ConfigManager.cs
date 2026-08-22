@@ -1,7 +1,8 @@
 using System.Globalization;
+using System.Linq;
 using Jeek.Avalonia.Localization;
-using Newtonsoft.Json;
 using Serilog;
+using VRCVideoCacher.Models;
 using VRCVideoCacher.Utils;
 
 // ReSharper disable FieldCanBeMadeReadOnly.Global
@@ -27,7 +28,7 @@ public class ConfigManager
         try
         {
             if (File.Exists(ConfigFilePath))
-                newConfig = JsonConvert.DeserializeObject<ConfigModel>(File.ReadAllText(ConfigFilePath));
+                newConfig = Json.Deserialize<ConfigModel>(File.ReadAllText(ConfigFilePath));
             if (newConfig != null)
                 Config = newConfig;
         }
@@ -54,22 +55,72 @@ public class ConfigManager
         if (Config.YtdlpWebServerUrl.EndsWith('/'))
             Config.YtdlpWebServerUrl = Config.YtdlpWebServerUrl.TrimEnd('/');
 
+        // Repairs and seeds the rule list. Called with the instance rather than reaching
+        // for ConfigManager.Config: PlusConfigManager has no static state of its own, so
+        // there is no initialiser to re-enter here.
+        PlusConfigManager.Initialize(Config);
+
         Log.Information("Loaded config.");
         TrySaveConfig();
     }
 
     public static void TrySaveConfig()
     {
-        var newConfig = JsonConvert.SerializeObject(Config, Formatting.Indented);
+        var newConfig = Json.Serialize(Config);
         var oldConfig = File.Exists(ConfigFilePath) ? File.ReadAllText(ConfigFilePath) : string.Empty;
         if (newConfig == oldConfig)
             return;
 
         Log.Information("Config changed, saving...");
-        File.WriteAllText(ConfigFilePath, newConfig);
+        AtomicFile.WriteAllText(ConfigFilePath, newConfig);
         Log.Information("Config saved.");
+
         OnConfigChanged?.Invoke();
-        CacheManager.TryFlushCache();
+    }
+
+    public static void SetVideoPlayersEnabled(bool enabled)
+    {
+        Config.VideoPlayersEnabled = enabled;
+
+        var rule = Config.UriRules.FirstOrDefault(r => r.Name == "Block all Videos");
+        if (!enabled)
+        {
+            if (rule == null)
+            {
+                rule = new UriRule
+                {
+                    Name = "Block all Videos",
+                    Pattern = ".*",
+                    Action = RuleAction.Block,
+                    Enabled = true
+                };
+                Config.UriRules.Insert(0, rule);
+            }
+            else
+            {
+                rule.Enabled = true;
+                Config.UriRules.Remove(rule);
+                Config.UriRules.Insert(0, rule);
+            }
+        }
+        else
+        {
+            if (rule != null)
+            {
+                rule.Enabled = false;
+            }
+        }
+
+        TrySaveConfig();
+
+        if (!enabled)
+        {
+            // Fire-and-forget: severing spawns subprocesses and must not block whoever
+            // toggled the setting. Outcome is reported through the log.
+            // No elevation here: this fires from a settings toggle, and a polkit/UAC
+            // dialog nobody asked for is worse than a connection that keeps playing.
+            _ = Utils.ConnectionSevering.SeverAllAsync();
+        }
     }
 
     private static bool GetUserConfirmation(string prompt, bool defaultValue)
@@ -93,17 +144,6 @@ public class ConfigManager
         }
         else
         {
-            Config.CacheYouTube = GetUserConfirmation("Would you like to cache/download Youtube videos?", true);
-            if (Config.CacheYouTube)
-            {
-                var maxResolution = GetUserConfirmation("Would you like to cache/download Youtube videos in 4k?", true);
-                Config.CacheYouTubeMaxResolution = maxResolution ? 2160 : 1080;
-            }
-
-            var vrDancingPyPyChoice = GetUserConfirmation("Would you like to cache/download VRDancing & PyPyDance videos?", true);
-            Config.CacheVrDancing = vrDancingPyPyChoice;
-            Config.CachePyPyDance = vrDancingPyPyChoice;
-
             Config.PatchResonite = GetUserConfirmation("Would you like to enable Resonite support?", false);
         }
 
@@ -144,17 +184,9 @@ public class ConfigModel
     // Caching
     public string CachedAssetPath = "";
     public float CacheMaxSizeInGb = 10f;
-    public bool CacheYouTube = true;
-    public int CacheYouTubeMaxResolution = 1080;
-    public int CacheYouTubeMaxLength = 120;
-    public bool CachePyPyDance = true;
-    public bool CacheVrDancing = true;
     public bool CacheHlsPlaylists = true;
     public int CacheHlsMaxLength = 30;
     public bool CacheOnly = false;
-    // Cache Rules
-    public string[] BlockedUrls = ["https://na2.vrdancing.club/sampleurl.mp4"];
-    public string BlockRedirect = "https://www.youtube.com/watch?v=byv2bKekeWQ";
     // URLs of JSON manifests listing direct file downloads to mirror into the cache.
     public string[] PreCacheUrls = [];
     // Video URLs (YouTube, VRDancing, ...) resolved through the normal download path
@@ -167,11 +199,11 @@ public class ConfigModel
     public bool PatchVrChat = true;
 
     // Video Cacher
+    public bool VideoPlayersEnabled = true;
     public bool CloseToTray = true;
     public bool StartMinimized = false;
     public bool StartWithSteamVr = true;
     public bool CookieSetupCompleted = false;
-    public bool RedirectVRDancing = false;
     public bool ErrorPopups = true;
 
     // Localization
@@ -179,4 +211,15 @@ public class ConfigModel
 
     // UI state
     public bool HasShownTrayNotice = false;
+    public bool HasShownSharedConfigNotice = false;
+    public string DismissedMotdHash = string.Empty;
+
+    // PlusPlus settings (flattened)
+    public int CacheDownloadRateLimitMBs = 0; // 0 = unlimited
+    public int CacheDownloadIdleSeconds = 30; // 0 = disabled
+    public bool CacheYouTubePreferVp9 = true; // VP9+aac in mp4 instead of h264+aac
+    public List<UriRule> UriRules = DefaultRules.Create();
+    public List<string> SeededDefaultRules = [];
+
+    public static List<UriRule> GetDefaultRules() => DefaultRules.Create();
 }

@@ -18,10 +18,14 @@ public static class DatabaseManager
     {
         Directory.CreateDirectory(Database.CacheDir);
 
-        var options = new DbContextOptionsBuilder<Database>()
-            .UseSqlite($"Data Source={Database.DbPath}")
-            .EnableSensitiveDataLogging()
-            .Options;
+        var optionsBuilder = new DbContextOptionsBuilder<Database>()
+            .UseSqlite($"Data Source={Database.DbPath}");
+#if DEBUG
+        // Puts parameter values — watch history URLs and video ids — into the log output.
+        // Useful while developing, not something to ship enabled.
+        optionsBuilder = optionsBuilder.EnableSensitiveDataLogging();
+#endif
+        var options = optionsBuilder.Options;
 
         _contextFactory = new PooledDbContextFactory<Database>(options);
 
@@ -37,6 +41,21 @@ public static class DatabaseManager
                 UrlType INTEGER NOT NULL,
                 DownloadFormat INTEGER NOT NULL
             )
+            """);
+
+        // A queue entry is identified by (VideoId, DownloadFormat), but nothing enforced
+        // that — AddPendingDownload checked for an existing row and then inserted, so two
+        // callers racing both saw "absent" and both inserted. Collapse any duplicates an
+        // existing database already accumulated, keeping the earliest, then constrain it.
+        db.Database.ExecuteSqlRaw("""
+            DELETE FROM vvc_PendingDownloads
+            WHERE Key NOT IN (
+                SELECT MIN(Key) FROM vvc_PendingDownloads GROUP BY VideoId, DownloadFormat
+            )
+            """);
+        db.Database.ExecuteSqlRaw("""
+            CREATE UNIQUE INDEX IF NOT EXISTS ux_vvc_PendingDownloads_Video
+                ON vvc_PendingDownloads (VideoId, DownloadFormat)
             """);
 
         db.Database.ExecuteSqlRaw("""
@@ -55,6 +74,11 @@ public static class DatabaseManager
                 Instructor TEXT NOT NULL DEFAULT ''
             )
             """);
+
+        // TODO: Remove later - EnsureCreated above builds the schema only for a database that does not yet
+        // exist, and there are no migrations, so a property added to an existing entity
+        // would be missing for every current user until they deleted their database.
+        SchemaReconciler.Run(db);
     }
 
     public static string? GetLatestHistoryUrl(string videoId)
@@ -159,6 +183,10 @@ public static class DatabaseManager
             db.VideoInfoCache.Add(videoInfoCache);
         }
         db.SaveChanges();
+        if (!string.IsNullOrEmpty(videoInfoCache.Title))
+        {
+            YTDL.ActiveStreamTracker.AssociateUrlInfo(videoInfoCache.Id, videoInfoCache.Id, videoInfoCache.Title, videoInfoCache.Id, videoInfoCache.Duration);
+        }
         OnVideoInfoCacheUpdated?.Invoke();
     }
 
@@ -228,22 +256,18 @@ public static class DatabaseManager
         if (string.IsNullOrEmpty(videoId)) return;
 
         using var db = _contextFactory.CreateDbContext();
-        var stats = db.VideoWatchStats.Find(videoId);
-        if (stats != null)
-        {
-            stats.WatchCount++;
-            stats.LastWatchedAt = DateTime.UtcNow;
-        }
-        else
-        {
-            db.VideoWatchStats.Add(new VideoWatchStats
-            {
-                VideoId = videoId,
-                WatchCount = 1,
-                LastWatchedAt = DateTime.UtcNow
-            });
-        }
-        db.SaveChanges();
+
+        // Single atomic upsert rather than read-modify-write. Two plays landing at once
+        // previously either lost an increment (both read the same count) or collided on the
+        // primary key. The DateTime goes through a parameter so the provider writes it in
+        // the same text format EF reads back.
+        db.Database.ExecuteSqlRaw("""
+            INSERT INTO vvc_VideoWatchStats (VideoId, LastWatchedAt, WatchCount)
+            VALUES ({0}, {1}, 1)
+            ON CONFLICT(VideoId) DO UPDATE SET
+                WatchCount = WatchCount + 1,
+                LastWatchedAt = excluded.LastWatchedAt
+            """, videoId, DateTime.UtcNow);
     }
 
     public static Dictionary<string, VideoWatchStats> GetAllVideoWatchStats()
@@ -267,20 +291,24 @@ public static class DatabaseManager
     public static void AddPendingDownload(VideoInfo videoInfo)
     {
         using var db = _contextFactory.CreateDbContext();
-        var exists = db.PendingDownloads.Any(p =>
-            p.VideoId == videoInfo.VideoId && p.DownloadFormat == videoInfo.DownloadFormat);
-        if (exists) return;
 
-        db.PendingDownloads.Add(new PendingDownload
-        {
-            QueuedAt = DateTime.UtcNow,
-            VideoUrl = videoInfo.VideoUrl,
-            VideoId = videoInfo.VideoId,
-            UrlType = videoInfo.UrlType,
-            DownloadFormat = videoInfo.DownloadFormat
-        });
-        db.SaveChanges();
-        OnPendingDownloadsChanged?.Invoke();
+        // Insert-or-ignore against the unique (VideoId, DownloadFormat) index, rather than
+        // Any() followed by Add — two callers racing both saw "not present" and both
+        // inserted, so the same video was downloaded twice. The row count tells us whether
+        // anything was actually queued, so the UI is not notified for a no-op.
+        var inserted = db.Database.ExecuteSqlRaw("""
+            INSERT INTO vvc_PendingDownloads (QueuedAt, VideoUrl, VideoId, UrlType, DownloadFormat)
+            VALUES ({0}, {1}, {2}, {3}, {4})
+            ON CONFLICT (VideoId, DownloadFormat) DO NOTHING
+            """,
+            DateTime.UtcNow,
+            videoInfo.VideoUrl,
+            videoInfo.VideoId,
+            (int)videoInfo.UrlType,
+            (int)videoInfo.DownloadFormat);
+
+        if (inserted > 0)
+            OnPendingDownloadsChanged?.Invoke();
     }
 
     public static void RemovePendingDownload(string videoId, DownloadFormat format)

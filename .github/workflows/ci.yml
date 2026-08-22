@@ -1,0 +1,83 @@
+name: CI
+
+# Disabled: GitHub Actions does not run on this account, so every push produced a failed
+# run and a notification. Left in the repo rather than deleted because it still documents
+# what a full check is, and it is one edit away from working again for anyone who forks.
+#
+# Everything below now runs locally instead — `./build.sh --lint` covers build-and-test
+# and browser-extension, and `./build.sh --artifacts` covers publish. Re-enable by
+# restoring the push/pull_request triggers:
+#
+#   on:
+#     push:
+#       branches: [main]
+#     pull_request:
+#     workflow_dispatch:
+on:
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore VRCVideoCacher.sln
+
+      # The tree builds warning-free today; -warnaserror keeps it that way rather than
+      # letting warnings accumulate until nobody reads them.
+      - name: Build
+        run: dotnet build VRCVideoCacher.sln -c Debug --no-restore -warnaserror
+
+      - name: Test
+        run: dotnet test VRCVideoCacher.sln -c Debug --no-build --verbosity normal
+
+  browser-extension:
+    # chrome/ and firefox/ each have to contain their own copy of the shared files, so they
+    # can silently diverge when a fix lands in only one. This is the cheap guard against that.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check shared extension files
+        run: ./BrowserExtension/build.sh --check
+
+      - name: Check locales
+        run: python3 scripts/lint-locales.py
+
+  publish:
+    # PublishTrimmed only takes effect on publish, so build-and-test above never exercises
+    # it. This job is what would catch the trimmer removing something that only reflection
+    # reaches — a failure mode that cannot reproduce in a Debug build.
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        rid: [win-x64, linux-x64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Publish ${{ matrix.rid }}
+        run: >
+          dotnet publish VRCVideoCacher/VRCVideoCacher.csproj
+          -c Release -r ${{ matrix.rid }}
+          -o out/${{ matrix.rid }}
+
+      - name: Package Zip Archive
+        run: |
+          cd out/${{ matrix.rid }}
+          zip -r ../../VRCVideoCacher-${{ matrix.rid }}.zip .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VRCVideoCacher-${{ matrix.rid }}.zip
+          path: VRCVideoCacher-${{ matrix.rid }}.zip
+          retention-days: 7

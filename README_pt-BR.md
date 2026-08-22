@@ -18,13 +18,13 @@ As extensões do VRCVideoCacherPlus estão em alfa e não foram testadas — ign
 O VRCVideoCacherPlus ajuda os vídeos do VRChat a tocarem. Às vezes, o YouTube bloqueia ou limita vídeos quando o cliente do usuário não fornece cookies. Este aplicativo fornece os cookies ao YouTube enquanto você joga VRChat, para que os vídeos toquem de forma fluida e em alta definição. O aplicativo também baixa vídeos de forma inteligente, se você ativar essa configuração, para que os vídeos que você toca com frequência (por exemplo, VRDancing) não precisem ser baixados da internet novamente. Você pode gerenciar o cache de vídeos, alterar a velocidade de download em segundo plano e atrasar o download do vídeo (para não baixar dois ou mais arquivos de vídeo ao mesmo tempo).
 O VRCVideoCacherPlus é baseado no VRCVideoCacher e adiciona muitas melhorias, como suporte a vídeos HLS e listas de reprodução de streaming (.m3u8).
 
-![Tela principal](docs/screenshots/main-info.png)
+![Tela principal](https://raw.githubusercontent.com/Bluscream/VRCVideoCacherPlusPlus/assets/main-info.png)
 *Tela principal — status, tamanho do cache e o que o aplicativo está fazendo no momento.*
 
-![Configurações de velocidade de download e atraso do cache](docs/screenshots/download-settings.png)
+![Configurações de velocidade de download e atraso do cache](https://raw.githubusercontent.com/Bluscream/VRCVideoCacherPlusPlus/assets/download-settings.png)
 *Configurações de cache — limite a velocidade de download em segundo plano e atrase os downloads para que não concorram com o vídeo que você está assistindo.*
 
-![Atualização automática de cookies com a extensão beta](docs/screenshots/cookie-refresh.png)
+![Atualização automática de cookies com a extensão beta](https://raw.githubusercontent.com/Bluscream/VRCVideoCacherPlusPlus/assets/cookie-refresh.png)
 *Cookies — a extensão de navegador em beta pode atualizar seus cookies do YouTube automaticamente, a pedido do aplicativo.*
 
 ### Recursos

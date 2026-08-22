@@ -90,6 +90,10 @@ public partial class App : Application
                 _isExiting = true;
                 _trayIcon?.Dispose();
                 _trayIcon = null;
+
+                // Stops the background polling that the Active Connections and Now Playing
+                // tabs start when first opened.
+                (MainWindow?.DataContext as MainWindowViewModel)?.Dispose();
             };
         }
 
@@ -103,6 +107,16 @@ public partial class App : Application
 
         var configLang = ConfigManager.Config.Language;
         var lang = string.IsNullOrEmpty(configLang) ? "en" : configLang;
+
+        // The config can name a language we no longer ship. The localizer falls back on its
+        // own now, but correcting it here keeps Localizer.Language consistent with what is
+        // actually rendered, so the Settings dropdown doesn't show a blank selection.
+        if (!Localizer.Languages.Contains(lang))
+        {
+            ConfigManager.Config.Language = lang = "en";
+            ConfigManager.TrySaveConfig();
+        }
+
         Localizer.Language = lang;
     }
 
@@ -118,6 +132,7 @@ public partial class App : Application
     private bool _isExiting;
     private IClassicDesktopStyleApplicationLifetime? _desktop;
     private NativeMenuItem? _showItem;
+    private NativeMenuItem? _videoPlayersItem;
     private NativeMenuItem? _openCacheItem;
     private NativeMenuItem? _exitItem;
 
@@ -194,8 +209,12 @@ public partial class App : Application
             };
         }
 
-        _showItem = new NativeMenuItem(Localizer.Get("TrayShow"));
+        _showItem = new NativeMenuItem(Localizer.Get("Show"));
         _showItem.Click += (_, _) => ShowMainWindow();
+
+        _videoPlayersItem = new NativeMenuItem();
+        _videoPlayersItem.Click += (_, _) => ConfigManager.SetVideoPlayersEnabled(!ConfigManager.Config.VideoPlayersEnabled);
+        UpdateVideoPlayersTrayHeader();
 
         _openCacheItem = new NativeMenuItem(Localizer.Get("TrayOpenCacheFolder"));
         _openCacheItem.Click += (_, _) => OpenCacheFolder();
@@ -209,14 +228,19 @@ public partial class App : Application
 
         Localizer.LanguageChanged += (_, _) =>
         {
-            if (_showItem != null) _showItem.Header = Localizer.Get("TrayShow");
+            if (_showItem != null) _showItem.Header = Localizer.Get("Show");
             if (_openCacheItem != null) _openCacheItem.Header = Localizer.Get("TrayOpenCacheFolder");
             if (_exitItem != null) _exitItem.Header = Localizer.Get("TrayExit");
+            UpdateVideoPlayersTrayHeader();
         };
+
+        ConfigManager.OnConfigChanged += UpdateVideoPlayersTrayHeader;
 
         var menu = new NativeMenu
         {
             _showItem,
+            new NativeMenuItemSeparator(),
+            _videoPlayersItem,
             new NativeMenuItemSeparator(),
             _openCacheItem,
             new NativeMenuItemSeparator(),
@@ -232,6 +256,17 @@ public partial class App : Application
         };
 
         _trayIcon.Clicked += (_, _) => ShowMainWindow();
+    }
+
+    private void UpdateVideoPlayersTrayHeader()
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (_videoPlayersItem == null) return;
+            var enabled = ConfigManager.Config.VideoPlayersEnabled;
+            var actionText = enabled ? Localizer.Get("Disable") : Localizer.Get("Enable");
+            _videoPlayersItem.Header = $"{actionText} {Localizer.Get("VideoPlayers")}";
+        });
     }
 
     private async void HideToTray()
@@ -259,16 +294,5 @@ public partial class App : Application
         }
     }
 
-    private void OpenCacheFolder()
-    {
-        var cachePath = CacheManager.CachePath;
-        if (OperatingSystem.IsWindows())
-        {
-            System.Diagnostics.Process.Start("explorer.exe", cachePath);
-        }
-        else if (OperatingSystem.IsLinux())
-        {
-            System.Diagnostics.Process.Start("xdg-open", cachePath);
-        }
-    }
+    private void OpenCacheFolder() => OpenUrl.OpenFolder(CacheManager.CachePath);
 }

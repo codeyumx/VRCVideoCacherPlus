@@ -3,10 +3,53 @@
              xmlns:vm="using:VRCVideoCacher.ViewModels"
              xmlns:mi="using:Material.Icons.Avalonia"
              xmlns:l="using:Jeek.Avalonia.Localization"
+             xmlns:ctl="using:VRCVideoCacher.Controls"
              x:Class="VRCVideoCacher.Views.DashboardView"
              x:DataType="vm:DashboardViewModel">
 <Grid RowDefinitions="Auto, *">
-    
+    <Border
+        Grid.Row="0"
+        Background="#1a73e8"
+        IsVisible="{Binding HasMotd}"
+        Padding="12,8">
+        <Border.Styles>
+            <Style Selector="HyperlinkButton">
+                <Setter Property="Foreground" Value="White"/>
+                <Setter Property="TextBlock.TextDecorations" Value="Underline"/>
+                <Setter Property="Cursor" Value="Hand"/>
+            </Style>
+            <Style Selector="HyperlinkButton:pointerover /template/ ContentPresenter">
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="Foreground" Value="#d6e4ff"/>
+            </Style>
+            <Style Selector="HyperlinkButton:pressed /template/ ContentPresenter">
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="Foreground" Value="#b9d0ff"/>
+            </Style>
+        </Border.Styles>
+        <Grid ColumnDefinitions="*, Auto">
+            <TextBlock
+                Grid.Column="0"
+                Foreground="White"
+                ctl:MarkdownText.Text="{Binding Motd}"
+                TextWrapping="Wrap"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                FontWeight="Medium" />
+            <Button
+                Grid.Column="1"
+                Command="{Binding DismissMotdCommand}"
+                Background="Transparent"
+                BorderThickness="0"
+                Padding="4"
+                Margin="8,0,0,0"
+                VerticalAlignment="Center"
+                ToolTip.Tip="Dismiss">
+                <mi:MaterialIcon Kind="Close" Width="16" Height="16" Foreground="White"/>
+            </Button>
+        </Grid>
+    </Border>
+
     <ScrollViewer Grid.Row="1">
         
         <StackPanel Spacing="20" Margin="10">
@@ -81,6 +124,49 @@
                         </StackPanel>
                         <TextBlock Text="{Binding CookieStatus}"
                                    FontSize="20" FontWeight="Bold" Margin="0,10,0,0"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Tools Status Card -->
+                <Border Background="#2d2d2d" CornerRadius="8" Padding="20" Margin="0,0,15,15" MinWidth="220">
+                    <StackPanel Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,0,0,5">
+                            <mi:MaterialIcon Kind="Tools" Width="24" Height="24" Foreground="#4FC3F7"/>
+                            <TextBlock Text="{l:Localize Tools}" FontWeight="SemiBold" FontSize="14"/>
+                        </StackPanel>
+
+                        <Grid ColumnDefinitions="*, Auto">
+                            <TextBlock Text="yt-dlp" Foreground="#CCCCCC" FontSize="13"/>
+                            <TextBlock Grid.Column="1" Text="{Binding YtdlpStatus}" FontWeight="Bold" FontSize="13" Foreground="#4FC3F7"/>
+                        </Grid>
+
+                        <Grid ColumnDefinitions="*, Auto">
+                            <TextBlock Text="Deno" Foreground="#CCCCCC" FontSize="13"/>
+                            <TextBlock Grid.Column="1" Text="{Binding DenoStatus}" FontWeight="Bold" FontSize="13" Foreground="#AED581"/>
+                        </Grid>
+
+                        <Grid ColumnDefinitions="*, Auto">
+                            <TextBlock Text="FFmpeg" Foreground="#CCCCCC" FontSize="13"/>
+                            <TextBlock Grid.Column="1" Text="{Binding FfmpegStatus}" FontWeight="Bold" FontSize="13" Foreground="#FF8A65"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Video Players Control Card -->
+                <Border Background="#2d2d2d" CornerRadius="8" Padding="20" Margin="0,0,15,15" MinWidth="220">
+                    <StackPanel Spacing="10">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <mi:MaterialIcon Kind="Video" Width="24" Height="24" Foreground="#81C784"/>
+                            <TextBlock Text="{l:Localize VideoPlayers}" FontWeight="SemiBold" FontSize="14"/>
+                        </StackPanel>
+
+                        <Button Command="{Binding ToggleVideoPlayersCommand}"
+                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,5,0,0">
+                            <Panel>
+                                <TextBlock Text="{l:Localize Disable}" IsVisible="{Binding VideoPlayersEnabled}" FontWeight="Bold"/>
+                                <TextBlock Text="{l:Localize Enable}" IsVisible="{Binding !VideoPlayersEnabled}" FontWeight="Bold"/>
+                            </Panel>
+                        </Button>
                     </StackPanel>
                 </Border>
             </WrapPanel>

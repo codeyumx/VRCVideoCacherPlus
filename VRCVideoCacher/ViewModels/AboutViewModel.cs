@@ -1,8 +1,11 @@
+using Avalonia.Threading;
+using CommunityToolkit.Mvvm.ComponentModel;
 using Jeek.Avalonia.Localization;
+using VRCVideoCacher.Services;
 
 namespace VRCVideoCacher.ViewModels;
 
-public class AboutViewModel : ViewModelBase
+public partial class AboutViewModel : ViewModelBase
 {
     public string Version { get; }
     public string PlusAuthor { get; } = "VRCVideoCacherPlus by codeyumx";

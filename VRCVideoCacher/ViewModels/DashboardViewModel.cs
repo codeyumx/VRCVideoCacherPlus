@@ -3,14 +3,13 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Jeek.Avalonia.Localization;
+using VRCVideoCacher.Models;
 using VRCVideoCacher.Services;
 using VRCVideoCacher.Utils;
 using VRCVideoCacher.Views;
 using VRCVideoCacher.YTDL;
 
 namespace VRCVideoCacher.ViewModels;
-
-public partial class MainWindowViewModel;
 
 public partial class DashboardViewModel : ViewModelBase
 {
@@ -44,11 +43,57 @@ public partial class DashboardViewModel : ViewModelBase
     [ObservableProperty]
     private bool _cookiesFileExists = false;
 
+    [ObservableProperty]
+    private string _ytdlpStatus = "Up-To-Date";
+
+    [ObservableProperty]
+    private string _denoStatus = "Up-To-Date";
+
+    [ObservableProperty]
+    private string _ffmpegStatus = "Up-To-Date";
+
+    [ObservableProperty]
+    private bool _videoPlayersEnabled = true;
+
+    [ObservableProperty]
+    private string? _motd;
+
+    public bool HasMotd =>
+        !string.IsNullOrWhiteSpace(Motd) &&
+        ConfigManager.Config.DismissedMotdHash != ComputeMotdHash(Motd);
+
+    partial void OnMotdChanged(string? value) => OnPropertyChanged(nameof(HasMotd));
+
+    private static string ComputeMotdHash(string? text)
+    {
+        if (string.IsNullOrEmpty(text)) return string.Empty;
+        var bytes = System.Text.Encoding.UTF8.GetBytes(text);
+        var hash = System.Security.Cryptography.SHA256.HashData(bytes);
+        return Convert.ToHexString(hash);
+    }
+
+    [RelayCommand]
+    private void DismissMotd()
+    {
+        if (!string.IsNullOrWhiteSpace(Motd))
+        {
+            ConfigManager.Config.DismissedMotdHash = ComputeMotdHash(Motd);
+            ConfigManager.TrySaveConfig();
+            OnPropertyChanged(nameof(HasMotd));
+        }
+    }
+
     public DashboardViewModel()
     {
+        VideoPlayersEnabled = ConfigManager.Config.VideoPlayersEnabled;
         ServerUrl = ConfigManager.Config.YtdlpWebServerUrl;
         MaxCacheSize = ConfigManager.Config.CacheMaxSizeInGb;
         HostState = ElevatorManager.HasHostsLine;
+        Motd = VvcConfigService.CurrentConfig.Motd;
+        VvcConfigService.OnApiConfigChanged += () =>
+        {
+            Dispatcher.UIThread.Post(() => Motd = VvcConfigService.CurrentConfig.Motd);
+        };
 
         // Initial data load
         RefreshData();
@@ -60,6 +105,7 @@ public partial class DashboardViewModel : ViewModelBase
         CacheManager.OnCacheChanged += OnCacheChanged;
         VideoDownloader.OnDownloadStarted += OnDownloadStarted;
         VideoDownloader.OnDownloadCompleted += OnDownloadCompleted;
+        VideoDownloader.OnDownloadProgress += OnDownloadProgress;
         VideoDownloader.OnQueueChanged += OnQueueChanged;
         ConfigManager.OnConfigChanged += OnConfigChanged;
         Program.OnCookiesUpdated += OnCookiesUpdated;
@@ -87,14 +133,32 @@ public partial class DashboardViewModel : ViewModelBase
 
     private void OnDownloadStarted(Models.VideoInfo video)
     {
+        _currentDownloadLabel = $"{video.UrlType}: {video.VideoId}";
         Dispatcher.UIThread.InvokeAsync(() =>
         {
-            CurrentDownloadText = $"{video.UrlType}: {video.VideoId}";
+            CurrentDownloadText = _currentDownloadLabel;
         });
+    }
+
+    // Kept so a progress update can re-append to the same label without re-deriving it.
+    private string _currentDownloadLabel = string.Empty;
+
+    private void OnDownloadProgress(Models.DownloadProgress progress)
+    {
+        if (string.IsNullOrEmpty(_currentDownloadLabel))
+            return;
+
+        var eta = progress.FormatEta();
+        var suffix = eta != null
+            ? $" — {progress.Percent:F0}%, {string.Format(Localizer.Get("DownloadTimeRemaining"), eta)}"
+            : $" — {progress.Percent:F0}%";
+
+        Dispatcher.UIThread.InvokeAsync(() => CurrentDownloadText = _currentDownloadLabel + suffix);
     }
 
     private void OnDownloadCompleted(Models.VideoInfo video, bool success, string? failReason)
     {
+        _currentDownloadLabel = string.Empty;
         Dispatcher.UIThread.InvokeAsync(() =>
         {
             CurrentDownloadText = Localizer.Get("None");
@@ -123,6 +187,7 @@ public partial class DashboardViewModel : ViewModelBase
     private void RefreshData()
     {
         RefreshCacheStats();
+        RefreshUtilStatuses();
         DownloadQueueCount = VideoDownloader.GetQueueCount();
 
         var currentDownload = VideoDownloader.GetCurrentDownload();
@@ -133,37 +198,94 @@ public partial class DashboardViewModel : ViewModelBase
         _ = ValidateCookiesAsync();
     }
 
-    [RelayCommand]
-    private void ToggleHost()
+    public void RefreshUtilStatuses()
     {
-        ElevatorManager.ToggleHostLine();
-        Dispatcher.UIThread.Post(() => { HostState = ElevatorManager.HasHostsLine; });
+        // 1. yt-dlp Status
+        if (!File.Exists(YtdlManager.YtdlPath))
+        {
+            var sysYtdlp = FileTools.LocateFile(OperatingSystem.IsWindows() ? "yt-dlp.exe" : "yt-dlp");
+            YtdlpStatus = sysYtdlp != null ? "Shim" : "Missing";
+        }
+        else
+        {
+            try
+            {
+                var bytes = File.ReadAllBytes(YtdlManager.YtdlPath);
+                var hash = Program.ComputeBinaryContentHash(bytes);
+                if (hash == Program.YtdlpHash)
+                {
+                    YtdlpStatus = "Shim";
+                }
+                else if (Versions.CurrentVersion.Ytdlp == "Outdated")
+                {
+                    YtdlpStatus = "Outdated";
+                }
+                else
+                {
+                    YtdlpStatus = "Up-To-Date";
+                }
+            }
+            catch
+            {
+                YtdlpStatus = "Up-To-Date";
+            }
+        }
+
+        // 2. Deno Status
+        if (!File.Exists(YtdlManager.DenoPath))
+        {
+            var systemDeno = FileTools.LocateFile(OperatingSystem.IsWindows() ? "deno.exe" : "deno");
+            DenoStatus = systemDeno != null ? "Shim" : "Missing";
+        }
+        else if (Versions.CurrentVersion.Deno == "Outdated")
+        {
+            DenoStatus = "Outdated";
+        }
+        else
+        {
+            DenoStatus = "Up-To-Date";
+        }
+
+        // 3. FFmpeg Status
+        if (!File.Exists(YtdlManager.FfmpegPath))
+        {
+            var systemFfmpeg = FileTools.LocateFile(OperatingSystem.IsWindows() ? "ffmpeg.exe" : "ffmpeg");
+            FfmpegStatus = systemFfmpeg != null ? "Shim" : "Missing";
+        }
+        else if (Versions.CurrentVersion.Ffmpeg == "Outdated")
+        {
+            FfmpegStatus = "Outdated";
+        }
+        else
+        {
+            FfmpegStatus = "Up-To-Date";
+        }
+    }
+
+    [RelayCommand]
+    private void ToggleVideoPlayers()
+    {
+        VideoPlayersEnabled = !VideoPlayersEnabled;
+        ConfigManager.SetVideoPlayersEnabled(VideoPlayersEnabled);
+    }
+
+    [RelayCommand]
+    private async Task ToggleHost()
+    {
+        await ElevatorManager.ToggleHostLineAsync();
+        HostState = ElevatorManager.HasHostsLine;
     }
 
     private void RefreshCacheStats()
     {
         TotalCacheSize = CacheManager.GetTotalCacheSize();
-        // Subtract 1 for index.html if it exists in the cache
-        var count = CacheManager.GetCachedVideoCount();
-        var assets = CacheManager.GetCachedAssets();
-        if (assets.ContainsKey("index.html"))
-            count--;
-        CachedVideoCount = count;
+        // The index only holds .mp4/.webm now, so index.html is never counted and no
+        // longer has to be subtracted back out.
+        CachedVideoCount = CacheManager.GetCachedVideoCount();
     }
 
     [RelayCommand]
-    private void OpenCacheFolder()
-    {
-        var cachePath = CacheManager.CachePath;
-        if (OperatingSystem.IsWindows())
-        {
-            System.Diagnostics.Process.Start("explorer.exe", cachePath);
-        }
-        else if (OperatingSystem.IsLinux())
-        {
-            System.Diagnostics.Process.Start("xdg-open", cachePath);
-        }
-    }
+    private void OpenCacheFolder() => OpenUrl.OpenFolder(CacheManager.CachePath);
 
     private async Task ValidateCookiesAsync()
     {

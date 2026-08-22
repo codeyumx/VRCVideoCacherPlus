@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Runtime.Versioning;
-using System.Text;
 using Serilog;
 
 namespace VRCVideoCacher.Utils;
@@ -20,18 +19,18 @@ public class WinGet
     public static async Task TryInstallPackages()
     {
         Log.Information("Checking for missing codec packages...");
-        if (!IsOurPackagesInstalled())
+        if (!await IsOurPackagesInstalled())
         {
             Log.Information("Installing missing codec packages...");
             await InstallAllPackages();
         }
     }
 
-    private static bool IsOurPackagesInstalled()
+    private static async Task<bool> IsOurPackagesInstalled()
     {
         foreach (var package in WingetPackages.Values)
         {
-            if (!IsPackageInstalled(package))
+            if (!await IsPackageInstalled(package))
             {
                 return false;
             }
@@ -41,27 +40,16 @@ public class WinGet
         return true;
     }
 
-    private static bool IsPackageInstalled(string packageId)
+    private static async Task<bool> IsPackageInstalled(string packageId)
     {
         try
         {
-            var process = new Process
+            var result = await ProcessRunner.RunAsync(new ProcessStartInfo
             {
-                StartInfo =
-                {
-                    FileName = WingetPath,
-                    Arguments = $"list \"{packageId}\" -s msstore --accept-source-agreements",
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true,
-                    StandardOutputEncoding = Encoding.UTF8,
-                    StandardErrorEncoding = Encoding.UTF8,
-                }
-            };
-            process.Start();
-            process.WaitForExit();
-            return process.ExitCode == 0;
+                FileName = WingetPath,
+                Arguments = $"list \"{packageId}\" -s msstore --accept-source-agreements"
+            });
+            return result.ExitCode == 0;
         }
         catch (Exception ex)
         {
@@ -82,34 +70,23 @@ public class WinGet
     {
         try
         {
-            var process = new Process
+            var (output, error, exitCode) = await ProcessRunner.RunAsync(new ProcessStartInfo
             {
-                StartInfo =
-                {
-                    FileName = WingetPath,
-                    Arguments = $"install --id {packageId} -s msstore --accept-package-agreements --accept-source-agreements",
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true,
-                    StandardOutputEncoding = Encoding.UTF8,
-                    StandardErrorEncoding = Encoding.UTF8,
-                }
-            };
-            process.Start();
-            string? line;
-            while ((line = await process.StandardOutput.ReadLineAsync()) != null)
+                FileName = WingetPath,
+                Arguments = $"install --id {packageId} -s msstore --accept-package-agreements --accept-source-agreements"
+            });
+
+            foreach (var line in output.Split('\n'))
             {
-                if (!string.IsNullOrEmpty(line.Trim()))
-                    Log.Debug("{Winget}: {Line}", "winget", line);
+                if (!string.IsNullOrWhiteSpace(line))
+                    Log.Debug("{Winget}: {Line}", "winget", line.TrimEnd());
             }
-            var error = await process.StandardError.ReadToEndAsync();
-            await process.WaitForExitAsync();
-            if (process.ExitCode != 0 && !string.IsNullOrEmpty(error))
-                throw new Exception($"Installation failed with exit code {process.ExitCode}. Error: {error}");
+
+            if (exitCode != 0 && !string.IsNullOrEmpty(error))
+                throw new Exception($"Installation failed with exit code {exitCode}. Error: {error}");
 
             var packageName = WingetPackages.FirstOrDefault(x => x.Value == packageId).Key;
-            if (process.ExitCode == 0)
+            if (exitCode == 0)
                 Log.Information("Successfully installed package: {PackageName}", packageName);
         }
         catch (Exception ex)

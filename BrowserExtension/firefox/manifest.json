@@ -20,6 +20,11 @@
     "default_popup": "popup.html"
   },
   "browser_specific_settings": {
-    "gecko": { "id": "vrcvideocacher-cookies@local" }
+    "gecko": {
+      "id": "vrcvideocacher-cookies@local",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    }
   }
 }

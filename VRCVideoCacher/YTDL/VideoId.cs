@@ -6,7 +6,8 @@ using Serilog;
 using VRCVideoCacher.Database;
 using VRCVideoCacher.Database.Models;
 using VRCVideoCacher.Models;
-using VRCVideoCacher.YTDL.SiteHandlers;
+using VRCVideoCacher.Utils;
+using VRCVideoCacher.Integrations;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace VRCVideoCacher.YTDL;
@@ -28,47 +29,58 @@ public class VideoId
             .Replace("=", "");
     }
 
-    private static Process GetYtdlpProcess()
+    /// <summary>
+    /// Errors that no alternative client, format or cookie state can fix.
+    ///
+    /// Every retry is another yt-dlp launch — a ~15 MB Python bundle with a second or two of
+    /// startup — and VRChat is blocked on the resolve the whole time. A failing video could
+    /// otherwise take four launches: the AVPro attempt, the non-AVPro retry, the android
+    /// fallback, and ApiController's own post-prefetch retry. For a deleted or private video
+    /// none of them was ever going to succeed.
+    /// </summary>
+    internal static bool IsTerminalFailure(string error)
     {
-        var process = new Process
-        {
-            StartInfo =
-            {
-                FileName = YtdlManager.YtdlPath,
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true,
-                StandardOutputEncoding = Encoding.UTF8,
-                StandardErrorEncoding = Encoding.UTF8,
-            }
-        };
+        if (string.IsNullOrWhiteSpace(error))
+            return false;
 
-        return process;
+        string[] markers =
+        [
+            "Video unavailable",
+            "Private video",
+            "This video has been removed",
+            "video has been removed",
+            "members-only",
+            "join this channel",
+            "does not exist",
+            "has been terminated",
+            "Incomplete YouTube ID",
+            "Unsupported URL",
+            "is not a valid URL",
+            "Video not available"
+        ];
+
+        return markers.Any(marker => error.Contains(marker, StringComparison.OrdinalIgnoreCase));
     }
 
-    private static async Task<(string Output, string Error, int ExitCode)> RunYtdlpAsync(List<string> args, string url)
+    private static async Task<(string Output, string Error, int ExitCode)> RunYtdlpAsync(List<string> args, string url, bool includeCookies = true)
     {
-        var ytdlpProcess = GetYtdlpProcess();
-        ytdlpProcess.StartInfo.Arguments = YtdlManager.GenerateYtdlArgs(args, $"\"{url}\"");
-        Log.Information("Starting yt-dlp with args: {args:l}", ytdlpProcess.StartInfo.Arguments);
-        ytdlpProcess.Start();
-        var output = await ytdlpProcess.StandardOutput.ReadToEndAsync();
-        var error = await ytdlpProcess.StandardError.ReadToEndAsync();
-        await ytdlpProcess.WaitForExitAsync();
+        // "--" so a URL that happens to start with a dash is never taken for a flag.
+        var arguments = YtdlManager.GenerateYtdlArgs(args, ["--", url], includeCookies);
+        Log.Information("Starting yt-dlp with args: {args:l}", string.Join(' ', arguments));
+        var (output, error, exitCode) = await ProcessRunner.RunAsync(YtdlManager.YtdlPath, arguments);
         Log.Information("Finished yt-dlp");
-        return (output.Trim(), error.Trim(), ytdlpProcess.ExitCode);
+        return (output, error, exitCode);
     }
 
     public static async Task<VideoInfo?> GetVideoId(string url, bool avPro)
     {
         url = url.Trim();
-        url = await SiteHandlerRegistry.ApplyRewrites(url);
+        url = await IntegrationRegistry.ApplyRewrites(url);
 
         var uri = ToUri(url);
         if (uri == null) return null;
 
-        var handler = await SiteHandlerRegistry.ResolveAsync(url, uri);
+        var handler = await IntegrationRegistry.ResolveAsync(url, uri, Services.RuleEngine.EvaluateUrl(url).MatchedRule);
         return handler == null ? null : await handler.GetVideoInfo(url, uri, avPro);
     }
 
@@ -85,17 +97,32 @@ public class VideoId
         if (existing?.Duration is > 0)
             return existing.Duration;
 
+        // Fast oEmbed lookup so a title appears immediately, ahead of the slower yt-dlp
+        // call below. Deliberately after the cache check: it used to run first, so every
+        // call made an HTTP round trip to YouTube even when the answer was already known.
+        // GetVideoTitleAsync caches what it finds and logs its own failures.
+        await Integrations.YouTube.YouTubeMetadataService.GetVideoTitleAsync(videoId);
+
         try
         {
             var url = $"https://www.youtube.com/watch?v={videoId}";
             var args = new List<string>
             {
                 "-j",
-                "--impersonate=\"safari\"",
-                "--extractor-args=\"youtube:player_client=web\""
+                "--skip-download",
+                "--impersonate", "safari",
+                "--extractor-args", "youtube:player_client=web"
             };
 
-            var (rawData, error, exitCode) = await RunYtdlpAsync(args, url);
+            var (rawData, error, exitCode) = await RunYtdlpAsync(args, url, includeCookies: true);
+            if ((exitCode != 0 || string.IsNullOrEmpty(rawData)) && !IsTerminalFailure(error))
+            {
+                // Worth one retry: expired or rejected cookies make yt-dlp fail in a way a
+                // cookie-less request often survives. Pointless for a deleted video.
+                Log.Warning("Metadata fetch with cookies failed for {VideoId} ({Error}). Retrying without cookies...", videoId, error.Trim());
+                (rawData, error, exitCode) = await RunYtdlpAsync(args, url, includeCookies: false);
+            }
+
             if (exitCode != 0 || string.IsNullOrEmpty(rawData))
             {
                 Log.Warning("Failed to fetch metadata for {VideoId}: {Error}", videoId, error);
@@ -127,12 +154,22 @@ public class VideoId
 
     public static async Task<(string VideoId, string? SkipReason)> TryGetYouTubeVideoId(string url)
     {
-        var args = new List<string>();
-        args.Add("-j");
+        var args = new List<string> { "-j" };
 
-        var (rawData, error, exitCode) = await RunYtdlpAsync(args, url);
-        if (exitCode != 0)
+        var (rawData, error, exitCode) = await RunYtdlpAsync(args, url, includeCookies: true);
+        if ((exitCode != 0 || string.IsNullOrEmpty(rawData)) && IsTerminalFailure(error))
             throw new Exception($"yt-dlp metadata fetch failed: {error.Trim()}");
+
+        if (exitCode != 0 || string.IsNullOrEmpty(rawData))
+        {
+            Log.Warning("TryGetYouTubeVideoId with cookies failed ({Error}). Retrying without cookies...", error.Trim());
+            var (fallbackData, fallbackError, fallbackExitCode) = await RunYtdlpAsync(new List<string> { "-j" }, url, includeCookies: false);
+            if (fallbackExitCode != 0 || string.IsNullOrEmpty(fallbackData))
+            {
+                throw new Exception($"yt-dlp metadata fetch failed: {fallbackError.Trim()}");
+            }
+            rawData = fallbackData;
+        }
 
         if (string.IsNullOrEmpty(rawData))
         {
@@ -160,10 +197,13 @@ public class VideoId
             Log.Warning("Skipping video: video is a live stream");
             return (string.Empty, "SkipReasonLiveStream");
         }
-        if (data.Duration > ConfigManager.Config.CacheYouTubeMaxLength * 60)
+        var evalResult = Services.RuleEngine.EvaluateUrl(url);
+        int maxDurationMinutes = evalResult.MaxDurationMinutes ?? 120;
+
+        if (data.Duration > maxDurationMinutes * 60)
         {
-            Log.Warning("Skipping video: duration exceeds allowed duration ({VideoMin:F1}min > {MaxMin}min)", data.Duration / 60.0, ConfigManager.Config.CacheYouTubeMaxLength);
-            return (string.Empty, string.Format("SkipReasonTooLong|{0:F0}|{1}", data.Duration / 60.0, ConfigManager.Config.CacheYouTubeMaxLength));
+            Log.Warning("Skipping video: duration exceeds allowed duration ({VideoMin:F1}min > {MaxMin}min)", data.Duration / 60.0, maxDurationMinutes);
+            return (string.Empty, string.Format("SkipReasonTooLong|{0:F0}|{1}", data.Duration / 60.0, maxDurationMinutes));
         }
 
         return (data.Id, null);
@@ -173,13 +213,18 @@ public class VideoId
     {
         var args = new List<string>();
         if (!string.IsNullOrEmpty(ConfigManager.Config.YtdlpDubLanguage))
-            args.Add($"-f \"[language={ConfigManager.Config.YtdlpDubLanguage}]\"");
+        {
+            args.Add("-f");
+            args.Add($"[language={ConfigManager.Config.YtdlpDubLanguage}]");
+        }
         args.Add("--flat-playlist");
         args.Add("-i");
         args.Add("-J"); // --dump-single-json
         args.Add("-s");
-        args.Add("--impersonate=\"safari\"");
-        args.Add("--extractor-args=\"youtube:player_client=web\"");
+        args.Add("--impersonate");
+        args.Add("safari");
+        args.Add("--extractor-args");
+        args.Add("youtube:player_client=web");
 
         var (output, error, exitCode) = await RunYtdlpAsync(args, url);
         if (exitCode != 0)
@@ -204,25 +249,52 @@ public class VideoId
 
         var url = videoInfo.VideoUrl;
         var uri = ToUri(url);
-        var handler = uri != null ? SiteHandlerRegistry.Resolve(uri) : null;
+
+        // Select the handler from the type recorded on the VideoInfo rather than
+        // re-evaluating the rules against its URL. GetVideoInfo has already canonicalised
+        // that URL, so a second evaluation is both redundant and able to disagree with the
+        // handler that produced this record in the first place.
+        var handler = uri != null ? IntegrationRegistry.ResolveByUrlType(videoInfo.UrlType) : null;
         var args = handler?.GetYtdlpArguments(uri!, avPro) ?? [];
         args.Add("--get-url");
 
         var (output, error, exitCode) = await RunYtdlpAsync(args, url);
 
-        if (exitCode == 0) // success
+        if (exitCode == 0 && !string.IsNullOrEmpty(output)) // success
             return new Tuple<string, bool>(output, true);
 
         if (error.Contains("Sign in to confirm you’re not a bot")) // Exact Text, do not modify.
             Log.Error("Fix this error by running cookie setup.");
 
-        if (error.Contains(
-            "Requested format is not available. Use --list-formats for a list of available formats") && avPro)
+        // Nothing below can help with a deleted, private or members-only video, and each
+        // step costs another yt-dlp launch that VRChat waits through.
+        if (IsTerminalFailure(error))
         {
-            Log.Warning("AVPro format request failed retrying for 360p.");
+            Log.Information("Not retrying {URL}: {Error}", url, error.Trim());
+            return new Tuple<string, bool>(error, false);
+        }
+
+        if (avPro)
+        {
+            Log.Warning("AVPro format request failed retrying without AVPro.");
             return await GetUrl(videoInfo, false);
         }
-        return new Tuple<string, bool>(error, false);
+
+        // Ultimate fallback for videos with restricted DASH/AVPro formats
+        Log.Warning("Standard format request failed ({Error}). Retrying with android fallback client...", error.Trim());
+        var fallbackArgs = new List<string>
+        {
+            "--get-url",
+            "--extractor-args", "youtube:player_client=android,web",
+            "-f", "b[height<=?1080]/bv*+ba/best"
+        };
+        var (fallbackOutput, fallbackError, fallbackExitCode) = await RunYtdlpAsync(fallbackArgs, url);
+        if (fallbackExitCode == 0 && !string.IsNullOrEmpty(fallbackOutput))
+        {
+            return new Tuple<string, bool>(fallbackOutput, true);
+        }
+
+        return new Tuple<string, bool>(!string.IsNullOrEmpty(fallbackError) ? fallbackError : error, false);
     }
 
     public static bool IsYouTubePlaylist(string url)
@@ -251,41 +323,33 @@ public class VideoId
             "-j",
             "--ignore-config",
             "--no-warnings",
-            "--encoding utf-8"
+            "--encoding", "utf-8"
         };
 
         if (File.Exists(YtdlManager.FfmpegPath))
-            args.Add($"--ffmpeg-location \"{YtdlManager.FfmpegPath}\"");
+        {
+            args.Add("--ffmpeg-location");
+            args.Add(YtdlManager.FfmpegPath);
+        }
         if (File.Exists(YtdlManager.DenoPath))
-            args.Add($"--js-runtimes deno:\"{YtdlManager.DenoPath}\"");
+        {
+            args.Add("--js-runtimes");
+            args.Add($"deno:{YtdlManager.DenoPath}");
+        }
         if (Program.IsCookiesEnabledAndValid())
-            args.Add($"--cookies \"{YtdlManager.CookiesPath}\"");
-        if (!string.IsNullOrEmpty(ConfigManager.Config.YtdlpAdditionalArgs))
-            args.Add(ConfigManager.Config.YtdlpAdditionalArgs);
-        args.Add($"\"{url}\"");
-
-        var process = new Process
         {
-            StartInfo =
-            {
-                FileName = YtdlManager.YtdlPath,
-                Arguments = string.Join(' ', args),
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true,
-                StandardOutputEncoding = Encoding.UTF8,
-                StandardErrorEncoding = Encoding.UTF8,
-            }
-        };
-        process.Start();
-        var output = await process.StandardOutput.ReadToEndAsync();
-        var error = await process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
+            args.Add("--cookies");
+            args.Add(YtdlManager.CookiesPath);
+        }
+        args.AddRange(YtdlManager.SplitArguments(ConfigManager.Config.YtdlpAdditionalArgs));
+        args.Add("--");
+        args.Add(url);
 
-        if (process.ExitCode != 0)
+        var (output, error, exitCode) = await ProcessRunner.RunAsync(YtdlManager.YtdlPath, args);
+
+        if (exitCode != 0)
         {
-            Log.Error("Failed to get playlist entries: {Error}", error.Trim());
+            Log.Error("Failed to get playlist entries: {Error}", error);
             return results;
         }
 

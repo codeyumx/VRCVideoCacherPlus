@@ -18,13 +18,13 @@ VRCVideoCacherPlus 확장 프로그램은 알파 단계이며 테스트되지 �
 VRCVideoCacherPlus는 VRChat 동영상 재생을 도와줍니다. YouTube는 사용자 클라이언트가 쿠키를 제공하지 않으면 동영상을 차단하거나 제한하는 경우가 있습니다. 이 앱은 VRChat을 플레이하는 동안 YouTube에 쿠키를 전달하여 동영상이 고화질로 부드럽게 재생되도록 합니다. 또한 해당 설정을 켜면 동영상을 지능적으로 다운로드하여 자주 재생하는 동영상(예: VRDancing)을 매번 인터넷에서 다시 다운로드할 필요가 없게 합니다. 동영상 캐시를 관리하고, 백그라운드 다운로드 속도를 변경하며, 동영상 다운로드를 지연시킬 수 있습니다(두 개 이상의 동영상 파일을 동시에 다운로드하지 않도록).
 VRCVideoCacherPlus는 VRCVideoCacher를 기반으로 하며, HLS 및 스트리밍 재생 목록(.m3u8) 동영상 지원과 같은 여러 개선 사항을 추가했습니다.
 
-![메인 화면](docs/screenshots/main-info.png)
+![메인 화면](https://raw.githubusercontent.com/Bluscream/VRCVideoCacherPlusPlus/assets/main-info.png)
 *메인 화면 — 상태, 캐시 크기, 앱이 현재 수행 중인 작업.*
 
-![다운로드 속도 및 캐시 지연 설정](docs/screenshots/download-settings.png)
+![다운로드 속도 및 캐시 지연 설정](https://raw.githubusercontent.com/Bluscream/VRCVideoCacherPlusPlus/assets/download-settings.png)
 *캐시 설정 — 백그라운드 다운로드 속도를 제한하고, 시청 중인 동영상과 겹치지 않도록 다운로드를 지연시킵니다.*
 
-![베타 확장 프로그램을 통한 쿠키 자동 갱신](docs/screenshots/cookie-refresh.png)
+![베타 확장 프로그램을 통한 쿠키 자동 갱신](https://raw.githubusercontent.com/Bluscream/VRCVideoCacherPlusPlus/assets/cookie-refresh.png)
 *쿠키 — 베타 브라우저 확장 프로그램은 앱의 요청에 따라 YouTube 쿠키를 자동으로 갱신할 수 있습니다.*
 
 ### 기능
