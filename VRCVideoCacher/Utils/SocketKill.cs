@@ -3,49 +3,14 @@ using System.Net;
 using System.Runtime.InteropServices;
 using Serilog;
 
+using static Vanara.PInvoke.IpHlpApi;
+using Vanara.PInvoke;
+
 namespace VRCVideoCacher.Utils;
 
 public static class SocketKill
 {
     private static readonly ILogger Log = Program.Logger.ForContext(typeof(SocketKill));
-
-    // Win32 structures & P/Invokes
-    [StructLayout(LayoutKind.Sequential)]
-    private struct MIB_TCPROW_OWNER_PID
-    {
-        public uint state;
-        public uint localAddr;
-        public uint localPort; // in network byte order
-        public uint remoteAddr;
-        public uint remotePort;
-        public int owningPid;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct MIB_TCPROW
-    {
-        public uint dwState;
-        public uint dwLocalAddr;
-        public uint dwLocalPort;
-        public uint dwRemoteAddr;
-        public uint dwRemotePort;
-    }
-
-    [DllImport("iphlpapi.dll", SetLastError = true)]
-    private static extern uint GetExtendedTcpTable(
-        IntPtr pTcpTable,
-        ref int dwOutBufLen,
-        bool sort,
-        int ipVersion,
-        int tblClass,
-        uint reserved = 0);
-
-    [DllImport("iphlpapi.dll", SetLastError = true)]
-    private static extern int SetTcpEntry(ref MIB_TCPROW pTcpRow);
-
-    private const int AF_INET = 2;
-    private const int TCP_TABLE_OWNER_PID_ALL = 5;
-    private const int MIB_TCP_STATE_DELETE_TCB = 12;
 
     public static void SeverActiveVideoConnections()
     {
@@ -96,6 +61,7 @@ public static class SocketKill
         }
     }
 
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
     private static void SeverConnectionsWindows(string? filterIp = null)
     {
         var targetPids = GetTargetPids();
@@ -105,14 +71,14 @@ public static class SocketKill
             return;
         }
 
-        int bufferSize = 0;
-        GetExtendedTcpTable(IntPtr.Zero, ref bufferSize, false, AF_INET, TCP_TABLE_OWNER_PID_ALL);
+        uint bufferSize = 0;
+        GetExtendedTcpTable(IntPtr.Zero, ref bufferSize, false, 2, TCP_TABLE_CLASS.TCP_TABLE_OWNER_PID_ALL);
         if (bufferSize == 0) return;
 
-        IntPtr tcpTablePtr = Marshal.AllocHGlobal(bufferSize);
+        IntPtr tcpTablePtr = Marshal.AllocHGlobal((int)bufferSize);
         try
         {
-            uint result = GetExtendedTcpTable(tcpTablePtr, ref bufferSize, false, AF_INET, TCP_TABLE_OWNER_PID_ALL);
+            var result = GetExtendedTcpTable(tcpTablePtr, ref bufferSize, false, 2, TCP_TABLE_CLASS.TCP_TABLE_OWNER_PID_ALL);
             if (result != 0)
             {
                 Log.Warning("GetExtendedTcpTable returned error: {Result}", result);
@@ -130,11 +96,11 @@ public static class SocketKill
                 var row = Marshal.PtrToStructure<MIB_TCPROW_OWNER_PID>(rowPtr);
                 rowPtr += rowSize;
 
-                if (!targetPids.Contains(row.owningPid))
+                if (!targetPids.Contains((int)row.dwOwningPid))
                     continue;
 
-                ushort localPort = (ushort)(((row.localPort & 0xFF00) >> 8) | ((row.localPort & 0x00FF) << 8));
-                ushort remotePort = (ushort)(((row.remotePort & 0xFF00) >> 8) | ((row.remotePort & 0x00FF) << 8));
+                ushort localPort = (ushort)IPAddress.NetworkToHostOrder((short)row.dwLocalPort);
+                ushort remotePort = (ushort)IPAddress.NetworkToHostOrder((short)row.dwRemotePort);
 
                 bool shouldKill = false;
                 if (localPort == 9696 || remotePort == 9696)
@@ -144,8 +110,7 @@ public static class SocketKill
                 }
                 else if (remotePort == 80 || remotePort == 443)
                 {
-                    var remoteIpBytes = BitConverter.GetBytes(row.remoteAddr);
-                    var remoteIp = new IPAddress(remoteIpBytes).ToString();
+                    var remoteIp = new IPAddress((long)row.dwRemoteAddr).ToString();
                     if (filterIp != null)
                     {
                         if (remoteIp == filterIp)
@@ -161,18 +126,18 @@ public static class SocketKill
                 {
                     var rowToKill = new MIB_TCPROW
                     {
-                        dwState = MIB_TCP_STATE_DELETE_TCB,
-                        dwLocalAddr = row.localAddr,
-                        dwLocalPort = row.localPort,
-                        dwRemoteAddr = row.remoteAddr,
-                        dwRemotePort = row.remotePort
+                        dwState = MIB_TCP_STATE.MIB_TCP_STATE_DELETE_TCB,
+                        dwLocalAddr = row.dwLocalAddr,
+                        dwLocalPort = row.dwLocalPort,
+                        dwRemoteAddr = row.dwRemoteAddr,
+                        dwRemotePort = row.dwRemotePort
                     };
 
-                    int setRes = SetTcpEntry(ref rowToKill);
-                    if (setRes == 0)
+                    var setRes = SetTcpEntry(rowToKill);
+                    if (setRes.Succeeded)
                         killedCount++;
                     else
-                        Log.Debug("SetTcpEntry failed to close connection owned by PID {Pid}: {Error}", row.owningPid, setRes);
+                        Log.Debug("SetTcpEntry failed to close connection owned by PID {Pid}: {Error}", row.dwOwningPid, setRes);
                 }
             }
 
@@ -344,6 +309,7 @@ public static class SocketKill
         return list;
     }
 
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
     private static List<ActiveConnectionInfo> ListConnectionsWindows()
     {
         var list = new List<ActiveConnectionInfo>();
@@ -361,14 +327,14 @@ public static class SocketKill
             catch { pidNames[pid] = "VRChat"; }
         }
 
-        int bufferSize = 0;
-        GetExtendedTcpTable(IntPtr.Zero, ref bufferSize, false, AF_INET, TCP_TABLE_OWNER_PID_ALL);
+        uint bufferSize = 0;
+        GetExtendedTcpTable(IntPtr.Zero, ref bufferSize, false, 2, TCP_TABLE_CLASS.TCP_TABLE_OWNER_PID_ALL);
         if (bufferSize == 0) return list;
 
-        IntPtr tcpTablePtr = Marshal.AllocHGlobal(bufferSize);
+        IntPtr tcpTablePtr = Marshal.AllocHGlobal((int)bufferSize);
         try
         {
-            uint result = GetExtendedTcpTable(tcpTablePtr, ref bufferSize, false, AF_INET, TCP_TABLE_OWNER_PID_ALL);
+            var result = GetExtendedTcpTable(tcpTablePtr, ref bufferSize, false, 2, TCP_TABLE_CLASS.TCP_TABLE_OWNER_PID_ALL);
             if (result != 0) return list;
 
             int numEntries = Marshal.ReadInt32(tcpTablePtr);
@@ -380,16 +346,17 @@ public static class SocketKill
                 var row = Marshal.PtrToStructure<MIB_TCPROW_OWNER_PID>(rowPtr);
                 rowPtr += rowSize;
 
-                if (!targetPids.Contains(row.owningPid))
+                int pid = (int)row.dwOwningPid;
+                if (!targetPids.Contains(pid))
                     continue;
 
-                ushort localPort = (ushort)(((row.localPort & 0xFF00) >> 8) | ((row.localPort & 0x00FF) << 8));
-                ushort remotePort = (ushort)(((row.remotePort & 0xFF00) >> 8) | ((row.remotePort & 0x00FF) << 8));
+                ushort localPort = (ushort)IPAddress.NetworkToHostOrder((short)row.dwLocalPort);
+                ushort remotePort = (ushort)IPAddress.NetworkToHostOrder((short)row.dwRemotePort);
 
                 if (localPort == 9696 || remotePort == 9696 || remotePort == 80 || remotePort == 443)
                 {
-                    var localIp = new IPAddress(BitConverter.GetBytes(row.localAddr)).ToString();
-                    var remoteIp = new IPAddress(BitConverter.GetBytes(row.remoteAddr)).ToString();
+                    var localIp = new IPAddress((long)row.dwLocalAddr).ToString();
+                    var remoteIp = new IPAddress((long)row.dwRemoteAddr).ToString();
 
                     var info = new ActiveConnectionInfo
                     {
@@ -397,8 +364,8 @@ public static class SocketKill
                         LocalPort = localPort,
                         RemoteAddress = remoteIp,
                         RemotePort = remotePort,
-                        OwningPid = row.owningPid,
-                        ProcessName = pidNames.TryGetValue(row.owningPid, out var name) ? name : "VRChat",
+                        OwningPid = pid,
+                        ProcessName = pidNames.TryGetValue(pid, out var name) ? name : "VRChat",
                         AssociatedUrl = string.Empty,
                         AssociatedTitle = string.Empty
                     };
@@ -407,16 +374,6 @@ public static class SocketKill
                     {
                         info.AssociatedUrl = urlInfo.OriginalUrl;
                         info.AssociatedTitle = urlInfo.Title;
-                    }
-                    else
-                    {
-                        var sessions = YTDL.ActiveStreamTracker.GetActiveSessions();
-                        var match = sessions.FirstOrDefault(s => s.RemoteIp == remoteIp);
-                        if (match != null)
-                        {
-                            info.AssociatedUrl = match.OriginalUrl;
-                            info.AssociatedTitle = match.Title;
-                        }
                     }
 
                     list.Add(info);
@@ -427,6 +384,7 @@ public static class SocketKill
         {
             Marshal.FreeHGlobal(tcpTablePtr);
         }
+
         return list;
     }
 
