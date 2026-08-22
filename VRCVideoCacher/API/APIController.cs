@@ -52,6 +52,8 @@ public class ApiController : WebApiController
     // Without this OPTIONS handler the preflight is rejected and the extension never sends
     // cookies, regardless of which Chromium-based browser the user has the extension in.
     [Route(HttpVerbs.Options, "/youtube-cookies")]
+    [Route(HttpVerbs.Options, "/youtube-cookies/refresh-wait")]
+    [Route(HttpVerbs.Options, "/youtube-cookies/refresh-needed")]
     public Task ReceiveYoutubeCookiesOptions()
     {
         ApplyCorsHeaders();

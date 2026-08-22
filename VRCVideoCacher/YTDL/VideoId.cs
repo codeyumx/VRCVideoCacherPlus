@@ -214,19 +214,33 @@ public class VideoId
 
         var (output, error, exitCode) = await RunYtdlpAsync(args, url);
 
-        if (exitCode == 0) // success
+        if (exitCode == 0 && !string.IsNullOrEmpty(output)) // success
             return new Tuple<string, bool>(output, true);
 
         if (error.Contains("Sign in to confirm you’re not a bot")) // Exact Text, do not modify.
             Log.Error("Fix this error by running cookie setup.");
 
-        if (error.Contains(
-            "Requested format is not available. Use --list-formats for a list of available formats") && avPro)
+        if (avPro)
         {
-            Log.Warning("AVPro format request failed retrying for 360p.");
+            Log.Warning("AVPro format request failed retrying without AVPro.");
             return await GetUrl(videoInfo, false);
         }
-        return new Tuple<string, bool>(error, false);
+
+        // Ultimate fallback for videos with restricted DASH/AVPro formats
+        Log.Warning("Standard format request failed ({Error}). Retrying with android fallback client...", error.Trim());
+        var fallbackArgs = new List<string>
+        {
+            "--get-url",
+            "--extractor-args", "youtube:player_client=android,web",
+            "-f", "b[height<=?1080]/bv*+ba/best"
+        };
+        var (fallbackOutput, fallbackError, fallbackExitCode) = await RunYtdlpAsync(fallbackArgs, url);
+        if (fallbackExitCode == 0 && !string.IsNullOrEmpty(fallbackOutput))
+        {
+            return new Tuple<string, bool>(fallbackOutput, true);
+        }
+
+        return new Tuple<string, bool>(!string.IsNullOrEmpty(fallbackError) ? fallbackError : error, false);
     }
 
     public static bool IsYouTubePlaylist(string url)
