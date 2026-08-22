@@ -210,5 +210,7 @@
   "UpdateFailed": "Aggiornamento non riuscito. Controlla i log e riprova.",
   "SkipReasonInvalidDownload": "Il file scaricato non ha superato la validazione",
   "SkipReasonTruncated": "Il download è incompleto",
-  "DownloadTimeRemaining": "{0} rimanenti"
+  "DownloadTimeRemaining": "{0} rimanenti",
+  "SharedConfigNoticeTitle": "Le impostazioni sono ora condivise",
+  "SharedConfigNotice": "VRCVideoCacherPlusPlus ora salva le impostazioni nello stesso Config.json del VRCVideoCacher originale, invece che in un file separato.\n\nSe esegui di nuovo il VRCVideoCacher originale, riscriverà quel file eliminando le impostazioni PlusPlus, incluse le tue regole URL, che torneranno ai valori predefiniti.\n\nLe impostazioni precedenti sono state conservate come backup in PlusConfig.json.bak, nella cartella VRCVideoCacher."
 }

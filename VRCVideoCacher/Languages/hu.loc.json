@@ -210,5 +210,7 @@
   "UpdateFailed": "A frissítés sikertelen. Ellenőrizd a naplót, és próbáld újra.",
   "SkipReasonInvalidDownload": "A letöltött fájl nem ment át az ellenőrzésen",
   "SkipReasonTruncated": "A letöltés hiányos volt",
-  "DownloadTimeRemaining": "{0} van hátra"
+  "DownloadTimeRemaining": "{0} van hátra",
+  "SharedConfigNoticeTitle": "A beállítások mostantól közösek",
+  "SharedConfigNotice": "A VRCVideoCacherPlusPlus mostantól ugyanabban a Config.json fájlban tárolja a beállításait, mint az eredeti VRCVideoCacher, külön fájl helyett.\n\nHa újra futtatod az eredeti VRCVideoCachert, az felülírja ezt a fájlt, és eltávolítja a PlusPlus beállításokat – beleértve az URL-szabályaidat is. Ezek visszaállnának az alapértelmezettre.\n\nA korábbi beállításaidról biztonsági másolat készült a PlusConfig.json.bak fájlba, a VRCVideoCacher mappában."
 }

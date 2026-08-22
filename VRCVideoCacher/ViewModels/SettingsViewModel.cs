@@ -142,8 +142,9 @@ public partial class SettingsViewModel : ViewModelBase
     public SettingsViewModel()
     {
         PreCacheVideos.CollectionChanged += OnUrlCollectionChanged;
+        // One file, one event. This used to subscribe to both managers and so ran
+        // LoadFromConfig twice for every save.
         ConfigManager.OnConfigChanged += LoadFromConfig;
-        PlusConfigManager.OnConfigChanged += LoadFromConfig;
         LoadFromConfig();
     }
 
@@ -300,16 +301,13 @@ public partial class SettingsViewModel : ViewModelBase
 
         // Temporarily unhook config-changed events to avoid redundant LoadFromConfig calls during save
         ConfigManager.OnConfigChanged -= LoadFromConfig;
-        PlusConfigManager.OnConfigChanged -= LoadFromConfig;
         try
         {
             ConfigManager.TrySaveConfig();
-            PlusConfigManager.TrySaveConfig();
         }
         finally
         {
             ConfigManager.OnConfigChanged += LoadFromConfig;
-            PlusConfigManager.OnConfigChanged += LoadFromConfig;
         }
 
         // Patch toggles are applied straight away; they used to sit inert until the next

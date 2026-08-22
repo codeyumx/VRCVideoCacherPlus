@@ -210,5 +210,7 @@
   "UpdateFailed": "更新に失敗しました。ログを確認して再試行してください。",
   "SkipReasonInvalidDownload": "ダウンロードしたファイルの検証に失敗しました",
   "SkipReasonTruncated": "ダウンロードが不完全でした",
-  "DownloadTimeRemaining": "残り {0}"
+  "DownloadTimeRemaining": "残り {0}",
+  "SharedConfigNoticeTitle": "設定が共有されるようになりました",
+  "SharedConfigNotice": "VRCVideoCacherPlusPlus は、専用ファイルではなく、オリジナルの VRCVideoCacher と同じ Config.json に設定を保存するようになりました。\n\nオリジナルの VRCVideoCacher を再度実行すると、そのファイルが書き換えられ、URL ルールを含む PlusPlus の設定が削除され、既定値に戻ります。\n\n以前の設定は VRCVideoCacher フォルダー内の PlusConfig.json.bak にバックアップとして保存されています。"
 }

@@ -145,7 +145,7 @@ public partial class RulesViewModel : ViewModelBase
 
     public RulesViewModel()
     {
-        PlusConfigManager.OnConfigChanged += LoadFromConfig;
+        ConfigManager.OnConfigChanged += LoadFromConfig;
         Services.RuleEngine.OnRuleMatched += HandleRuleMatched;
         LoadFromConfig();
     }

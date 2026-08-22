@@ -54,6 +54,11 @@ public class ConfigManager
         if (Config.YtdlpWebServerUrl.EndsWith('/'))
             Config.YtdlpWebServerUrl = Config.YtdlpWebServerUrl.TrimEnd('/');
 
+        // Folds in a legacy PlusConfig.json, repairs and seeds the rule list. Called with
+        // the instance rather than reaching for ConfigManager.Config: PlusConfigManager has
+        // no static state of its own, so there is no initialiser to re-enter here.
+        PlusConfigManager.Initialize(Config);
+
         Log.Information("Loaded config.");
         TrySaveConfig();
     }
@@ -169,6 +174,15 @@ public class ConfigModel
 
     // UI state
     public bool HasShownTrayNotice = false;
+    public bool HasShownSharedConfigNotice = false;
 
-    public static List<UriRule> GetDefaultRules() => PlusConfigManager.GetDefaultRules();
+    /// <summary>
+    /// PlusPlus-only settings, nested under one key rather than scattered across the top
+    /// level. Upstream VRCVideoCacher reads this same file into its own model and writes it
+    /// back, dropping whatever it does not recognise — so this whole block is what it
+    /// removes, and keeping it together is what makes that loss legible and recoverable.
+    /// </summary>
+    public PlusConfigModel Plus = new();
+
+    public static List<UriRule> GetDefaultRules() => DefaultRules.Create();
 }

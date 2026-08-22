@@ -210,5 +210,7 @@
   "UpdateFailed": "更新失败。请查看日志后重试。",
   "SkipReasonInvalidDownload": "下载的文件未通过校验",
   "SkipReasonTruncated": "下载不完整",
-  "DownloadTimeRemaining": "剩余 {0}"
+  "DownloadTimeRemaining": "剩余 {0}",
+  "SharedConfigNoticeTitle": "设置现已共享",
+  "SharedConfigNotice": "VRCVideoCacherPlusPlus 现在将设置保存在与原版 VRCVideoCacher 相同的 Config.json 中，而不再使用单独的文件。\n\n如果再次运行原版 VRCVideoCacher，它会重写该文件并删除 PlusPlus 的设置（包括你的 URL 规则），这些设置将恢复为默认值。\n\n你之前的设置已备份到 VRCVideoCacher 文件夹中的 PlusConfig.json.bak。"
 }

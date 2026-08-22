@@ -209,5 +209,7 @@
   "UpdateFailed": "업데이트에 실패했습니다. 로그를 확인한 후 다시 시도하세요.",
   "SkipReasonInvalidDownload": "다운로드한 파일이 검증에 실패했습니다",
   "SkipReasonTruncated": "다운로드가 완료되지 않았습니다",
-  "DownloadTimeRemaining": "{0} 남음"
+  "DownloadTimeRemaining": "{0} 남음",
+  "SharedConfigNoticeTitle": "설정이 이제 공유됩니다",
+  "SharedConfigNotice": "VRCVideoCacherPlusPlus는 이제 별도 파일 대신 원본 VRCVideoCacher와 동일한 Config.json에 설정을 저장합니다.\n\n원본 VRCVideoCacher를 다시 실행하면 해당 파일을 덮어써서 URL 규칙을 포함한 PlusPlus 설정이 제거되고 기본값으로 돌아갑니다.\n\n이전 설정은 VRCVideoCacher 폴더의 PlusConfig.json.bak에 백업으로 보관되어 있습니다."
 }

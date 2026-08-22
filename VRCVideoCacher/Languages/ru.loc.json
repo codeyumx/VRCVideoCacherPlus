@@ -210,5 +210,7 @@
   "UpdateFailed": "Не удалось обновить. Проверьте журнал и повторите попытку.",
   "SkipReasonInvalidDownload": "Загруженный файл не прошёл проверку",
   "SkipReasonTruncated": "Загрузка не завершена",
-  "DownloadTimeRemaining": "осталось {0}"
+  "DownloadTimeRemaining": "осталось {0}",
+  "SharedConfigNoticeTitle": "Настройки теперь общие",
+  "SharedConfigNotice": "VRCVideoCacherPlusPlus теперь хранит настройки в том же файле Config.json, что и оригинальный VRCVideoCacher, а не в отдельном файле.\n\nЕсли снова запустить оригинальный VRCVideoCacher, он перезапишет этот файл и удалит настройки PlusPlus, включая ваши правила URL — они вернутся к значениям по умолчанию.\n\nПрежние настройки сохранены в виде резервной копии в PlusConfig.json.bak, в папке VRCVideoCacher."
 }
