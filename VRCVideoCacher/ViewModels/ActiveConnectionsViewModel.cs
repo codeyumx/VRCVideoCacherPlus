@@ -1,5 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -16,13 +17,21 @@ public partial class ActiveConnectionsViewModel : ViewModelBase, IDisposable
     public ObservableCollection<ActiveConnectionInfo> Connections { get; } = [];
 
     [ObservableProperty]
+    private string _searchText = string.Empty;
+
+    [ObservableProperty]
+    private string _statusMessage = string.Empty;
+
+    [ObservableProperty]
+    private string _statusMessageColor = "#81C784";
+
+    [ObservableProperty]
     private bool _hasConnections;
 
     private readonly DispatcherTimer _timer;
 
     public ActiveConnectionsViewModel()
     {
-        // Polling timer to refresh active TCP connections every 3 seconds
         _timer = new DispatcherTimer
         {
             Interval = TimeSpan.FromSeconds(3)
@@ -33,26 +42,68 @@ public partial class ActiveConnectionsViewModel : ViewModelBase, IDisposable
         RefreshConnections();
     }
 
-    private void RefreshConnections()
+    partial void OnSearchTextChanged(string value)
+    {
+        FilterConnections();
+    }
+
+    [RelayCommand]
+    public void RefreshConnections()
     {
         var active = SocketKill.ListActiveConnections();
-        
-        // Simple full reload of the socket list
         Connections.Clear();
+
+        var query = SearchText.Trim().ToLowerInvariant();
         foreach (var conn in active)
         {
-            Connections.Add(conn);
+            if (string.IsNullOrEmpty(query) ||
+                conn.ProcessName.ToLowerInvariant().Contains(query) ||
+                conn.RemoteAddress.Contains(query) ||
+                conn.LocalAddress.Contains(query) ||
+                conn.AssociatedTitle.ToLowerInvariant().Contains(query) ||
+                conn.AssociatedUrl.ToLowerInvariant().Contains(query))
+            {
+                Connections.Add(conn);
+            }
         }
 
         HasConnections = Connections.Count > 0;
+    }
+
+    private void FilterConnections()
+    {
+        RefreshConnections();
+    }
+
+    [RelayCommand]
+    public void SeverAllConnections()
+    {
+        try
+        {
+            SocketKill.SeverActiveVideoConnections();
+            SetStatus("Severed all active video connections.", "#81C784");
+            RefreshConnections();
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Error severing connections: {ex.Message}", "#E57373");
+        }
     }
 
     [RelayCommand]
     private void SeverConnection(ActiveConnectionInfo? conn)
     {
         if (conn == null) return;
-        SocketKill.SeverConnectionByIp(conn.RemoteAddress);
-        RefreshConnections();
+        try
+        {
+            SocketKill.SeverConnectionByIp(conn.RemoteAddress);
+            SetStatus($"Severed connection to {conn.RemoteAddress}", "#81C784");
+            RefreshConnections();
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Error severing connection: {ex.Message}", "#E57373");
+        }
     }
 
     [RelayCommand]
@@ -78,7 +129,14 @@ public partial class ActiveConnectionsViewModel : ViewModelBase, IDisposable
         if (clipboard != null)
         {
             await clipboard.SetTextAsync(text);
+            SetStatus("Address copied to clipboard.", "#81C784");
         }
+    }
+
+    private void SetStatus(string message, string colorHex)
+    {
+        StatusMessage = message;
+        StatusMessageColor = colorHex;
     }
 
     public void Dispose()

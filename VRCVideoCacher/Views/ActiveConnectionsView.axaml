@@ -8,113 +8,155 @@
              x:DataType="vm:ActiveConnectionsViewModel">
 
     <Grid RowDefinitions="Auto, *">
-        <!-- Header -->
-        <StackPanel Grid.Row="0" Margin="0,0,0,20">
-            <TextBlock Text="{l:Localize ActiveConnections}" FontSize="24" FontWeight="Bold" Foreground="White"/>
-            <TextBlock Text="List of active sockets used by VRChat/Unity processes" FontSize="12" Foreground="#888888" Margin="0,5,0,0"/>
-        </StackPanel>
+        <!-- Header & Action Bar -->
+        <Grid Grid.Row="0" ColumnDefinitions="*, Auto, Auto, Auto, Auto" Margin="10">
+            <TextBlock Text="{l:Localize ActiveConnections}" FontSize="24" FontWeight="Bold"/>
 
-        <!-- No Connections Placeholder -->
-        <Border Grid.Row="1" Background="#252525" CornerRadius="8" Padding="40"
-                IsVisible="{Binding !HasConnections}"
-                VerticalAlignment="Center" HorizontalAlignment="Center" Width="400">
-            <StackPanel Spacing="15" HorizontalAlignment="Center">
-                <mi:MaterialIcon Kind="NetworkOff" Width="64" Height="64" Foreground="#444444" HorizontalAlignment="Center"/>
-                <TextBlock Text="No Connections Found" FontSize="18" FontWeight="SemiBold" Foreground="#aaaaaa" HorizontalAlignment="Center"/>
-                <TextBlock Text="No active network sockets for VRChat or Unity processes were detected on the system." 
-                           TextWrapping="Wrap" TextAlignment="Center" Foreground="#888888" FontSize="12"/>
-            </StackPanel>
-        </Border>
+            <!-- Status Message -->
+            <TextBlock Grid.Column="1" Text="{Binding StatusMessage}" Margin="15,0" VerticalAlignment="Center"
+                       IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                       Foreground="{Binding StatusMessageColor}"/>
 
-        <!-- Connections Table -->
-        <Border Grid.Row="1" Background="#2d2d2d" CornerRadius="8" Margin="10" Padding="10" IsVisible="{Binding HasConnections}">
-            <DataGrid ItemsSource="{Binding Connections}" AutoGenerateColumns="False" CanUserResizeColumns="True" GridLinesVisibility="Horizontal" SelectionMode="Single">
-                <DataGrid.Columns>
-                    <!-- Process Name -->
-                    <DataGridTextColumn Header="Process" Binding="{Binding ProcessName}" Width="100"/>
+            <!-- Search / Filter Field -->
+            <TextBox Grid.Column="2" Text="{Binding SearchText, Mode=TwoWay}" PlaceholderText="Filter connections..." Width="240" Margin="0,0,10,0"/>
 
-                    <!-- PID -->
-                    <DataGridTextColumn Header="PID" Binding="{Binding OwningPid}" Width="60"/>
+            <!-- Refresh Button -->
+            <Button Grid.Column="3" Command="{Binding RefreshConnectionsCommand}" Margin="0,0,10,0">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <mi:MaterialIcon Kind="Refresh" Width="16" Height="16"/>
+                    <TextBlock Text="Refresh"/>
+                </StackPanel>
+            </Button>
 
-                    <!-- Local Address -->
-                    <DataGridTemplateColumn Header="Local Socket" Width="140">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate x:DataType="utils:ActiveConnectionInfo">
-                                <StackPanel Orientation="Horizontal" Margin="10,0" VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding LocalAddress}" Foreground="#bbbbbb" FontSize="12"/>
-                                    <TextBlock Text=":" Foreground="#666666" FontSize="12"/>
-                                    <TextBlock Text="{Binding LocalPort}" Foreground="#999999" FontSize="12" FontWeight="SemiBold"/>
-                                </StackPanel>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
+            <!-- Sever All Connections Button -->
+            <Button Grid.Column="4" Command="{Binding SeverAllConnectionsCommand}"
+                    Background="#D32F2F" Foreground="White">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <mi:MaterialIcon Kind="LinkOff" Width="16" Height="16"/>
+                    <TextBlock Text="Sever All"/>
+                </StackPanel>
+            </Button>
+        </Grid>
 
-                    <!-- Remote Address -->
-                    <DataGridTemplateColumn Header="Remote Socket" Width="160">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate x:DataType="utils:ActiveConnectionInfo">
-                                <StackPanel Orientation="Horizontal" Margin="10,0" VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding RemoteAddress}" Foreground="#dddddd" FontSize="12" FontWeight="SemiBold"/>
-                                    <TextBlock Text=":" Foreground="#666666" FontSize="12"/>
-                                    <TextBlock Text="{Binding RemotePort}" Foreground="#42A5F5" FontSize="12" FontWeight="Bold"/>
-                                </StackPanel>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
+        <!-- Main Content Area -->
+        <Grid Grid.Row="1">
+            <!-- No Connections Placeholder -->
+            <Border Background="#252525" CornerRadius="8" Padding="40"
+                    IsVisible="{Binding !HasConnections}"
+                    VerticalAlignment="Center" HorizontalAlignment="Center" Width="400">
+                <StackPanel Spacing="15" HorizontalAlignment="Center">
+                    <mi:MaterialIcon Kind="NetworkOff" Width="64" Height="64" Foreground="#444444" HorizontalAlignment="Center"/>
+                    <TextBlock Text="No Connections Found" FontSize="18" FontWeight="SemiBold" Foreground="#aaaaaa" HorizontalAlignment="Center"/>
+                    <TextBlock Text="No active network sockets for VRChat or Unity processes were detected on the system." 
+                               TextWrapping="Wrap" TextAlignment="Center" Foreground="#888888" FontSize="12"/>
+                </StackPanel>
+            </Border>
 
-                    <!-- Associated Title -->
-                    <DataGridTemplateColumn Header="Associated Video" Width="*">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate x:DataType="utils:ActiveConnectionInfo">
-                                <Grid Margin="10,0" VerticalAlignment="Center">
-                                    <!-- Display Title if available -->
-                                    <TextBlock Text="{Binding AssociatedTitle}" ToolTip.Tip="{Binding AssociatedUrl}" 
-                                               Foreground="White" FontWeight="SemiBold" FontSize="12"
-                                               TextTrimming="CharacterEllipsis"
-                                               IsVisible="{Binding AssociatedTitle, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-                                    
-                                    <!-- Fallback to URL -->
-                                    <TextBlock Text="{Binding AssociatedUrl}" ToolTip.Tip="{Binding AssociatedUrl}" 
-                                               Foreground="#888888" FontSize="12"
-                                               TextTrimming="CharacterEllipsis"
-                                               IsVisible="{Binding !AssociatedTitle, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-                                </Grid>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
+            <!-- Connections DataGrid / Table -->
+            <Border Background="#2d2d2d" CornerRadius="8" Margin="10" Padding="10" IsVisible="{Binding HasConnections}">
+                <DataGrid ItemsSource="{Binding Connections}" AutoGenerateColumns="False" CanUserResizeColumns="True" GridLinesVisibility="Horizontal" SelectionMode="Single">
+                    <DataGrid.Styles>
+                        <Style Selector="DataGridRow:selected /template/ Rectangle#BackgroundRectangle">
+                            <Setter Property="IsVisible" Value="False"/>
+                        </Style>
+                        <Style Selector="DataGridRow:pointerover /template/ Rectangle#BackgroundRectangle">
+                            <Setter Property="IsVisible" Value="False"/>
+                        </Style>
+                        <Style Selector="DataGridCell:focus /template/ Grid#FocusVisual">
+                            <Setter Property="IsVisible" Value="False"/>
+                        </Style>
+                        <Style Selector="DataGridCell:focus /template/ Rectangle#FocusVisual">
+                            <Setter Property="IsVisible" Value="False"/>
+                        </Style>
+                    </DataGrid.Styles>
+                    <DataGrid.Columns>
+                        <!-- Process Name -->
+                        <DataGridTextColumn Header="Process" Binding="{Binding ProcessName}" Width="110"/>
 
-                    <!-- Action Column -->
-                    <DataGridTemplateColumn Header="" Width="40">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate x:DataType="utils:ActiveConnectionInfo">
-                                <Button HorizontalAlignment="Center" Padding="4" Background="Transparent" BorderThickness="0" ToolTip.Tip="Connection Actions">
-                                    <mi:MaterialIcon Kind="DotsVertical" Width="16" Height="16"/>
-                                    <Button.Flyout>
-                                        <MenuFlyout Placement="BottomEdgeAlignedRight">
-                                            <MenuItem Header="Copy IP / URL" Command="{Binding $parent[DataGrid].((vm:ActiveConnectionsViewModel)DataContext).CopyAddressCommand}" CommandParameter="{Binding}">
-                                                <MenuItem.Icon>
-                                                    <mi:MaterialIcon Kind="ContentCopy" Width="16" Height="16"/>
-                                                </MenuItem.Icon>
-                                            </MenuItem>
-                                            <MenuItem Header="Create Rule" Command="{Binding $parent[DataGrid].((vm:ActiveConnectionsViewModel)DataContext).CreateRuleCommand}" CommandParameter="{Binding}">
-                                                <MenuItem.Icon>
-                                                    <mi:MaterialIcon Kind="Tune" Width="16" Height="16"/>
-                                                </MenuItem.Icon>
-                                            </MenuItem>
-                                            <Separator/>
-                                            <MenuItem Header="Sever Connection" Command="{Binding $parent[DataGrid].((vm:ActiveConnectionsViewModel)DataContext).SeverConnectionCommand}" CommandParameter="{Binding}" Foreground="#E57373">
-                                                <MenuItem.Icon>
-                                                    <mi:MaterialIcon Kind="LinkOff" Width="16" Height="16" Foreground="#E57373"/>
-                                                </MenuItem.Icon>
-                                            </MenuItem>
-                                        </MenuFlyout>
-                                    </Button.Flyout>
-                                </Button>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                </DataGrid.Columns>
-            </DataGrid>
-        </Border>
+                        <!-- PID -->
+                        <DataGridTextColumn Header="PID" Binding="{Binding OwningPid}" Width="65"/>
+
+                        <!-- Local Address -->
+                        <DataGridTemplateColumn Header="Local Socket" Width="150">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate x:DataType="utils:ActiveConnectionInfo">
+                                    <StackPanel Orientation="Horizontal" Margin="8,0" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding LocalAddress}" Foreground="#bbbbbb" FontSize="12"
+                                                   FontFamily="Consolas,Monospace,Courier New"/>
+                                        <TextBlock Text=":" Foreground="#666666" FontSize="12"/>
+                                        <TextBlock Text="{Binding LocalPort}" Foreground="#999999" FontSize="12" FontWeight="SemiBold"
+                                                   FontFamily="Consolas,Monospace,Courier New"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                        <!-- Remote Address -->
+                        <DataGridTemplateColumn Header="Remote Socket" Width="170">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate x:DataType="utils:ActiveConnectionInfo">
+                                    <StackPanel Orientation="Horizontal" Margin="8,0" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding RemoteAddress}" Foreground="#81C784" FontSize="12" FontWeight="SemiBold"
+                                                   FontFamily="Consolas,Monospace,Courier New"/>
+                                        <TextBlock Text=":" Foreground="#666666" FontSize="12"/>
+                                        <TextBlock Text="{Binding RemotePort}" Foreground="#64B5F6" FontSize="12" FontWeight="Bold"
+                                                   FontFamily="Consolas,Monospace,Courier New"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                        <!-- Associated Title / URL -->
+                        <DataGridTemplateColumn Header="Associated Stream" Width="*">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate x:DataType="utils:ActiveConnectionInfo">
+                                    <Grid Margin="8,0" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding AssociatedTitle}" ToolTip.Tip="{Binding AssociatedUrl}" 
+                                                   Foreground="White" FontWeight="SemiBold" FontSize="12"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   IsVisible="{Binding AssociatedTitle, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                        <TextBlock Text="{Binding AssociatedUrl}" ToolTip.Tip="{Binding AssociatedUrl}" 
+                                                   Foreground="#888888" FontSize="12"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   IsVisible="{Binding !AssociatedTitle, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                        <!-- Actions (Menu) -->
+                        <DataGridTemplateColumn Header="" Width="40">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate x:DataType="utils:ActiveConnectionInfo">
+                                    <Button HorizontalAlignment="Center" Padding="4" Background="Transparent" BorderThickness="0" ToolTip.Tip="Connection Actions">
+                                        <mi:MaterialIcon Kind="DotsVertical" Width="16" Height="16"/>
+                                        <Button.Flyout>
+                                            <MenuFlyout Placement="BottomEdgeAlignedRight">
+                                                <MenuItem Header="Copy IP / URL" Command="{Binding $parent[DataGrid].((vm:ActiveConnectionsViewModel)DataContext).CopyAddressCommand}" CommandParameter="{Binding}">
+                                                    <MenuItem.Icon>
+                                                        <mi:MaterialIcon Kind="ContentCopy" Width="16" Height="16"/>
+                                                    </MenuItem.Icon>
+                                                </MenuItem>
+                                                <MenuItem Header="Create Rule" Command="{Binding $parent[DataGrid].((vm:ActiveConnectionsViewModel)DataContext).CreateRuleCommand}" CommandParameter="{Binding}">
+                                                    <MenuItem.Icon>
+                                                        <mi:MaterialIcon Kind="Tune" Width="16" Height="16"/>
+                                                    </MenuItem.Icon>
+                                                </MenuItem>
+                                                <Separator/>
+                                                <MenuItem Header="Sever Connection" Command="{Binding $parent[DataGrid].((vm:ActiveConnectionsViewModel)DataContext).SeverConnectionCommand}" CommandParameter="{Binding}" Foreground="#E57373">
+                                                    <MenuItem.Icon>
+                                                        <mi:MaterialIcon Kind="LinkOff" Width="16" Height="16" Foreground="#E57373"/>
+                                                    </MenuItem.Icon>
+                                                </MenuItem>
+                                            </MenuFlyout>
+                                        </Button.Flyout>
+                                    </Button>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Border>
+        </Grid>
     </Grid>
 </UserControl>
