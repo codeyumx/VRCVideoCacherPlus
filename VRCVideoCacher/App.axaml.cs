@@ -90,6 +90,10 @@ public partial class App : Application
                 _isExiting = true;
                 _trayIcon?.Dispose();
                 _trayIcon = null;
+
+                // Stops the background polling that the Active Connections and Now Playing
+                // tabs start when first opened.
+                (MainWindow?.DataContext as MainWindowViewModel)?.Dispose();
             };
         }
 

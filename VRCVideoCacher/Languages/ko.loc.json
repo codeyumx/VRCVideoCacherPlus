@@ -213,5 +213,11 @@
   "SkipReasonTruncated": "다운로드가 완료되지 않았습니다",
   "DownloadTimeRemaining": "{0} 남음",
   "SharedConfigNoticeTitle": "설정이 이제 공유됩니다",
-  "SharedConfigNotice": "VRCVideoCacherPlusPlus는 이제 별도 파일 대신 원본 VRCVideoCacher와 동일한 Config.json에 설정을 저장합니다.\n\n원본 VRCVideoCacher를 다시 실행하면 해당 파일을 덮어써서 URL 규칙을 포함한 PlusPlus 설정이 제거되고 기본값으로 돌아갑니다.\n\n이전 설정은 VRCVideoCacher 폴더의 PlusConfig.json.bak에 백업으로 보관되어 있습니다."
+  "SharedConfigNotice": "VRCVideoCacherPlusPlus는 이제 별도 파일 대신 원본 VRCVideoCacher와 동일한 Config.json에 설정을 저장합니다.\n\n원본 VRCVideoCacher를 다시 실행하면 해당 파일을 덮어써서 URL 규칙을 포함한 PlusPlus 설정이 제거되고 기본값으로 돌아갑니다.\n\n이전 설정은 VRCVideoCacher 폴더의 PlusConfig.json.bak에 백업으로 보관되어 있습니다.",
+  "SeverSucceeded": "{0}개의 연결을 중지했습니다.",
+  "SeverNeedsPrivileges": "캐시된 영상은 중지되었습니다. VRChat의 직접 연결을 끊으려면 관리자/root 권한이 필요하므로 이미 재생 중인 스트림은 끝까지 계속됩니다.",
+  "SeverUnsupported": "이 플랫폼에서는 VRChat의 직접 연결을 끊을 수 없습니다.",
+  "SeverFailed": "연결을 끊지 못했습니다. 자세한 내용은 로그를 확인하세요.",
+  "SeverNothingToDo": "중지할 항목이 없습니다.",
+  "AddressCopied": "주소를 클립보드에 복사했습니다."
 }

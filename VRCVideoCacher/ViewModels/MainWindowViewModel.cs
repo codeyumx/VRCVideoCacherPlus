@@ -8,7 +8,7 @@ using VRCVideoCacher.Utils;
 
 namespace VRCVideoCacher.ViewModels;
 
-public partial class MainWindowViewModel : ViewModelBase
+public partial class MainWindowViewModel : ViewModelBase, IDisposable
 {
     [ObservableProperty]
     private ViewModelBase _currentView;
@@ -184,6 +184,24 @@ public partial class MainWindowViewModel : ViewModelBase
         // response, and OpenUrl is what enforces the http/https allowlist. Handing an
         // arbitrary string to ShellExecute does not.
         OpenUrl.Open(_pendingRelease?.html_url ?? Program.LatestReleaseUrl);
+    }
+
+    /// <summary>
+    /// Disposes the tab view models that own background work. Several of them implement
+    /// IDisposable and start timers or polling loops in their constructors; nothing used to
+    /// call this, so those kept running for the life of the process once their tab had been
+    /// opened even once.
+    /// </summary>
+    public void Dispose()
+    {
+        DisposeIfCreated(_activeConnections);
+        DisposeIfCreated(_nowPlaying);
+    }
+
+    private static void DisposeIfCreated<T>(Lazy<T> lazy) where T : class
+    {
+        if (lazy.IsValueCreated && lazy.Value is IDisposable disposable)
+            disposable.Dispose();
     }
 
     public void CheckDnsFailure()

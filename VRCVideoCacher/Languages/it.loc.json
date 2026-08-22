@@ -214,5 +214,11 @@
   "SkipReasonTruncated": "Il download è incompleto",
   "DownloadTimeRemaining": "{0} rimanenti",
   "SharedConfigNoticeTitle": "Le impostazioni sono ora condivise",
-  "SharedConfigNotice": "VRCVideoCacherPlusPlus ora salva le impostazioni nello stesso Config.json del VRCVideoCacher originale, invece che in un file separato.\n\nSe esegui di nuovo il VRCVideoCacher originale, riscriverà quel file eliminando le impostazioni PlusPlus, incluse le tue regole URL, che torneranno ai valori predefiniti.\n\nLe impostazioni precedenti sono state conservate come backup in PlusConfig.json.bak, nella cartella VRCVideoCacher."
+  "SharedConfigNotice": "VRCVideoCacherPlusPlus ora salva le impostazioni nello stesso Config.json del VRCVideoCacher originale, invece che in un file separato.\n\nSe esegui di nuovo il VRCVideoCacher originale, riscriverà quel file eliminando le impostazioni PlusPlus, incluse le tue regole URL, che torneranno ai valori predefiniti.\n\nLe impostazioni precedenti sono state conservate come backup in PlusConfig.json.bak, nella cartella VRCVideoCacher.",
+  "SeverSucceeded": "Interrotte {0} connessioni.",
+  "SeverNeedsPrivileges": "I video in cache sono stati fermati. Chiudere le connessioni dirette di VRChat richiede privilegi di amministratore/root, quindi un video già in streaming continuerà fino alla fine.",
+  "SeverUnsupported": "Questa piattaforma non permette di chiudere le connessioni dirette di VRChat.",
+  "SeverFailed": "Impossibile chiudere le connessioni. Consulta il log.",
+  "SeverNothingToDo": "Niente da interrompere.",
+  "AddressCopied": "Indirizzo copiato negli appunti."
 }

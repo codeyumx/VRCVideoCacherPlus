@@ -78,13 +78,13 @@ public partial class NowPlayingViewModel : ViewModelBase, IDisposable
     }
 
     [RelayCommand]
-    private void SeverStream(ActiveVideoSessionViewModel? item)
+    private async Task SeverStream(ActiveVideoSessionViewModel? item)
     {
         if (item == null) return;
+
         if (!string.IsNullOrEmpty(item.RemoteIp))
-        {
-            SocketKill.SeverConnectionByIp(item.RemoteIp);
-        }
+            await ConnectionSevering.SeverAddressAsync(item.RemoteIp);
+
         ActiveStreamTracker.RemoveSessionByUrl(item.ResolvedUrl);
     }
 

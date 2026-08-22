@@ -214,5 +214,11 @@
   "SkipReasonTruncated": "Загрузка не завершена",
   "DownloadTimeRemaining": "осталось {0}",
   "SharedConfigNoticeTitle": "Настройки теперь общие",
-  "SharedConfigNotice": "VRCVideoCacherPlusPlus теперь хранит настройки в том же файле Config.json, что и оригинальный VRCVideoCacher, а не в отдельном файле.\n\nЕсли снова запустить оригинальный VRCVideoCacher, он перезапишет этот файл и удалит настройки PlusPlus, включая ваши правила URL — они вернутся к значениям по умолчанию.\n\nПрежние настройки сохранены в виде резервной копии в PlusConfig.json.bak, в папке VRCVideoCacher."
+  "SharedConfigNotice": "VRCVideoCacherPlusPlus теперь хранит настройки в том же файле Config.json, что и оригинальный VRCVideoCacher, а не в отдельном файле.\n\nЕсли снова запустить оригинальный VRCVideoCacher, он перезапишет этот файл и удалит настройки PlusPlus, включая ваши правила URL — они вернутся к значениям по умолчанию.\n\nПрежние настройки сохранены в виде резервной копии в PlusConfig.json.bak, в папке VRCVideoCacher.",
+  "SeverSucceeded": "Остановлено соединений: {0}.",
+  "SeverNeedsPrivileges": "Кэшированные видео остановлены. Для закрытия прямых соединений VRChat нужны права администратора/root, поэтому уже идущая трансляция продолжится до конца.",
+  "SeverUnsupported": "На этой платформе нельзя закрыть прямые соединения VRChat.",
+  "SeverFailed": "Не удалось закрыть соединения. Подробности в журнале.",
+  "SeverNothingToDo": "Нечего останавливать.",
+  "AddressCopied": "Адрес скопирован в буфер обмена."
 }

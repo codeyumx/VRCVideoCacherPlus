@@ -115,7 +115,9 @@ public class ConfigManager
 
         if (!enabled)
         {
-            SocketKill.SeverActiveVideoConnections();
+            // Fire-and-forget: severing spawns subprocesses and must not block whoever
+            // toggled the setting. Outcome is reported through the log.
+            _ = Utils.ConnectionSevering.SeverAllAsync();
         }
     }
 

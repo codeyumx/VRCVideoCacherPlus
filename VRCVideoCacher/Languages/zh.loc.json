@@ -214,5 +214,11 @@
   "SkipReasonTruncated": "下载不完整",
   "DownloadTimeRemaining": "剩余 {0}",
   "SharedConfigNoticeTitle": "设置现已共享",
-  "SharedConfigNotice": "VRCVideoCacherPlusPlus 现在将设置保存在与原版 VRCVideoCacher 相同的 Config.json 中，而不再使用单独的文件。\n\n如果再次运行原版 VRCVideoCacher，它会重写该文件并删除 PlusPlus 的设置（包括你的 URL 规则），这些设置将恢复为默认值。\n\n你之前的设置已备份到 VRCVideoCacher 文件夹中的 PlusConfig.json.bak。"
+  "SharedConfigNotice": "VRCVideoCacherPlusPlus 现在将设置保存在与原版 VRCVideoCacher 相同的 Config.json 中，而不再使用单独的文件。\n\n如果再次运行原版 VRCVideoCacher，它会重写该文件并删除 PlusPlus 的设置（包括你的 URL 规则），这些设置将恢复为默认值。\n\n你之前的设置已备份到 VRCVideoCacher 文件夹中的 PlusConfig.json.bak。",
+  "SeverSucceeded": "已停止 {0} 个连接。",
+  "SeverNeedsPrivileges": "已停止缓存视频。关闭 VRChat 的直连需要管理员/root 权限，因此正在播放的流会继续到结束。",
+  "SeverUnsupported": "此平台无法关闭 VRChat 的直连。",
+  "SeverFailed": "关闭连接失败。详情请查看日志。",
+  "SeverNothingToDo": "没有可停止的内容。",
+  "AddressCopied": "地址已复制到剪贴板。"
 }
