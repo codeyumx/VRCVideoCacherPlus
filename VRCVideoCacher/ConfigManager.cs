@@ -117,6 +117,8 @@ public class ConfigManager
         {
             // Fire-and-forget: severing spawns subprocesses and must not block whoever
             // toggled the setting. Outcome is reported through the log.
+            // No elevation here: this fires from a settings toggle, and a polkit/UAC
+            // dialog nobody asked for is worse than a connection that keeps playing.
             _ = Utils.ConnectionSevering.SeverAllAsync();
         }
     }

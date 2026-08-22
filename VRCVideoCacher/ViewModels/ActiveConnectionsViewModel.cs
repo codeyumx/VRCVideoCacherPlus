@@ -130,7 +130,7 @@ public partial class ActiveConnectionsViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private async Task SeverAllConnections()
     {
-        var result = await ConnectionSevering.SeverAllAsync();
+        var result = await ConnectionSevering.SeverAllAsync(allowElevation: true);
         ReportSeverResult(result);
         await RefreshConnections();
     }
@@ -141,7 +141,7 @@ public partial class ActiveConnectionsViewModel : ViewModelBase, IDisposable
         if (connection == null)
             return;
 
-        var result = await ConnectionSevering.SeverAddressAsync(connection.RemoteAddress);
+        var result = await ConnectionSevering.SeverAddressAsync(connection.RemoteAddress, allowElevation: true);
         ReportSeverResult(result);
         await RefreshConnections();
     }

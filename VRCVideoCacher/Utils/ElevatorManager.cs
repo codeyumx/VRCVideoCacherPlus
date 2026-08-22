@@ -51,7 +51,7 @@ public class ElevatorManager
         return null;
     }
 
-    private static Process? MakeLinuxElevatedProcess(string flag)
+    private static Process? MakeLinuxElevatedProcess(params string[] flags)
     {
         var launchClient = InPressureVessel ? FindLaunchClient() : null;
         Log.Debug("InPressureVessel={InPressureVessel} launch-client={LC}", InPressureVessel, launchClient ?? "n/a");
@@ -62,7 +62,7 @@ public class ElevatorManager
         // that routinely contains spaces (a Steam library on an external drive, say), and
         // interpolating it unquoted split it into two arguments — so the elevated command
         // either failed or, worse, ran against a truncated path.
-        ProcessStartInfo MakeStartInfo(string exe, params string[] args)
+        ProcessStartInfo MakeStartInfo(string exe, string[] args)
         {
             var psi = new ProcessStartInfo { UseShellExecute = false };
             if (launchClient != null)
@@ -88,7 +88,7 @@ public class ElevatorManager
         if (pkexec != null)
         {
             Log.Debug("Using pkexec");
-            return new Process { StartInfo = MakeStartInfo(pkexec, appPath, flag) };
+            return new Process { StartInfo = MakeStartInfo(pkexec, [appPath, .. flags]) };
         }
 
         // 2. Try sudo -A with a graphical askpass helper
@@ -104,7 +104,7 @@ public class ElevatorManager
             var check = InPressureVessel ? $"/run/host{askpass}" : askpass;
             if (!File.Exists(check)) continue;
             Log.Debug("Using sudo -A with askpass: {Askpass}", askpass);
-            var psi = MakeStartInfo("/usr/bin/sudo", "-A", appPath, flag);
+            var psi = MakeStartInfo("/usr/bin/sudo", ["-A", appPath, .. flags]);
             psi.Environment["SUDO_ASKPASS"] = askpass;
             return new Process { StartInfo = psi };
         }
@@ -118,11 +118,66 @@ public class ElevatorManager
             Log.Debug("Using terminal {Term} with sudo", termPath);
             // gnome-terminal wants "-- cmd args", the others "-e cmd args".
             var termFlag = termPath.Contains("gnome-terminal") ? "--" : "-e";
-            return new Process { StartInfo = MakeStartInfo(termPath, termFlag, "/usr/bin/sudo", appPath, flag) };
+            return new Process { StartInfo = MakeStartInfo(termPath, [termFlag, "/usr/bin/sudo", appPath, .. flags]) };
         }
 
-        Log.Error("No elevation method found. Please manually edit /etc/hosts.");
+        Log.Error("No elevation method found (tried pkexec, sudo with a graphical askpass, and a terminal).");
         return null;
+    }
+
+    /// <summary>
+    /// Result of asking the system for elevation and running ourselves with <paramref name="argument"/>.
+    /// </summary>
+    /// <returns>
+    /// The helper's exit code, or null when elevation was unavailable or the user dismissed
+    /// the prompt — those are not failures of the operation, they are the user declining it.
+    /// </returns>
+    public static async Task<int?> RunElevatedSelfAsync(string argument)
+    {
+        Process? proc;
+        if (OperatingSystem.IsWindows())
+        {
+            proc = new Process
+            {
+                StartInfo = { FileName = Environment.ProcessPath, Arguments = argument, UseShellExecute = true, Verb = "runas" }
+            };
+            try
+            {
+                proc.Start();
+            }
+            catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
+            {
+                Log.Information("User cancelled the UAC prompt.");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Failed to launch elevated helper.");
+                return null;
+            }
+        }
+        else
+        {
+            proc = MakeLinuxElevatedProcess(argument);
+            if (proc == null)
+                return null;
+
+            try
+            {
+                proc.Start();
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Failed to launch privilege elevator.");
+                return null;
+            }
+        }
+
+        using (proc)
+        {
+            await proc.WaitForExitAsync();
+            return proc.ExitCode;
+        }
     }
 
     /// <summary>

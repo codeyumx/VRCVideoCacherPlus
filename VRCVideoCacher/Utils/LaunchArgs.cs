@@ -11,6 +11,7 @@ public class LaunchArgs
     private const string CloseWithSteamVrArg = "--close-with-steamvr";
     private const string AddHostArg = "--addhost";
     private const string RemoveHostArg = "--removehost";
+    private const string SeverArg = "--sever-connections";
 
     public static bool HasGui = true;
     public static bool UseGlobalPath;
@@ -23,10 +24,24 @@ public class LaunchArgs
     public static bool RemoveHost = false;
 
     /// <summary>
+    /// Addresses passed to an elevated instance spawned purely to close sockets and exit.
+    /// Populated from --sever-connections=1.2.3.4,2001:db8::1
+    /// </summary>
+    public static IReadOnlyList<string> SeverAddresses = [];
+
+    /// <summary>
     /// True when this process was spawned by the elevation helper purely to edit the hosts
     /// file and exit. Such a process has no UI and should not touch user config.
     /// </summary>
     public static bool IsHostsEdit => AddHost || RemoveHost;
+
+    /// <summary>True when this process exists only to sever connections and exit.</summary>
+    public static bool IsSeverCommand => SeverAddresses.Count > 0;
+
+    /// <summary>
+    /// A short-lived privileged helper: no window, no config writes, no background work.
+    /// </summary>
+    public static bool IsPrivilegedHelper => IsHostsEdit || IsSeverCommand;
 
     public static void SetupArguments(params string[] args)
     {
@@ -62,6 +77,13 @@ public class LaunchArgs
 
             if (arg.Equals(RemoveHostArg, StringComparison.OrdinalIgnoreCase))
                 RemoveHost = true;
+
+            if (arg.StartsWith(SeverArg + "=", StringComparison.OrdinalIgnoreCase))
+            {
+                SeverAddresses = arg[(SeverArg.Length + 1)..]
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .ToList();
+            }
         }
     }
 

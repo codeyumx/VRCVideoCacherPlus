@@ -96,8 +96,9 @@ internal sealed class Program
         InitializeLogger();
 
         // Must run before Steam API init — this process may be a privileged subprocess
-        // invoked by ElevatorManager, in which case it edits the hosts file and exits.
+        // invoked by ElevatorManager, in which case it does its one job and exits.
         HostsManager.TryRun();
+        Utils.ConnectionSevering.TryRunElevatedCommand();
 
 #if STEAMRELEASE
         if (LaunchArgs.SteamSdk)
@@ -213,7 +214,7 @@ internal sealed class Program
 
         // The hosts-edit subprocess has no UI, and UiLogSink reads ConfigManager.Config —
         // which under elevation would create a second config under the admin's profile.
-        if (LaunchArgs.HasGui && !LaunchArgs.IsHostsEdit)
+        if (LaunchArgs.HasGui && !LaunchArgs.IsPrivilegedHelper)
         {
             loggerConfiguration = loggerConfiguration.WriteTo.Sink(new UiLogSink());
         }

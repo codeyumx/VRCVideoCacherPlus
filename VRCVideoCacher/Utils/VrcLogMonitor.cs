@@ -45,8 +45,13 @@ public static class VrcLogMonitor
     {
         if (_monitorTask != null) return;
 
-        _cts = new CancellationTokenSource();
-        _monitorTask = Task.Run(() => MonitorLoop(_cts.Token));
+        // Linked to the application shutdown token as well as our own, so the loop unwinds on
+        // its own during shutdown instead of relying on Stop() being reached. Program.Main
+        // signals shutdown and then force-exits, and a monitor that has not observed it is
+        // killed mid-read — which meant a half-consumed log tail and, on Windows, an open
+        // FileStream handle on the log VRChat was still writing to.
+        _cts = CancellationTokenSource.CreateLinkedTokenSource(Program.ShutdownToken);
+        _monitorTask = Task.Run(() => MonitorLoop(_cts.Token), _cts.Token);
         Log.Information("VRChat Log Monitor service started.");
     }
 

@@ -83,7 +83,7 @@ public partial class NowPlayingViewModel : ViewModelBase, IDisposable
         if (item == null) return;
 
         if (!string.IsNullOrEmpty(item.RemoteIp))
-            await ConnectionSevering.SeverAddressAsync(item.RemoteIp);
+            await ConnectionSevering.SeverAddressAsync(item.RemoteIp, allowElevation: true);
 
         ActiveStreamTracker.RemoveSessionByUrl(item.ResolvedUrl);
     }

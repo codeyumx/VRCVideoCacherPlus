@@ -64,10 +64,67 @@ public static class ConnectionSevering
     // ss reports a refused SOCK_DESTROY on stderr but still exits 0.
     private const string PermissionDeniedMarker = "Operation not permitted";
 
+    // Exit codes of the elevated helper, read back by the unprivileged parent. Deliberately
+    // outside the 0-1 range so an unrelated crash is never mistaken for a real outcome.
+    private const int HelperSevered = 0;
+    private const int HelperNothingToDo = 10;
+    private const int HelperNotPermitted = 11;
+    private const int HelperUnsupported = 12;
+    private const int HelperFailed = 13;
+
+    /// <summary>
+    /// Entry point for the short-lived privileged instance spawned by
+    /// <see cref="ElevatorManager.RunElevatedSelfAsync"/>. Closes the requested sockets and
+    /// exits — it never starts the UI, the web server, or touches the user's config.
+    ///
+    /// Called from Program.Main before anything else is initialised.
+    /// </summary>
+    public static void TryRunElevatedCommand()
+    {
+        if (!LaunchArgs.IsSeverCommand)
+            return;
+
+        // This runs as root. Everything on the command line is re-parsed as an IP address and
+        // anything that is not one is dropped, so nothing reaches `ss` that could be read as a
+        // filter expression or a shell fragment.
+        var addresses = LaunchArgs.SeverAddresses
+            .Where(a => IPAddress.TryParse(a, out _))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var rejected = LaunchArgs.SeverAddresses.Count - addresses.Count;
+        if (rejected > 0)
+            Log.Warning("Ignored {Count} --sever-connections value(s) that are not IP addresses.", rejected);
+
+        if (addresses.Count == 0)
+        {
+            Environment.Exit(HelperNothingToDo);
+            return;
+        }
+
+        var (severed, outcome) = SeverRemoteAsync(addresses).GetAwaiter().GetResult();
+        Log.Information("Elevated sever helper closed {Count} socket(s): {Outcome}", severed, outcome);
+
+        Environment.Exit(outcome switch
+        {
+            SeverOutcome.Severed => HelperSevered,
+            SeverOutcome.NothingToDo => HelperNothingToDo,
+            SeverOutcome.NotPermitted => HelperNotPermitted,
+            SeverOutcome.Unsupported => HelperUnsupported,
+            _ => HelperFailed
+        });
+    }
+
     /// <summary>
     /// Closes everything: our own streams, then best-effort on VRChat's direct connections.
     /// </summary>
-    public static async Task<SeverResult> SeverAllAsync()
+    /// <param name="allowElevation">
+    /// Whether to fall back to an elevation prompt when the kernel refuses. Off by default:
+    /// this method is also called from the automatic "block all videos" toggle, and throwing a
+    /// polkit or UAC dialog at somebody mid-session because a setting flipped is hostile. Pass
+    /// true only when the user explicitly asked for this connection to be cut.
+    /// </param>
+    public static async Task<SeverResult> SeverAllAsync(bool allowElevation = false)
     {
         var localClosed = API.LocalStreamRegistry.CloseAll();
         if (localClosed > 0)
@@ -75,6 +132,9 @@ public static class ConnectionSevering
 
         var targets = YTDL.ActiveStreamTracker.GetActiveVideoIps();
         var (severed, outcome) = await SeverRemoteAsync(targets);
+
+        if (outcome == SeverOutcome.NotPermitted && allowElevation)
+            (severed, outcome) = await SeverElevatedAsync(targets);
 
         YTDL.ActiveStreamTracker.ClearActiveVideoIps();
         LogOutcome(outcome, severed, targets.Count);
@@ -88,7 +148,7 @@ public static class ConnectionSevering
     /// Does not touch other cached streams — severing one CDN connection used to call
     /// CloseAllLocalStreams and take every other playing video down with it.
     /// </summary>
-    public static async Task<SeverResult> SeverAddressAsync(string address)
+    public static async Task<SeverResult> SeverAddressAsync(string address, bool allowElevation = false)
     {
         if (string.IsNullOrWhiteSpace(address))
             return new SeverResult(0, 0, SeverOutcome.NothingToDo);
@@ -102,9 +162,77 @@ public static class ConnectionSevering
         }
 
         var (severed, outcome) = await SeverRemoteAsync([address]);
+
+        if (outcome == SeverOutcome.NotPermitted && allowElevation)
+            (severed, outcome) = await SeverElevatedAsync([address]);
+
         LogOutcome(outcome, severed, 1);
         return new SeverResult(0, severed, outcome);
     }
+
+    /// <summary>
+    /// Re-runs the sever as root by asking the desktop's authorisation agent — polkit on
+    /// Linux (KDE, GNOME and the rest all ship an agent for it), UAC on Windows. The prompt
+    /// is the system's, so the password never passes through this process.
+    ///
+    /// Users who would rather never see the prompt can grant the capability once instead;
+    /// <see cref="CapabilityHint"/> spells out how.
+    /// </summary>
+    private static async Task<(int, SeverOutcome)> SeverElevatedAsync(IReadOnlyCollection<string> addresses)
+    {
+        var targets = addresses
+            .Where(a => IPAddress.TryParse(a, out _))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (targets.Count == 0)
+            return (0, SeverOutcome.NothingToDo);
+
+        Log.Information("Requesting elevated privileges to close {Count} connection(s).", targets.Count);
+
+        var exitCode = await ElevatorManager.RunElevatedSelfAsync(
+            $"--sever-connections={string.Join(',', targets)}");
+
+        if (exitCode is null)
+        {
+            // No elevation mechanism, or the user dismissed the prompt. Either way the
+            // original refusal still stands — say so rather than inventing a new failure.
+            Log.Information("Elevation was declined or unavailable. {Hint}", CapabilityHint);
+            return (0, SeverOutcome.NotPermitted);
+        }
+
+        switch (exitCode)
+        {
+            case HelperSevered:
+                // The helper does not report a count across the process boundary; one
+                // confirmed close is enough for the UI to say the connection was cut.
+                return (targets.Count, SeverOutcome.Severed);
+            case HelperNothingToDo:
+                return (0, SeverOutcome.NothingToDo);
+            case HelperUnsupported:
+                return (0, SeverOutcome.Unsupported);
+            case HelperNotPermitted:
+                Log.Warning("Even with elevation the kernel refused to close the connection.");
+                return (0, SeverOutcome.NotPermitted);
+            default:
+                Log.Warning("Elevated sever helper exited with {Code}.", exitCode);
+                return (0, SeverOutcome.Failed);
+        }
+    }
+
+    /// <summary>
+    /// The one-off alternative to being prompted every time. CAP_NET_ADMIN is exactly the
+    /// privilege SOCK_DESTROY requires, so granting it to the binary removes the need for
+    /// root entirely — this is the "do we still need sudo" answer, and the answer is no.
+    ///
+    /// It has to be re-applied after an update, because the updater replaces the binary and
+    /// file capabilities live on the inode.
+    /// </summary>
+    public static string CapabilityHint =>
+        OperatingSystem.IsLinux()
+            ? $"To close connections without a password prompt, grant the capability once: " +
+              $"sudo setcap cap_net_admin+ep \"{Environment.ProcessPath}\" (re-apply after each update)."
+            : "Run VRCVideoCacher as administrator to close connections without a prompt.";
 
     private static bool IsLoopback(string address) =>
         IPAddress.TryParse(address, out var parsed) && IPAddress.IsLoopback(parsed);
@@ -121,8 +249,9 @@ public static class ConnectionSevering
                 Log.Warning(
                     "Could not close VRChat's direct connections: this needs {Requirement}. " +
                     "Cached videos were still stopped, and further requests are blocked, but a video " +
-                    "already streaming from a CDN will keep playing until it ends.",
-                    OperatingSystem.IsWindows() ? "administrator rights" : "root (CAP_NET_ADMIN)");
+                    "already streaming from a CDN will keep playing until it ends. {Hint}",
+                    OperatingSystem.IsWindows() ? "administrator rights" : "root (CAP_NET_ADMIN)",
+                    CapabilityHint);
                 break;
 
             case SeverOutcome.Unsupported:
@@ -145,13 +274,41 @@ public static class ConnectionSevering
             return (0, SeverOutcome.NothingToDo);
 
         if (OperatingSystem.IsWindows())
-            return SeverRemoteWindows(addresses);
+        {
+            // Windows exposes MIB_TCP6ROW for *listing* IPv6 connections but has never shipped
+            // a SetTcp6Entry to close one — there is no public API for it at any privilege
+            // level, elevation included. Severing IPv6 here is not a permissions problem and
+            // must not be reported as one, or the UI will offer an elevation prompt that
+            // cannot possibly help.
+            var v6 = addresses.Where(IsIpV6).ToList();
+            var v4 = addresses.Where(a => !IsIpV6(a)).ToList();
+
+            var result = v4.Count > 0 ? SeverRemoteWindows(v4) : (0, SeverOutcome.NothingToDo);
+
+            if (v6.Count > 0)
+            {
+                Log.Warning(
+                    "{Count} connection(s) are over IPv6, which Windows provides no way to close. " +
+                    "Blocking still applies to new requests.", v6.Count);
+
+                // Only downgrade when nothing else happened — an IPv4 sever that worked is
+                // still a success, it just did not cover everything.
+                if (result.Item2 == SeverOutcome.NothingToDo)
+                    result = (result.Item1, SeverOutcome.Unsupported);
+            }
+
+            return result;
+        }
 
         if (OperatingSystem.IsLinux())
             return await SeverRemoteLinuxAsync(addresses);
 
         return (0, SeverOutcome.Unsupported);
     }
+
+    private static bool IsIpV6(string address) =>
+        IPAddress.TryParse(address, out var parsed) &&
+        parsed.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6;
 
     [SupportedOSPlatform("windows")]
     private static (int, SeverOutcome) SeverRemoteWindows(IReadOnlyCollection<string> addresses)
@@ -235,7 +392,6 @@ public static class ConnectionSevering
     {
         var severed = 0;
         var denied = false;
-        var ran = false;
 
         foreach (var address in addresses)
         {
@@ -243,7 +399,6 @@ public static class ConnectionSevering
                 continue;
 
             var outcome = await RunSsKillAsync(address);
-            ran = true;
 
             switch (outcome)
             {
@@ -264,11 +419,24 @@ public static class ConnectionSevering
         if (denied)
             return (0, SeverOutcome.NotPermitted);
 
-        return (0, ran ? SeverOutcome.NothingToDo : SeverOutcome.NothingToDo);
+        return (0, SeverOutcome.NothingToDo);
     }
 
     /// <summary>
+    /// ss parses its address filter itself, and a bare IPv6 literal loses: the colons read as
+    /// a host:port separator, so `dst 2001:db8::1` is rejected with
+    /// "an inet prefix is expected rather than 2001:db8:" and nothing is closed. Brackets
+    /// disambiguate it, and IPv4 is unaffected either way — so this is the whole of IPv6
+    /// support on Linux.
+    /// </summary>
+    internal static string FormatSsDestination(string address) =>
+        IsIpV6(address) ? $"[{address}]" : address;
+
+    /// <summary>
     /// Runs `ss -t -K dst ADDRESS` and works out what really happened.
+    ///
+    /// Unlike Windows, Linux closes IPv6 sockets through the very same SOCK_DESTROY call, so
+    /// there is nothing extra to implement — only the filter has to be spelled correctly.
     ///
     /// ss exits 0 whether or not it managed to destroy anything, and always prints a column
     /// header to stdout, so neither the exit code nor "stdout is non-empty" tells us
@@ -279,7 +447,7 @@ public static class ConnectionSevering
     {
         try
         {
-            var result = await ProcessRunner.RunAsync("ss", ["-t", "-K", "dst", address]);
+            var result = await ProcessRunner.RunAsync("ss", ["-t", "-K", "dst", FormatSsDestination(address)]);
 
             if (result.Error.Contains(PermissionDeniedMarker, StringComparison.OrdinalIgnoreCase))
             {
