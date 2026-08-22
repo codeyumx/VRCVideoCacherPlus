@@ -89,7 +89,7 @@ public static class ActiveStreamTracker
         }
     }
 
-    public static void TrackVideoUrl(string url)
+    private static void TrackVideoUrl(string url)
     {
         if (string.IsNullOrEmpty(url)) return;
 
@@ -142,12 +142,12 @@ public static class ActiveStreamTracker
     private static readonly List<ActiveVideoSession> _activeSessions = new();
     private static readonly object SessionsLock = new();
 
-    private static readonly Dictionary<string, (string Title, string OriginalUrl, string VideoId, double? Duration)> _urlInfoMap = new();
+    private static readonly Dictionary<string, (string Title, string OriginalUrl, string? VideoId, double? Duration)> _urlInfoMap = new();
     private static readonly object MapLock = new();
 
     public static event Action? OnSessionsChanged;
 
-    public static void AssociateUrlInfo(string resolvedUrl, string originalUrl, string title, string videoId, double? duration)
+    public static void AssociateUrlInfo(string resolvedUrl, string originalUrl, string title, string? videoId, double? duration)
     {
         lock (MapLock)
         {
@@ -157,9 +157,12 @@ public static class ActiveStreamTracker
             if (!string.IsNullOrEmpty(originalUrl))
                 _urlInfoMap[originalUrl] = info;
         }
+
+        TrackVideoUrl(resolvedUrl);
+        TrackVideoUrl(originalUrl);
     }
 
-    public static bool TryGetUrlInfo(string url, out (string Title, string OriginalUrl, string VideoId, double? Duration) info)
+    public static bool TryGetUrlInfo(string url, out (string Title, string OriginalUrl, string? VideoId, double? Duration) info)
     {
         lock (MapLock)
         {
