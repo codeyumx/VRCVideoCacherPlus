@@ -345,6 +345,9 @@ public partial class SettingsViewModel : ViewModelBase
     [RelayCommand]
     private void OpenUtilsFolder() => OpenUrl.OpenFolder(Program.UtilsPath);
 
+    [RelayCommand]
+    private void OpenSettingsFolder() => OpenUrl.OpenFolder(Program.DataPath);
+
     [ObservableProperty]
     private bool _isRedownloading;
 

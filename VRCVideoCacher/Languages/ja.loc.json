@@ -163,6 +163,7 @@
   "OpenFirefoxAddons": "Firefox Add-ons を開く",
   "DontShowThisAgain": "今後表示しない",
   "TrayShow": "表示",
+  "Show": "表示",
   "TrayOpenCacheFolder": "キャッシュフォルダーを開く",
   "TrayExit": "終了",
   "TrayMinimizeNotice": "VRCVideoCacher はバックグラウンドで引き続き実行されています。タスクトレイのアイコンをクリックして再度表示してください。",

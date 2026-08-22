@@ -28,3 +28,7 @@ output_linux_release/
 output_steam_linux/
 output_win_release/
 VRCVideoCacher-*-x64.zip
+
+# Browser extension packages (produced by BrowserExtension/build.sh)
+/dist/
+/out/
