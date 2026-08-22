@@ -9,8 +9,8 @@ namespace VRCVideoCacher.Tests;
 // every previously cached file for the affected URL shape.
 public class VideoIdTests
 {
-    private static VideoInfo? Resolve(string url) =>
-        new YouTubeHandler().GetVideoInfo(url, new Uri(url), avPro: false).GetAwaiter().GetResult();
+    private static Task<VideoInfo?> ResolveAsync(string url, bool avPro = false) =>
+        new YouTubeHandler().GetVideoInfo(url, new Uri(url), avPro);
 
     [Theory]
     [InlineData("https://www.youtube.com/watch?v=dQw4w9WgXcQ")]
@@ -22,35 +22,34 @@ public class VideoIdTests
     [InlineData("https://m.youtube.com/watch?v=dQw4w9WgXcQ")]
     [InlineData("https://music.youtube.com/watch?v=dQw4w9WgXcQ")]
     [InlineData("https://www.youtube.com/shorts/dQw4w9WgXcQ")]
-    public void ExtractsTheVideoIdFromEveryCommonUrlShape(string url)
+    public async Task ExtractsTheVideoIdFromEveryCommonUrlShape(string url)
     {
-        var info = Resolve(url);
+        var info = await ResolveAsync(url);
         Assert.NotNull(info);
         Assert.Equal("dQw4w9WgXcQ", info!.VideoId);
         Assert.Equal(UrlType.YouTube, info.UrlType);
     }
 
     [Fact]
-    public void CanonicalisesToAWatchUrl()
+    public async Task CanonicalisesToAWatchUrl()
     {
         // History and the "open source" button must never end up pointing at a playlist.
-        Assert.Equal("https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-            Resolve("https://youtube.com/watch?v=dQw4w9WgXcQ&list=PL123")!.VideoUrl);
+        var info = await ResolveAsync("https://youtube.com/watch?v=dQw4w9WgXcQ&list=PL123");
+        Assert.Equal("https://www.youtube.com/watch?v=dQw4w9WgXcQ", info!.VideoUrl);
     }
 
     [Fact]
-    public void PicksTheFormatFromAvPro()
+    public async Task PicksTheFormatFromAvPro()
     {
-        var handler = new YouTubeHandler();
         const string url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
 
-        Assert.Equal(DownloadFormat.Webm, handler.GetVideoInfo(url, new Uri(url), true).GetAwaiter().GetResult()!.DownloadFormat);
-        Assert.Equal(DownloadFormat.MP4, handler.GetVideoInfo(url, new Uri(url), false).GetAwaiter().GetResult()!.DownloadFormat);
+        Assert.Equal(DownloadFormat.Webm, (await ResolveAsync(url, avPro: true))!.DownloadFormat);
+        Assert.Equal(DownloadFormat.MP4, (await ResolveAsync(url, avPro: false))!.DownloadFormat);
     }
 
     [Fact]
-    public void ReturnsNullWhenNoVideoIdIsPresent() =>
-        Assert.Null(Resolve("https://www.youtube.com/results?search_query=test"));
+    public async Task ReturnsNullWhenNoVideoIdIsPresent() =>
+        Assert.Null(await ResolveAsync("https://www.youtube.com/results?search_query=test"));
 
     [Theory]
     [InlineData("https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PL123", true)]
