@@ -21,7 +21,8 @@
         <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
         <PublishTrimmed>true</PublishTrimmed>
         <TrimMode>partial</TrimMode>
-        <!-- Suppress trim warnings from third-party libraries -->
+        <!-- The remaining IL2026s are inherent to using EF Core and Newtonsoft at all;
+             our own types are protected by the TrimmerRootAssembly entry below. -->
         <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
         <!-- IL2037: EF Core 10 DynamicDependency on ExecuteUpdate overload not resolvable by ILLink -->
         <NoWarn>$(NoWarn);IL2037</NoWarn>
@@ -35,7 +36,8 @@
         <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
         <PublishTrimmed>true</PublishTrimmed>
         <TrimMode>partial</TrimMode>
-        <!-- Suppress trim warnings from third-party libraries -->
+        <!-- The remaining IL2026s are inherent to using EF Core and Newtonsoft at all;
+             our own types are protected by the TrimmerRootAssembly entry below. -->
         <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
         <!-- IL2037: EF Core 10 DynamicDependency on ExecuteUpdate overload not resolvable by ILLink -->
         <NoWarn>$(NoWarn);IL2037</NoWarn>
@@ -43,6 +45,24 @@
 
     <ItemGroup Condition="'$(Configuration)' == 'SteamRelease'">
         <PackageReference Include="Steamworks.NET.AnyCPU" Version="2026.163.0-a" />
+    </ItemGroup>
+
+    <!--
+      Keep our own assembly out of the trimmer entirely.
+
+      Newtonsoft reflects over ConfigModel, PlusConfigModel, UriRule, VersionJson and
+      GitHubRelease; EF Core reflects over the entity types. None of that is visible to the
+      trimmer statically, so a trimmed build can drop members that only reflection uses —
+      and the result is config silently failing to load, or the database misbehaving, in
+      Release builds only. Debug never trims, so it would not reproduce during development.
+
+      This is what SuppressTrimAnalysisWarnings below was hiding: all 33 IL2026 warnings
+      come from our own call sites into those two libraries. Rooting the assembly costs
+      little (it is small next to the framework) and leaves PublishTrimmed doing what it is
+      actually there for, which is trimming the framework and the UI stack.
+    -->
+    <ItemGroup Condition="'$(Configuration)' == 'Release' Or '$(Configuration)' == 'SteamRelease'">
+        <TrimmerRootAssembly Include="VRCVideoCacher" />
     </ItemGroup>
 
     <ItemGroup>
