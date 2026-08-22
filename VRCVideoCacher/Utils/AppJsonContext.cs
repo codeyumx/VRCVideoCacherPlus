@@ -21,7 +21,6 @@ namespace VRCVideoCacher.Utils;
     WriteIndented = true,
     PropertyNameCaseInsensitive = true)]
 [JsonSerializable(typeof(ConfigModel))]
-[JsonSerializable(typeof(PlusConfigModel))]
 [JsonSerializable(typeof(VersionJson))]
 [JsonSerializable(typeof(GitHubRelease))]
 [JsonSerializable(typeof(VvcConfig))]

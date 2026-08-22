@@ -23,11 +23,46 @@ public class ConfigManager
         ConfigFilePath = Path.Join(Program.DataPath, "Config.json");
         Log.Debug("Using config file path: {ConfigFilePath}", ConfigFilePath);
 
+        string configText = string.Empty;
         ConfigModel? newConfig = null;
         try
         {
             if (File.Exists(ConfigFilePath))
-                newConfig = Json.Deserialize<ConfigModel>(File.ReadAllText(ConfigFilePath));
+            {
+                configText = File.ReadAllText(ConfigFilePath);
+                var hasPlusKeys = configText.Contains("UriRules", StringComparison.OrdinalIgnoreCase);
+
+                newConfig = Json.Deserialize<ConfigModel>(configText);
+
+                if (!hasPlusKeys && newConfig != null)
+                {
+                    var backupPath = ConfigFilePath + ".bak";
+                    if (File.Exists(backupPath))
+                    {
+                        try
+                        {
+                            var backupText = File.ReadAllText(backupPath);
+                            var backupConfig = Json.Deserialize<ConfigModel>(backupText);
+                            if (backupConfig != null)
+                            {
+                                newConfig.CacheDownloadRateLimitMBs = backupConfig.CacheDownloadRateLimitMBs;
+                                newConfig.CacheDownloadIdleSeconds = backupConfig.CacheDownloadIdleSeconds;
+                                newConfig.CacheYouTubePreferVp9 = backupConfig.CacheYouTubePreferVp9;
+                                if (backupConfig.UriRules is { Count: > 0 })
+                                    newConfig.UriRules = backupConfig.UriRules;
+                                if (backupConfig.SeededDefaultRules is { Count: > 0 })
+                                    newConfig.SeededDefaultRules = backupConfig.SeededDefaultRules;
+
+                                Log.Information("Restored PlusPlus settings from Config.json.bak (Config.json was overwritten by upstream).");
+                            }
+                        }
+                        catch (Exception backupEx)
+                        {
+                            Log.Error(backupEx, "Failed to restore config from backup.");
+                        }
+                    }
+                }
+            }
             if (newConfig != null)
                 Config = newConfig;
         }
@@ -57,7 +92,7 @@ public class ConfigManager
         // Folds in a legacy PlusConfig.json, repairs and seeds the rule list. Called with
         // the instance rather than reaching for ConfigManager.Config: PlusConfigManager has
         // no static state of its own, so there is no initialiser to re-enter here.
-        PlusConfigManager.Initialize(Config);
+        PlusConfigManager.Initialize(Config, configText);
 
         Log.Information("Loaded config.");
         TrySaveConfig();
@@ -74,15 +109,21 @@ public class ConfigManager
         AtomicFile.WriteAllText(ConfigFilePath, newConfig);
         Log.Information("Config saved.");
 
-        // Nothing else is called from here on purpose. This used to also save the Plus
-        // config and call CacheManager.TryFlushCache, which closed a static-initialisation
-        // loop: CacheManager's initialiser reads ConfigManager.Config, whose initialiser
-        // ends by calling TrySaveConfig, which called back into CacheManager while its
-        // CachePath was still null. It only ever worked because the asset dictionary was
-        // empty at that moment and TryFlushCache returned early.
-        //
-        // CacheManager subscribes to OnConfigChanged for the flush instead, and the Plus
-        // config is saved by the two view models that actually change it.
+        // Write rolling backup
+        try
+        {
+            var backupPath = ConfigFilePath + ".bak";
+            if (!File.Exists(backupPath) || !PlusConfigManager.IsDefault(Config))
+            {
+                AtomicFile.WriteAllText(backupPath, newConfig);
+                Log.Debug("Config backup updated.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to write config backup.");
+        }
+
         OnConfigChanged?.Invoke();
     }
 
@@ -176,13 +217,12 @@ public class ConfigModel
     public bool HasShownTrayNotice = false;
     public bool HasShownSharedConfigNotice = false;
 
-    /// <summary>
-    /// PlusPlus-only settings, nested under one key rather than scattered across the top
-    /// level. Upstream VRCVideoCacher reads this same file into its own model and writes it
-    /// back, dropping whatever it does not recognise — so this whole block is what it
-    /// removes, and keeping it together is what makes that loss legible and recoverable.
-    /// </summary>
-    public PlusConfigModel Plus = new();
+    // PlusPlus settings (flattened)
+    public int CacheDownloadRateLimitMBs = 0; // 0 = unlimited
+    public int CacheDownloadIdleSeconds = 30; // 0 = disabled
+    public bool CacheYouTubePreferVp9 = true; // VP9+aac in mp4 instead of h264+aac
+    public List<UriRule> UriRules = DefaultRules.Create();
+    public List<string> SeededDefaultRules = [];
 
     public static List<UriRule> GetDefaultRules() => DefaultRules.Create();
 }

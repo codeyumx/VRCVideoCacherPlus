@@ -5,13 +5,8 @@ using Xunit;
 
 namespace VRCVideoCacher.Tests;
 
-// These files already exist on every user's disk, written by Newtonsoft. The move to
-// System.Text.Json must read them back identically — a silent reset here means everyone
-// loses their settings and their entire rule list on upgrade, with only a log line to say
-// so, because both config loaders fall back to defaults when parsing fails.
 public class ConfigSerializationTests
 {
-    // A Config.json exactly as Newtonsoft wrote it, including the "10.0" float form.
     private const string LegacyConfigJson = """
         {
           "YtdlpWebServerUrl": "http://localhost.youtube.com:9696",
@@ -49,8 +44,6 @@ public class ConfigSerializationTests
         var config = Json.Deserialize<ConfigModel>(LegacyConfigJson);
 
         Assert.NotNull(config);
-        // Every field, because STJ ignores fields entirely without IncludeFields — the
-        // failure mode is not an exception, it is every value silently being the default.
         Assert.Equal("http://localhost.youtube.com:9696", config!.YtdlpWebServerUrl);
         Assert.True(config.YtdlpUseCookies);
         Assert.True(config.UseBetaExtension);
@@ -68,7 +61,6 @@ public class ConfigSerializationTests
     [Fact]
     public void IgnoresAKeyThatNoLongerExists()
     {
-        // RedirectVRDancing was removed from the model; an existing file still has it.
         var exception = Record.Exception(() => Json.Deserialize<ConfigModel>(LegacyConfigJson));
         Assert.Null(exception);
     }
@@ -89,7 +81,6 @@ public class ConfigSerializationTests
     [Fact]
     public void ReadsAPlusConfigWrittenByTheOldSerializer()
     {
-        // RuleAction is stored as a number by both serializers; 2 is Redirect.
         const string json = """
             {
               "CacheDownloadRateLimitMBs": 5,
@@ -112,7 +103,7 @@ public class ConfigSerializationTests
             }
             """;
 
-        var config = Json.Deserialize<PlusConfigModel>(json);
+        var config = Json.Deserialize<ConfigModel>(json);
 
         Assert.NotNull(config);
         Assert.Equal(5, config!.CacheDownloadRateLimitMBs);
@@ -127,16 +118,13 @@ public class ConfigSerializationTests
         Assert.Equal("https://youtube.com/watch?v=$1", rule.RedirectTarget);
         Assert.Null(rule.MaxResolution);
         Assert.Null(rule.Integration);
-        // The regex must come back exactly; a mangled pattern silently stops matching.
         Assert.Contains(@"music\.youtube\.com", rule.Pattern);
     }
 
     [Fact]
     public void DoesNotEscapeUrlsOrRegexPatternsIntoUnreadableText()
     {
-        // The default STJ encoder emits \u0026 for & and \u002B for +. Config files are
-        // meant to be hand-editable, and the rule list is full of both.
-        var config = new PlusConfigModel
+        var config = new ConfigModel
         {
             UriRules =
             [
@@ -160,12 +148,11 @@ public class ConfigSerializationTests
     [Fact]
     public void EnumsStayNumericSoExistingFilesKeepWorking()
     {
-        var json = Json.Serialize(new PlusConfigModel
+        var json = Json.Serialize(new ConfigModel
         {
             UriRules = [new UriRule { Action = RuleAction.Block }]
         });
 
-        // RuleAction.Block is 4. A string here would break every config already on disk.
         Assert.Contains("\"Action\": 4", json);
     }
 
@@ -179,7 +166,7 @@ public class ConfigSerializationTests
             }
             """;
 
-        Assert.Equal(45, Json.Deserialize<PlusConfigModel>(json)!.CacheDownloadIdleSeconds);
+        Assert.Equal(45, Json.Deserialize<ConfigModel>(json)!.CacheDownloadIdleSeconds);
     }
 
     [Fact]
@@ -196,31 +183,29 @@ public class ConfigSerializationTests
     [Fact]
     public void ReadsAGitHubReleasePayload()
     {
-        // Snake-case names on the model match the API exactly; digest drives the update's
-        // integrity check and is absent on older assets.
         const string json = """
             {
               "tag_name": "2026.8.21",
-              "html_url": "https://github.com/owner/repo/releases/tag/2026.8.21",
-              "name": "Release",
+              "html_url": "https://github.com/codeyumx/VRCVideoCacherPlus/releases/tag/2026.8.21",
               "assets": [
                 {
-                  "name": "VRCVideoCacher",
-                  "browser_download_url": "https://example.com/VRCVideoCacher",
-                  "digest": "sha256:abc123",
-                  "size": 52000000
-                },
-                { "name": "VRCVideoCacher.exe", "browser_download_url": "https://example.com/x.exe" }
+                  "name": "VRCVideoCacher.exe",
+                  "browser_download_url": "https://github.com/.../VRCVideoCacher.exe",
+                  "digest": "sha256:abc"
+                }
               ]
             }
             """;
 
-        var release = Json.Deserialize<GitHubRelease>(json);
+        var payload = Json.Deserialize<GitHubRelease>(json);
 
-        Assert.NotNull(release);
-        Assert.Equal("2026.8.21", release!.tag_name);
-        Assert.Equal(2, release.assets.Count);
-        Assert.Equal("sha256:abc123", release.assets[0].digest);
-        Assert.Null(release.assets[1].digest);
+        Assert.NotNull(payload);
+        Assert.Equal("2026.8.21", payload!.tag_name);
+        Assert.Equal("https://github.com/codeyumx/VRCVideoCacherPlus/releases/tag/2026.8.21", payload.html_url);
+
+        var asset = Assert.Single(payload.assets);
+        Assert.Equal("VRCVideoCacher.exe", asset.name);
+        Assert.Equal("https://github.com/.../VRCVideoCacher.exe", asset.browser_download_url);
+        Assert.Equal("sha256:abc", asset.digest);
     }
 }

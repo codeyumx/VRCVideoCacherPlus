@@ -7,18 +7,8 @@ namespace VRCVideoCacher;
 /// <summary>
 /// The PlusPlus-only settings, and the rule seeding that goes with them.
 ///
-/// These used to live in their own PlusConfig.json, specifically so that upstream
-/// VRCVideoCacher opening the shared Config.json could not overwrite them. That worked, but
-/// it meant two config files, two save paths, two change events, and settings the user
-/// could only find by knowing which file to open.
-///
-/// They now live under the "Plus" key of the shared Config.json. The upstream hazard is
-/// real and unchanged — it reads that file into its own model and writes it back, dropping
-/// what it does not recognise — so it is handled openly instead: the user is told once, and
-/// the pre-merge settings are kept as a backup alongside.
-///
-/// Deliberately has no static constructor. It reads through to ConfigManager.Config, and a
-/// static initialiser here would re-enter ConfigManager's while that is still running.
+/// These used to live nested under the "Plus" key of the shared Config.json or in a separate file.
+/// They are now flat top-level fields inside the main ConfigModel.
 /// </summary>
 public static class PlusConfigManager
 {
@@ -26,9 +16,9 @@ public static class PlusConfigManager
 
     private static readonly string LegacyConfigFilePath = Path.Join(Program.DataPath, "PlusConfig.json");
 
-    public static PlusConfigModel Config => ConfigManager.Config.Plus;
+    public static ConfigModel Config => ConfigManager.Config;
 
-    /// <summary>One file now, so one save path.</summary>
+    /// <summary>Saves config via ConfigManager.</summary>
     public static void TrySaveConfig() => ConfigManager.TrySaveConfig();
 
     public static List<UriRule> GetDefaultRules() => DefaultRules.Create();
@@ -37,25 +27,57 @@ public static class PlusConfigManager
     /// Runs once from ConfigManager's initialiser, after the file is loaded and before it
     /// is saved back.
     /// </summary>
-    internal static void Initialize(ConfigModel config)
+    internal static void Initialize(ConfigModel config, string rawJsonText)
     {
-        config.Plus ??= new PlusConfigModel();
+        // TODO: Remove later - Migrating legacy nested Plus block from Config.json
+        if (!string.IsNullOrEmpty(rawJsonText))
+        {
+            try
+            {
+                using var document = JsonDocument.Parse(rawJsonText);
+                var root = document.RootElement;
+                if (root.TryGetProperty("Plus", out var plusElement) && plusElement.ValueKind == JsonValueKind.Object)
+                {
+                    if (plusElement.TryGetProperty("CacheDownloadRateLimitMBs", out var rate) && rate.TryGetInt32(out var rateValue))
+                        config.CacheDownloadRateLimitMBs = rateValue;
 
+                    if (plusElement.TryGetProperty("CacheDownloadIdleSeconds", out var idle) && idle.TryGetInt32(out var idleValue))
+                        config.CacheDownloadIdleSeconds = idleValue;
+
+                    if (plusElement.TryGetProperty("CacheYouTubePreferVp9", out var vp9) && vp9.ValueKind is JsonValueKind.True or JsonValueKind.False)
+                        config.CacheYouTubePreferVp9 = vp9.GetBoolean();
+
+                    if (plusElement.TryGetProperty("UriRules", out var rules) && rules.ValueKind == JsonValueKind.Array)
+                    {
+                        var migratedRules = Utils.Json.Deserialize<List<UriRule>>(rules.GetRawText());
+                        if (migratedRules is { Count: > 0 })
+                            config.UriRules = migratedRules;
+                    }
+
+                    if (plusElement.TryGetProperty("SeededDefaultRules", out var seeded) && seeded.ValueKind == JsonValueKind.Array)
+                    {
+                        var migratedSeeded = Utils.Json.Deserialize<List<string>>(seeded.GetRawText());
+                        if (migratedSeeded is { Count: > 0 })
+                            config.SeededDefaultRules = migratedSeeded;
+                    }
+
+                    Log.Information("Migrated settings from the legacy nested Plus block in Config.json.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Failed to migrate settings from legacy nested Plus block.");
+            }
+        }
+
+        // TODO: Remove later - Migrating legacy separate PlusConfig.json file
         MigrateFromLegacyPlusConfigFile(config);
-        MigrateFromLegacyTopLevelKeys(config);
-        MigrateBrokenDefaultRules(config.Plus);
-        EnsureDefaultRules(config.Plus);
+
+        MigrateBrokenDefaultRules(config);
+        EnsureDefaultRules(config);
     }
 
-    /// <summary>
-    /// Folds a PlusConfig.json from a previous version into the shared config, then takes it
-    /// out of play.
-    ///
-    /// The original is copied to PlusConfig.json.bak and then removed. Removing it matters:
-    /// left in place it would be re-read on every launch and would overwrite whatever the
-    /// user had since changed. The .bak is never read again — it exists so the settings as
-    /// they were at the moment of the merge remain recoverable by hand.
-    /// </summary>
+    // TODO: Remove later - Migrating legacy separate PlusConfig.json file
     private static void MigrateFromLegacyPlusConfigFile(ConfigModel config)
     {
         if (!File.Exists(LegacyConfigFilePath))
@@ -63,15 +85,34 @@ public static class PlusConfigManager
 
         try
         {
-            var loaded = Utils.Json.Deserialize<PlusConfigModel>(File.ReadAllText(LegacyConfigFilePath));
-            if (loaded != null)
+            using var document = JsonDocument.Parse(File.ReadAllText(LegacyConfigFilePath));
+            var root = document.RootElement;
+            if (root.ValueKind == JsonValueKind.Object)
             {
-                config.Plus = loaded;
-                Log.Information("Merged PlusConfig.json into the shared config.");
-            }
-            else
-            {
-                Log.Warning("PlusConfig.json could not be read; keeping current Plus settings.");
+                if (root.TryGetProperty("CacheDownloadRateLimitMBs", out var rate) && rate.TryGetInt32(out var rateValue))
+                    config.CacheDownloadRateLimitMBs = rateValue;
+
+                if (root.TryGetProperty("CacheDownloadIdleSeconds", out var idle) && idle.TryGetInt32(out var idleValue))
+                    config.CacheDownloadIdleSeconds = idleValue;
+
+                if (root.TryGetProperty("CacheYouTubePreferVp9", out var vp9) && vp9.ValueKind is JsonValueKind.True or JsonValueKind.False)
+                    config.CacheYouTubePreferVp9 = vp9.GetBoolean();
+
+                if (root.TryGetProperty("UriRules", out var rules) && rules.ValueKind == JsonValueKind.Array)
+                {
+                    var migratedRules = Utils.Json.Deserialize<List<UriRule>>(rules.GetRawText());
+                    if (migratedRules is { Count: > 0 })
+                        config.UriRules = migratedRules;
+                }
+
+                if (root.TryGetProperty("SeededDefaultRules", out var seeded) && seeded.ValueKind == JsonValueKind.Array)
+                {
+                    var migratedSeeded = Utils.Json.Deserialize<List<string>>(seeded.GetRawText());
+                    if (migratedSeeded is { Count: > 0 })
+                        config.SeededDefaultRules = migratedSeeded;
+                }
+
+                Log.Information("Merged legacy PlusConfig.json into the shared config.");
             }
 
             var backupPath = LegacyConfigFilePath + ".bak";
@@ -88,75 +129,14 @@ public static class PlusConfigManager
     }
 
     /// <summary>
-    /// Picks up Plus settings from an even older layout, where they sat at the top level of
-    /// Config.json. Only applies when the Plus block is still untouched, so it can never
-    /// undo a newer value.
+    /// Repairs default rules that shipped with a broken pattern.
     /// </summary>
-    private static void MigrateFromLegacyTopLevelKeys(ConfigModel config)
+    private static void MigrateBrokenDefaultRules(ConfigModel config)
     {
-        var configPath = Path.Join(Program.DataPath, "Config.json");
-        if (!File.Exists(configPath))
+        if (config.UriRules == null)
             return;
 
-        try
-        {
-            using var document = JsonDocument.Parse(File.ReadAllText(configPath));
-            var root = document.RootElement;
-            if (root.ValueKind != JsonValueKind.Object || root.TryGetProperty("Plus", out _))
-                return;
-
-            var plus = config.Plus;
-            var migrated = false;
-
-            if (root.TryGetProperty("CacheDownloadRateLimitMBs", out var rate) && rate.TryGetInt32(out var rateValue))
-            {
-                plus.CacheDownloadRateLimitMBs = rateValue;
-                migrated = true;
-            }
-
-            if (root.TryGetProperty("CacheDownloadIdleSeconds", out var idle) && idle.TryGetInt32(out var idleValue))
-            {
-                plus.CacheDownloadIdleSeconds = idleValue;
-                migrated = true;
-            }
-
-            if (root.TryGetProperty("CacheYouTubePreferVp9", out var vp9) &&
-                vp9.ValueKind is JsonValueKind.True or JsonValueKind.False)
-            {
-                plus.CacheYouTubePreferVp9 = vp9.GetBoolean();
-                migrated = true;
-            }
-
-            if (root.TryGetProperty("UriRules", out var rules) && rules.ValueKind == JsonValueKind.Array)
-            {
-                var migratedRules = Utils.Json.Deserialize<List<UriRule>>(rules.GetRawText());
-                if (migratedRules is { Count: > 0 })
-                {
-                    plus.UriRules = migratedRules;
-                    migrated = true;
-                }
-            }
-
-            if (migrated)
-                Log.Information("Migrated Plus settings from the top level of Config.json.");
-        }
-        catch (Exception ex)
-        {
-            Log.Warning(ex, "Failed to migrate legacy top-level Plus settings, using defaults.");
-        }
-    }
-
-    /// <summary>
-    /// Repairs default rules that shipped with a broken pattern. Runs before
-    /// <see cref="EnsureDefaultRules"/> so the repaired rule is recognised as already
-    /// present and isn't duplicated by the corrected default.
-    /// </summary>
-    private static void MigrateBrokenDefaultRules(PlusConfigModel plus)
-    {
-        if (plus.UriRules == null)
-            return;
-
-        foreach (var rule in plus.UriRules)
+        foreach (var rule in config.UriRules)
         {
             if (rule.Pattern != DefaultRules.LegacyDropboxPattern)
                 continue;
@@ -174,73 +154,78 @@ public static class PlusConfigManager
 
     /// <summary>
     /// Seeds default rules that this installation has not been offered before.
-    ///
-    /// An earlier version re-added any default that was missing, every single launch — so
-    /// deleting a default rule was impossible: it silently reappeared on the next start.
-    /// Each default is now recorded once in SeededDefaultRules, and after that the user's
-    /// decision to remove it sticks.
     /// </summary>
-    private static void EnsureDefaultRules(PlusConfigModel plus)
+    private static void EnsureDefaultRules(ConfigModel config)
     {
         var defaults = DefaultRules.Create();
 
-        if (plus.UriRules == null || plus.UriRules.Count == 0)
+        if (config.UriRules == null || config.UriRules.Count == 0)
         {
-            plus.UriRules = defaults;
-            plus.SeededDefaultRules = defaults.Select(rule => rule.Name).ToList();
+            config.UriRules = defaults;
+            config.SeededDefaultRules = defaults.Select(rule => rule.Name).ToList();
             return;
         }
+
+        if (config.SeededDefaultRules == null)
+            config.SeededDefaultRules = [];
 
         // Upgrading from a version with no seed tracking: everything the user already has
         // has evidently been seeded. Anything missing is either a rule they deleted or a
         // genuinely new default; both get offered exactly once here, and are then recorded.
-        if (plus.SeededDefaultRules.Count == 0)
+        if (config.SeededDefaultRules.Count == 0)
         {
-            plus.SeededDefaultRules = defaults
-                .Where(d => plus.UriRules.Any(r => r.Name == d.Name || r.Pattern == d.Pattern))
+            config.SeededDefaultRules = defaults
+                .Where(d => config.UriRules.Any(r => r.Name == d.Name || r.Pattern == d.Pattern))
                 .Select(d => d.Name)
                 .ToList();
         }
 
         foreach (var defRule in defaults)
         {
-            if (plus.SeededDefaultRules.Contains(defRule.Name))
+            if (config.SeededDefaultRules.Contains(defRule.Name))
                 continue;
 
-            if (plus.UriRules.Any(r => r.Name == defRule.Name || r.Pattern == defRule.Pattern))
+            if (config.UriRules.Any(r => r.Name == defRule.Name || r.Pattern == defRule.Pattern))
             {
-                plus.SeededDefaultRules.Add(defRule.Name);
+                config.SeededDefaultRules.Add(defRule.Name);
                 continue;
             }
 
-            var catchAllIndex = plus.UriRules.FindIndex(r => r.Name == CatchAllRuleName);
+            var catchAllIndex = config.UriRules.FindIndex(r => r.Name == CatchAllRuleName);
             if (catchAllIndex >= 0)
-                plus.UriRules.Insert(catchAllIndex, defRule);
+                config.UriRules.Insert(catchAllIndex, defRule);
             else
-                plus.UriRules.Add(defRule);
+                config.UriRules.Add(defRule);
 
-            plus.SeededDefaultRules.Add(defRule.Name);
+            config.SeededDefaultRules.Add(defRule.Name);
             Log.Information("Added new default rule '{RuleName}'.", defRule.Name);
         }
 
         // Defensive: an earlier version could insert the same rule more than once. Keyed on
         // a tuple rather than a "Name + \"|\" + Pattern" string, which could collide across
         // differently-split name/pattern pairs.
-        plus.UriRules = plus.UriRules.DistinctBy(r => (r.Name, r.Pattern)).ToList();
+        config.UriRules = config.UriRules.DistinctBy(r => (r.Name, r.Pattern)).ToList();
     }
-}
-
-public class PlusConfigModel
-{
-    public int CacheDownloadRateLimitMBs { get; set; } // 0 = unlimited
-    public int CacheDownloadIdleSeconds { get; set; } = 30; // 0 = disabled
-    public bool CacheYouTubePreferVp9 { get; set; } = true; // VP9+aac in mp4 instead of h264+aac
-    public List<UriRule> UriRules { get; set; } = DefaultRules.Create();
 
     /// <summary>
-    /// Names of the default rules this installation has already been offered. A default is
-    /// seeded once; once it is in here, deleting the rule keeps it deleted instead of
-    /// having it reappear on the next launch.
+    /// Returns true if all PlusPlus settings are unmodified defaults.
     /// </summary>
-    public List<string> SeededDefaultRules { get; set; } = [];
+    public static bool IsDefault(ConfigModel config)
+    {
+        if (config.CacheDownloadRateLimitMBs != 0) return false;
+        if (config.CacheDownloadIdleSeconds != 30) return false;
+        if (config.CacheYouTubePreferVp9 != true) return false;
+
+        var defaults = DefaultRules.Create();
+        if (config.UriRules == null || config.UriRules.Count != defaults.Count) return false;
+        for (int i = 0; i < defaults.Count; i++)
+        {
+            var r = config.UriRules[i];
+            var d = defaults[i];
+            if (r.Name != d.Name || r.Pattern != d.Pattern || r.RedirectTarget != d.RedirectTarget || r.Action != d.Action || r.Enabled != d.Enabled)
+                return false;
+        }
+
+        return true;
+    }
 }
