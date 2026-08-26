@@ -223,6 +223,22 @@ public static class DatabaseManager
         return db.VideoInfoCache.Find(videoId);
     }
 
+    // Batched title lookup for list views: one query instead of one per row, so
+    // refreshing a long queue doesn't hammer SQLite on the UI thread.
+    public static Dictionary<string, string> GetVideoTitles(IEnumerable<string> videoIds)
+    {
+        var ids = videoIds.Where(id => !string.IsNullOrEmpty(id)).Distinct().ToList();
+        if (ids.Count == 0)
+            return new Dictionary<string, string>();
+
+        using var db = _contextFactory.CreateDbContext();
+        return db.VideoInfoCache
+            .AsNoTracking()
+            .Where(v => ids.Contains(v.Id))
+            .Select(v => new KeyValuePair<string, string?>(v.Id, v.Title))
+            .ToDictionary(p => p.Key, p => p.Value ?? string.Empty);
+    }
+
     public static void UpdateVideoWatchStats(string videoId)
     {
         if (string.IsNullOrEmpty(videoId)) return;

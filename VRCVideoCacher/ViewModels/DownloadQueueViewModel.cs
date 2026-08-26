@@ -151,15 +151,36 @@ public partial class DownloadQueueViewModel : ViewModelBase
 
     private void OnQueueChanged()
     {
-        Dispatcher.UIThread.InvokeAsync(RefreshQueue);
+        // Queue events arrive once per queued item; when a playlist enqueues hundreds
+        // at once, rebuilding the whole list per event saturates the UI thread.
+        // Coalesce bursts into a single refresh on the next dispatcher pass.
+        if (_refreshPending)
+            return;
+        _refreshPending = true;
+        Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            _refreshPending = false;
+            RefreshQueue();
+        });
     }
+
+    private bool _refreshPending;
 
     [RelayCommand]
     private void RefreshQueue()
     {
-        QueuedDownloads.Clear();
-
         var pending = VideoDownloader.GetQueueSnapshot();
+        var state = VideoDownloader.GetDownloadState();
+        var current = VideoDownloader.GetCurrentDownload() ?? VideoDownloader.GetPausedDownload();
+
+        // One batched title lookup for the whole list — per-row queries made every
+        // refresh O(N) DB calls, and the queue fires a refresh per queued item.
+        var titleIds = pending.Select(p => p.VideoId).ToList();
+        if (current != null)
+            titleIds.Add(current.VideoId);
+        var titles = DatabaseManager.GetVideoTitles(titleIds);
+
+        QueuedDownloads.Clear();
         foreach (var item in pending)
         {
             QueuedDownloads.Add(new DownloadItemViewModel
@@ -170,12 +191,10 @@ public partial class DownloadQueueViewModel : ViewModelBase
                 UrlType = item.UrlType.ToString(),
                 Format = item.DownloadFormat.ToString(),
                 QueuedAt = item.QueuedAt.ToLocalTime().ToString("g"),
-                Title = LookupTitle(item.VideoId)
+                Title = titles.GetValueOrDefault(item.VideoId)
             });
         }
 
-        var state = VideoDownloader.GetDownloadState();
-        var current = VideoDownloader.GetCurrentDownload() ?? VideoDownloader.GetPausedDownload();
         if (current != null)
         {
             CurrentDownload = new DownloadItemViewModel
@@ -184,7 +203,7 @@ public partial class DownloadQueueViewModel : ViewModelBase
                 VideoId = current.VideoId,
                 UrlType = current.UrlType.ToString(),
                 Format = current.DownloadFormat.ToString(),
-                Title = LookupTitle(current.VideoId)
+                Title = titles.GetValueOrDefault(current.VideoId)
             };
             CurrentStatus = state switch
             {
@@ -265,10 +284,16 @@ public partial class DownloadQueueViewModel : ViewModelBase
                         failed++;
                         continue;
                     }
+                    var queued = 0;
                     foreach (var video in playlistVideos)
                     {
                         VideoDownloader.QueueDownload(video);
                         added++;
+
+                        // Enqueueing is synchronous DB work; yield occasionally so a
+                        // multi-thousand-entry playlist can't pin the UI thread.
+                        if (++queued % 25 == 0)
+                            await Task.Yield();
                     }
                 }
                 else

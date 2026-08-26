@@ -53,9 +53,15 @@ public class VideoId
         ytdlpProcess.StartInfo.Arguments = YtdlManager.GenerateYtdlArgs(args, $"\"{url}\"");
         Log.Information("Starting yt-dlp with args: {args:l}", ytdlpProcess.StartInfo.Arguments);
         ytdlpProcess.Start();
-        var output = await ytdlpProcess.StandardOutput.ReadToEndAsync();
-        var error = await ytdlpProcess.StandardError.ReadToEndAsync();
+
+        // Drain both pipes concurrently: reading stdout to EOF before touching stderr
+        // deadlocks once yt-dlp fills the stderr pipe buffer (classic Process trap).
+        var outputTask = ytdlpProcess.StandardOutput.ReadToEndAsync();
+        var errorTask = ytdlpProcess.StandardError.ReadToEndAsync();
         await ytdlpProcess.WaitForExitAsync();
+        var output = await outputTask;
+        var error = await errorTask;
+
         Log.Information("Finished yt-dlp");
         return (output.Trim(), error.Trim(), ytdlpProcess.ExitCode);
     }
@@ -279,9 +285,15 @@ public class VideoId
             }
         };
         process.Start();
-        var output = await process.StandardOutput.ReadToEndAsync();
-        var error = await process.StandardError.ReadToEndAsync();
+
+        // Drain both pipes concurrently (see RunYtdlpAsync) — sequential reads deadlock
+        // when stderr fills while stdout is still open, which is common on large
+        // playlists that emit many warnings.
+        var outputTask = process.StandardOutput.ReadToEndAsync();
+        var errorTask = process.StandardError.ReadToEndAsync();
         await process.WaitForExitAsync();
+        var output = await outputTask;
+        var error = await errorTask;
 
         if (process.ExitCode != 0)
         {
