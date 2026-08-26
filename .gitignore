@@ -15,6 +15,9 @@ publish/
 *.log
 nul
 
+# Signing keys
+BrowserExtension/chrome.pem
+
 # Build files
 /Build
 /Build/linux-x64/VRCVideoCacher.pdb
