@@ -1,5 +1,5 @@
-using Newtonsoft.Json;
 using Serilog;
+using VRCVideoCacher.Utils;
 
 namespace VRCVideoCacher.Models;
 
@@ -15,7 +15,7 @@ public class Versions
         {
             try
             {
-                CurrentVersion = JsonConvert.DeserializeObject<VersionJson>(File.ReadAllText(VersionPath)) ??
+                CurrentVersion = Json.Deserialize<VersionJson>(File.ReadAllText(VersionPath)) ??
                                  new VersionJson();
                 return;
             }
@@ -30,7 +30,7 @@ public class Versions
 
     public static void Save()
     {
-        File.WriteAllText(VersionPath, JsonConvert.SerializeObject(CurrentVersion, Formatting.Indented));
+        AtomicFile.WriteAllText(VersionPath, Json.Serialize(CurrentVersion));
     }
 }
 

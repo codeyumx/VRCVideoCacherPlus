@@ -1,0 +1,123 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:VRCVideoCacher.ViewModels"
+             xmlns:mi="using:Material.Icons.Avalonia"
+             xmlns:l="using:Jeek.Avalonia.Localization"
+             xmlns:asyncImageLoader="clr-namespace:AsyncImageLoader;assembly=AsyncImageLoader.Avalonia"
+             x:Class="VRCVideoCacher.Views.NowPlayingView"
+             x:DataType="vm:NowPlayingViewModel">
+
+    <Grid RowDefinitions="Auto, *">
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,20">
+            <TextBlock Text="{l:Localize NowPlaying}" FontSize="24" FontWeight="Bold" Foreground="White"/>
+            <TextBlock Text="Monitor and control active VRChat video playback streams" FontSize="12" Foreground="#888888" Margin="0,5,0,0"/>
+        </StackPanel>
+
+        <!-- No Streams Active Placeholder -->
+        <Border Grid.Row="1" Background="#252525" CornerRadius="8" Padding="40"
+                IsVisible="{Binding !HasActiveSessions}"
+                VerticalAlignment="Center" HorizontalAlignment="Center" Width="400">
+            <StackPanel Spacing="15" HorizontalAlignment="Center">
+                <mi:MaterialIcon Kind="PlayCircleOutline" Width="64" Height="64" Foreground="#444444" HorizontalAlignment="Center"/>
+                <TextBlock Text="No Active Streams" FontSize="18" FontWeight="SemiBold" Foreground="#aaaaaa" HorizontalAlignment="Center"/>
+                <TextBlock Text="When you play a video in VRChat, it will appear here in real time." 
+                           TextWrapping="Wrap" TextAlignment="Center" Foreground="#888888" FontSize="12"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Active Streams Grid -->
+        <ScrollViewer Grid.Row="1" IsVisible="{Binding HasActiveSessions}">
+            <ItemsControl ItemsSource="{Binding Sessions}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Spacing="15"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ActiveVideoSessionViewModel">
+                        <Border Background="#2d2d2d" BorderBrush="#3d3d3d" BorderThickness="1" CornerRadius="8" Padding="15">
+                            <Grid ColumnDefinitions="160, *">
+                                <!-- Left: Video Thumbnail / Icon -->
+                                <Grid Grid.Column="0" Height="90" Width="140" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                    <!-- Thumbnail Image -->
+                                    <Border CornerRadius="4" ClipToBounds="True"
+                                            IsVisible="{Binding ThumbnailUrl, Converter={x:Static ObjectConverters.IsNotNull}}">
+                                        <Image asyncImageLoader:ImageLoader.Source="{Binding ThumbnailUrl}" Stretch="UniformToFill"/>
+                                    </Border>
+
+                                    <!-- Placeholder with Platform Gradients -->
+                                    <Border CornerRadius="4" 
+                                            IsVisible="{Binding ThumbnailUrl, Converter={x:Static ObjectConverters.IsNull}}">
+                                        <Border.Background>
+                                            <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                                                <GradientStop Color="#4A148C" Offset="0"/>
+                                                <GradientStop Color="#004D40" Offset="1"/>
+                                            </LinearGradientBrush>
+                                        </Border.Background>
+                                        <mi:MaterialIcon Kind="Video" Width="40" Height="40" Foreground="White" Opacity="0.6"/>
+                                    </Border>
+                                </Grid>
+
+                                <!-- Right: Details and Controls -->
+                                <Grid Grid.Column="1" RowDefinitions="Auto, Auto, Auto, Auto">
+                                    <!-- Title & Actions -->
+                                    <Grid Grid.Row="0" ColumnDefinitions="*, Auto">
+                                        <TextBlock Grid.Column="0" Text="{Binding Title}" FontSize="15" FontWeight="Bold" 
+                                                   Foreground="White" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis"
+                                                   VerticalAlignment="Center"/>
+
+                                        <!-- Actions Row -->
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" Margin="10,0,0,0" VerticalAlignment="Center">
+                                            <Button Command="{Binding $parent[UserControl].((vm:NowPlayingViewModel)DataContext).CopyUrlCommand}" 
+                                                    CommandParameter="{Binding}" ToolTip.Tip="Copy Video URL" Classes="action-button">
+                                                <mi:MaterialIcon Kind="ContentCopy" Width="16" Height="16"/>
+                                            </Button>
+                                            <Button Command="{Binding $parent[UserControl].((vm:NowPlayingViewModel)DataContext).CreateRuleCommand}" 
+                                                    CommandParameter="{Binding}" ToolTip.Tip="Create Block Rule" Classes="action-button">
+                                                <mi:MaterialIcon Kind="Tune" Width="16" Height="16"/>
+                                            </Button>
+                                            <Button Command="{Binding $parent[UserControl].((vm:NowPlayingViewModel)DataContext).SeverStreamCommand}" 
+                                                    CommandParameter="{Binding}" ToolTip.Tip="Sever Video Connection" 
+                                                    Background="#e53935" Foreground="White">
+                                                <mi:MaterialIcon Kind="LinkOff" Width="16" Height="16"/>
+                                            </Button>
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <!-- URL -->
+                                    <TextBlock Grid.Row="1" Text="{Binding OriginalUrl}" FontSize="11" Foreground="#888888" 
+                                               TextTrimming="CharacterEllipsis" Margin="0,4,0,0"/>
+
+                                    <!-- Progress Area -->
+                                    <Grid Grid.Row="2" ColumnDefinitions="*, Auto" Margin="0,15,0,0">
+                                        <!-- Progress Bar -->
+                                        <ProgressBar Grid.Column="0" Value="{Binding ProgressPercentage}" Minimum="0" Maximum="100" 
+                                                     Height="6" Foreground="#42A5F5" Background="#1e1e1e" VerticalAlignment="Center"
+                                                     Margin="0,0,15,0"/>
+                                        
+                                        <!-- Duration text -->
+                                        <TextBlock Grid.Column="1" Text="{Binding ProgressText}" FontSize="11" Foreground="#aaaaaa" 
+                                                   VerticalAlignment="Center"/>
+                                    </Grid>
+
+                                    <!-- Connection Info & Status Badge -->
+                                    <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="15" Margin="0,10,0,0">
+                                        <Border Background="{Binding StatusColor}" CornerRadius="4" Padding="8,3">
+                                            <TextBlock Text="{Binding Status}" FontSize="10" FontWeight="Bold" Foreground="#121212"/>
+                                        </Border>
+                                        
+                                        <StackPanel Orientation="Horizontal" Spacing="5" IsVisible="{Binding RemoteIp, Converter={x:Static ObjectConverters.IsNotNull}}">
+                                            <mi:MaterialIcon Kind="NetworkOutline" Width="14" Height="14" Foreground="#888888" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding RemoteIp}" FontSize="11" Foreground="#888888" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Grid>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

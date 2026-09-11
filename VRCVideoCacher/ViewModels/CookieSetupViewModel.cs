@@ -236,17 +236,17 @@ public partial class CookieSetupViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void ToggleHost()
+    private async Task ToggleHost()
     {
-        ElevatorManager.ToggleHostLine();
-        Dispatcher.UIThread.Post(() =>
-        {
-            HostState = ElevatorManager.HasHostsLine;
-            OnPropertyChanged(nameof(HostButtonText));
-            OnPropertyChanged(nameof(HostStatusText));
-            OnPropertyChanged(nameof(HostStatusIcon));
-            OnPropertyChanged(nameof(HostStatusColor));
-        });
+        // Awaiting resumes on the UI thread, so the Dispatcher.Post that used to wrap these
+        // updates is no longer needed.
+        await ElevatorManager.ToggleHostLineAsync();
+
+        HostState = ElevatorManager.HasHostsLine;
+        OnPropertyChanged(nameof(HostButtonText));
+        OnPropertyChanged(nameof(HostStatusText));
+        OnPropertyChanged(nameof(HostStatusIcon));
+        OnPropertyChanged(nameof(HostStatusColor));
     }
 
     [RelayCommand]
@@ -284,12 +284,5 @@ public partial class CookieSetupViewModel : ViewModelBase
         RequestClose?.Invoke();
     }
 
-    private static void OpenUrl(string url)
-    {
-        try
-        {
-            Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
-        }
-        catch { /* Ignore errors */ }
-    }
+    private static void OpenUrl(string url) => Utils.OpenUrl.Open(url);
 }

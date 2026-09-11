@@ -21,8 +21,6 @@ public class WebServer
 
         _server = CreateWebServer(ConfigManager.Config.YtdlpWebServerUrl);
 
-        // RunAsync returns a long-running task that completes when the server stops.
-        // Fire-and-forget, but observe faults so port-in-use errors get logged.
         _server.RunAsync().ContinueWith(t =>
         {
             if (t.IsFaulted)
@@ -50,13 +48,12 @@ public class WebServer
         var server = new EmbedIO.WebServer(o => o
                 .WithUrlPrefixes(urls)
                 .WithMode(HttpListenerMode.EmbedIO))
-            // First, we will configure our web server by adding Modules.
+            .WithModule(new ActiveStreamModule())
             .WithWebApi("/api", m => m
                 .WithController<ApiController>())
             .WithStaticFolder("/", CacheManager.CachePath, true, m => m
                 .WithContentCaching(true));
 
-        // Listen for state changes.
         server.StateChanged += (_, e) => $"WebServer State: {e.NewState}".Info();
         server.OnUnhandledException += OnUnhandledException;
         server.OnHttpException += OnHttpException;

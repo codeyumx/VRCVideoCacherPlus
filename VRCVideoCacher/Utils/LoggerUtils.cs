@@ -23,16 +23,17 @@ public static class LoggerUtils
             Program.Logger.Error(ex, "{Message}", message);
 
             var logFile = Path.Combine(LogsPath, $"VRCVideoCacher{(LoggerStartDateTime ?? DateTime.Now):yyyyMMdd}.log");
-            if (OperatingSystem.IsWindows())
+            if (OperatingSystem.IsWindows() && File.Exists(logFile))
             {
-                if (File.Exists(logFile))
-                    Process.Start("explorer.exe", $"/select,\"{logFile}\"");
-                else
-                    Process.Start("explorer.exe", LogsPath);
+                // /select, needs the argument as a single token including the comma, which
+                // ArgumentList would quote wrongly — so this one case stays hand-built.
+                var psi = new ProcessStartInfo { FileName = "explorer.exe", UseShellExecute = false };
+                psi.ArgumentList.Add($"/select,{logFile}");
+                Process.Start(psi);
             }
-            else if (OperatingSystem.IsLinux())
+            else
             {
-                Process.Start("xdg-open", LogsPath);
+                OpenUrl.OpenFolder(LogsPath);
             }
         }
         catch

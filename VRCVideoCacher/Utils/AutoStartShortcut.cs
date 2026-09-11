@@ -18,6 +18,22 @@ public class AutoStartShortcut
     [SupportedOSPlatform("windows")]
     public static void TryUpdateShortcutPath()
     {
+        // Runs unguarded from startup. Everything below touches files in VRCX's startup
+        // folder that we do not own — a locked file, a corrupt .lnk or a permissions
+        // problem must not take the whole application down over a shortcut refresh.
+        try
+        {
+            UpdateShortcutPath();
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to update the VRCX autostart shortcut; continuing without it.");
+        }
+    }
+
+    [SupportedOSPlatform("windows")]
+    private static void UpdateShortcutPath()
+    {
         RemoveLegacyShortcut(true);
 
         var shortcut = GetOurShortcut();
@@ -140,9 +156,17 @@ public class AutoStartShortcut
 
     private static List<string> FindShortcutFiles(string folderPath)
     {
-        var directoryInfo = new DirectoryInfo(folderPath);
-        var files = directoryInfo.GetFiles();
         var ret = new List<string>();
+        FileInfo[] files;
+        try
+        {
+            files = new DirectoryInfo(folderPath).GetFiles();
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Could not enumerate {FolderPath}", folderPath);
+            return ret;
+        }
 
         foreach (var file in files)
         {
@@ -155,16 +179,27 @@ public class AutoStartShortcut
         return ret;
     }
 
+    // Opens every file in a folder we don't own to sniff its header, so a single locked or
+    // unreadable file used to be enough to abort startup. Treat anything unreadable as
+    // "not one of ours" and move on.
     private static bool IsShortcutFile(string filePath)
     {
-        var headerBytes = new byte[4];
-        using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-        if (fileStream.Length >= 4)
+        try
         {
-            fileStream.ReadExactly(headerBytes, 0, 4);
-        }
+            var headerBytes = new byte[4];
+            using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            if (fileStream.Length >= 4)
+            {
+                fileStream.ReadExactly(headerBytes, 0, 4);
+            }
 
-        return headerBytes.SequenceEqual(ShortcutSignatureBytes);
+            return headerBytes.SequenceEqual(ShortcutSignatureBytes);
+        }
+        catch (Exception ex)
+        {
+            Log.Debug("Could not read {FilePath} while looking for shortcuts: {Error}", filePath, ex.Message);
+            return false;
+        }
     }
 
     [SupportedOSPlatform("windows")]

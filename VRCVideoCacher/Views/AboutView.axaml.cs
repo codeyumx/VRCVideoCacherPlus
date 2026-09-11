@@ -5,7 +5,7 @@ namespace VRCVideoCacher.Views;
 
 public partial class AboutView : UserControl
 {
-    private const string GithubUrl = "https://github.com/codeyumx/VRCVideoCacherPlus";
+    private const string GithubUrl = Program.RepoUrl;
     private const string DiscordUrl = "https://discord.gg/z5kVNkmQuS";
     private const string SteamUrl = "https://store.steampowered.com/app/4296960/";
 

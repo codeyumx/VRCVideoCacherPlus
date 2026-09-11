@@ -23,7 +23,10 @@ public class Database : DbContext
         {
             Directory.CreateDirectory(CacheDir);
             optionsBuilder.UseSqlite($"Data Source={DbPath}");
+#if DEBUG
+            // See DatabaseManager: logs parameter values, so debug builds only.
             optionsBuilder.EnableSensitiveDataLogging();
+#endif
         }
     }
 

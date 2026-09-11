@@ -1,7 +1,7 @@
 ﻿{
     "source" : "builtin",
     "applications" : [{
-        "app_key" : "com.github.codeyumx.vrcvideocacherplus",
+        "app_key" : "com.github.bluscream.vrcvideocacherplusplus",
         "launch_type" : "binary",
         "binary_path_windows": "VRCVideoCacher.exe",
         "binary_path_linux": "VRCVideoCacher",
@@ -9,8 +9,8 @@
         "is_dashboard_overlay" : true,
         "strings": {
             "en_us": {
-                "name": "VRCVideoCacherPlus",
-                "description": "Video Player utility for VRC"
+                "name": "VRCVideoCacherPlusPlus",
+                "description": "Video Player utility for VRC (PlusPlus fork)"
             }
         }
     }]

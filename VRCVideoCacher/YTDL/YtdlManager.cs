@@ -1,5 +1,5 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
-using Newtonsoft.Json;
 using Serilog;
 using SharpCompress.Readers;
 using VRCVideoCacher.Models;
@@ -35,6 +35,9 @@ public class YtdlManager
     private const string DenoFallBackVersionURL = "https://dl.deno.land/release-latest.txt";
     private const string DenoFallBackDownloadURL = "https://dl.deno.land/release/";
 
+    // Guards the "Deno missing" error so it is reported on transition, not per invocation.
+    private static int _denoMissingReported;
+
 
     static YtdlManager()
     {
@@ -54,35 +57,193 @@ public class YtdlManager
         Log.Debug("Using ytdl path: {YtdlPath}", YtdlPath);
     }
 
-    public static string GenerateYtdlArgs(List<string> args, string urlArg)
+    /// <summary>
+    /// Downloads an archive to a temporary file and verifies its GitHub digest before the
+    /// caller extracts it. Returns null when the download or the check fails.
+    ///
+    /// Buffering to disk first is the point: the archive contents get marked executable and
+    /// run, so they have to be verified before extraction rather than streamed straight out
+    /// of the socket into the utils directory.
+    /// </summary>
+    private static async Task<string?> DownloadArchiveAsync(string url, string? digest, string label)
     {
-        var globalArgs = new List<string>
+        var tempPath = Path.Join(Program.UtilsPath, $"_{label}.download");
+        try
         {
-            "--encoding utf-8",
+            using var response = await DownloadHttpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+            if (!response.IsSuccessStatusCode)
+            {
+                Log.Warning("{Label}: download failed with {StatusCode}.", label, response.StatusCode);
+                return null;
+            }
+
+            await using (var responseStream = await response.Content.ReadAsStreamAsync())
+            await using (var fileStream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None))
+            {
+                await responseStream.CopyToAsync(fileStream);
+            }
+
+            if (await FileHash.VerifyGitHubDigestAsync(tempPath, digest, label))
+                return tempPath;
+        }
+        catch
+        {
+            TryDeleteTemp(tempPath);
+            throw;
+        }
+
+        TryDeleteTemp(tempPath);
+        return null;
+    }
+
+    private static void TryDeleteTemp(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+        catch (Exception ex)
+        {
+            Log.Debug("Could not remove temporary download {Path}: {Error}", path, ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Resolves an archive entry to a destination inside <see cref="Program.UtilsPath"/>,
+    /// flattening any directory component and refusing anything that still escapes.
+    ///
+    /// Entry names come from a remote archive, and joining one straight onto a destination
+    /// directory is the classic zip-slip: an entry called "../../something" writes wherever
+    /// the process can reach. Returns null when the entry should be skipped.
+    /// </summary>
+    private static string? ResolveUtilsDestination(string entryKey)
+    {
+        var fileName = Path.GetFileName(entryKey);
+        if (string.IsNullOrEmpty(fileName))
+            return null;
+
+        var utilsRoot = Path.GetFullPath(Program.UtilsPath);
+        var destination = Path.GetFullPath(Path.Join(utilsRoot, fileName));
+
+        // GetFileName already strips directories; this also catches an entry literally
+        // named "..", which would otherwise resolve to the parent directory.
+        if (!destination.StartsWith(utilsRoot + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+        {
+            Log.Warning("Rejecting archive entry {Entry}: resolves outside {UtilsPath}.", entryKey, utilsRoot);
+            return null;
+        }
+
+        return destination;
+    }
+
+    /// <summary>
+    /// Builds the complete yt-dlp argument list. Every element is exactly one argv entry
+    /// and must NOT be pre-quoted — the result goes to ProcessStartInfo.ArgumentList, which
+    /// applies the correct platform quoting itself.
+    ///
+    /// This used to return a single concatenated command line with hand-written quotes,
+    /// which made the URL's own quoting the caller's problem. Exactly one call site escaped
+    /// it (a lone Replace("\"", "%22") in ApiController), so a URL arriving by any other
+    /// route — the pre-cache list, playlist expansion, the UI — could close the quote and
+    /// append flags of its own. yt-dlp has --exec, so that is arbitrary code execution.
+    /// </summary>
+    public static List<string> GenerateYtdlArgs(List<string> args, IEnumerable<string> trailingArgs, bool includeCookies = true)
+    {
+        args.AddRange([
+            "--encoding", "utf-8",
             "--ignore-config",
             "--no-playlist",
             "--no-warnings",
             "--no-mtime",
             "--no-progress"
-        };
-        args.AddRange(globalArgs);
+        ]);
 
         if (File.Exists(FfmpegPath))
-            args.Add($"--ffmpeg-location \"{FfmpegPath}\"");
+        {
+            args.Add("--ffmpeg-location");
+            args.Add(FfmpegPath);
+        }
 
         if (File.Exists(DenoPath))
-            args.Add($"--js-runtimes deno:\"{DenoPath}\"");
-        else
+        {
+            args.Add("--js-runtimes");
+            args.Add($"deno:{DenoPath}");
+            Interlocked.Exchange(ref _denoMissingReported, 0);
+        }
+        else if (Interlocked.Exchange(ref _denoMissingReported, 1) == 0)
+        {
+            // Reported once per transition to missing, not once per invocation. This method
+            // runs for every single video request, and an error-level log raises a modal
+            // dialog — which, mid-session in VR, is not a small thing to do repeatedly.
             Log.Error("Deno runtime not found at path: {DenoPath}", DenoPath);
+        }
 
-        if (Program.IsCookiesEnabledAndValid())
-            args.Add($"--cookies \"{CookiesPath}\"");
+        if (includeCookies && Program.IsCookiesEnabledAndValid())
+        {
+            args.Add("--cookies");
+            args.Add(CookiesPath);
+        }
 
-        if (!string.IsNullOrEmpty(ConfigManager.Config.YtdlpAdditionalArgs))
-            args.Add(ConfigManager.Config.YtdlpAdditionalArgs);
+        args.AddRange(SplitArguments(ConfigManager.Config.YtdlpAdditionalArgs));
+        args.AddRange(trailingArgs);
+        return args;
+    }
 
-        args.Add(urlArg);
-        return string.Join(' ', args);
+    /// <summary>
+    /// Splits the user's free-form "additional arguments" setting into individual argv
+    /// entries, honouring double and single quotes the way a shell would. The setting is a
+    /// single config string, but ArgumentList needs one token per element — appending it
+    /// whole would pass e.g. `--retries 3` as one argument named "--retries 3".
+    /// </summary>
+    internal static List<string> SplitArguments(string? value)
+    {
+        var result = new List<string>();
+        if (string.IsNullOrWhiteSpace(value))
+            return result;
+
+        var current = new System.Text.StringBuilder();
+        var quote = '\0';
+        var hasToken = false;
+
+        foreach (var c in value)
+        {
+            if (quote != '\0')
+            {
+                if (c == quote)
+                    quote = '\0';
+                else
+                    current.Append(c);
+                continue;
+            }
+
+            switch (c)
+            {
+                case '"':
+                case '\'':
+                    quote = c;
+                    hasToken = true;
+                    break;
+                case ' ':
+                case '\t':
+                    if (hasToken)
+                    {
+                        result.Add(current.ToString());
+                        current.Clear();
+                        hasToken = false;
+                    }
+                    break;
+                default:
+                    current.Append(c);
+                    hasToken = true;
+                    break;
+            }
+        }
+
+        if (hasToken)
+            result.Add(current.ToString());
+
+        return result;
     }
 
     public static void StartYtdlUpdaterThread()
@@ -92,20 +253,26 @@ public class YtdlManager
 
     private static async Task YtdlUpdaterTask()
     {
-        const int interval = 60 * 60 * 1000; // 1 hour
-        while (true)
+        var interval = TimeSpan.FromHours(1);
+        var token = Program.ShutdownToken;
+
+        while (!token.IsCancellationRequested)
         {
-            await Task.Delay(interval);
             try
             {
+                await Task.Delay(interval, token);
                 await TryDownloadYtdlp();
+            }
+            catch (OperationCanceledException)
+            {
+                // Shutting down.
+                return;
             }
             catch (Exception ex)
             {
                 Log.Warning(ex, "YT-DLP update check failed, will retry next interval.");
             }
         }
-        // ReSharper disable once FunctionNeverReturns
     }
 
     public static async Task TryDownloadYtdlp()
@@ -123,7 +290,7 @@ public class YtdlManager
                 return;
             }
             var data = await response.Content.ReadAsStringAsync();
-            var json = JsonConvert.DeserializeObject<GitHubRelease>(data);
+            var json = Json.Deserialize<GitHubRelease>(data);
             if (json == null)
             {
                 Log.Error("Failed to parse YT-DLP update response.");
@@ -171,19 +338,12 @@ public class YtdlManager
     {
         try
         {
-            using var process = new System.Diagnostics.Process();
-            process.StartInfo = new System.Diagnostics.ProcessStartInfo
+            var result = await ProcessRunner.RunAsync(new ProcessStartInfo
             {
                 FileName = YtdlPath,
-                Arguments = "--version",
-                RedirectStandardOutput = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-            process.Start();
-            var output = await process.StandardOutput.ReadToEndAsync();
-            await process.WaitForExitAsync();
-            return output.Trim();
+                Arguments = "--version"
+            });
+            return result.Output;
         }
         catch (Exception ex)
         {
@@ -196,20 +356,13 @@ public class YtdlManager
     {
         try
         {
-            using var process = new System.Diagnostics.Process();
-            process.StartInfo = new System.Diagnostics.ProcessStartInfo
+            var result = await ProcessRunner.RunAsync(new ProcessStartInfo
             {
                 FileName = FfmpegPath,
-                Arguments = "-version",
-                RedirectStandardOutput = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-            process.Start();
-            var output = await process.StandardOutput.ReadToEndAsync();
-            await process.WaitForExitAsync();
+                Arguments = "-version"
+            });
             // Output: "ffmpeg version 7.1.1-full_build-www.gyan.dev ..."
-            var firstLine = output.Split('\n')[0].Trim();
+            var firstLine = result.Output.Split('\n')[0].Trim();
             var parts = firstLine.Split(' ');
             if (parts.Length >= 3 && parts[0] == "ffmpeg" && parts[1] == "version")
                 return parts[2].Split('-')[0]; // strip "-full_build-..." suffix
@@ -225,20 +378,13 @@ public class YtdlManager
     {
         try
         {
-            using var process = new System.Diagnostics.Process();
-            process.StartInfo = new System.Diagnostics.ProcessStartInfo
+            var result = await ProcessRunner.RunAsync(new ProcessStartInfo
             {
                 FileName = DenoPath,
-                Arguments = "--version",
-                RedirectStandardOutput = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-            process.Start();
-            var output = await process.StandardOutput.ReadToEndAsync();
-            await process.WaitForExitAsync();
+                Arguments = "--version"
+            });
             // Output: "deno 2.8.0\n..."
-            var firstLine = output.Split('\n')[0].Trim();
+            var firstLine = result.Output.Split('\n')[0].Trim();
             var parts = firstLine.Split(' ');
             if (parts.Length >= 2 && parts[0] == "deno")
                 return $"v{parts[1]}";
@@ -275,7 +421,7 @@ public class YtdlManager
             return;
         }
         var data = await apiResponse.Content.ReadAsStringAsync();
-        var json = JsonConvert.DeserializeObject<GitHubRelease>(data);
+        var json = Json.Deserialize<GitHubRelease>(data);
         if (json == null)
         {
             Log.Error("Failed to parse deno release response.");
@@ -344,16 +490,17 @@ public class YtdlManager
         }
 
         Log.Information("Downloading Deno...");
-        var url = assets.First().browser_download_url;
+        var asset = assets.First();
 
-        using var response = await DownloadHttpClient.GetAsync(url);
-        if (!response.IsSuccessStatusCode)
+        var archivePath = await DownloadArchiveAsync(asset.browser_download_url, asset.digest, "Deno");
+        if (archivePath == null)
         {
             Log.Information("Failed to download deno from github attempting fallback download.");
             await TryDownloadDenoFallback(assetName);
             return;
         }
-        await using var responseStream = await response.Content.ReadAsStreamAsync();
+
+        await using var responseStream = File.OpenRead(archivePath);
         var reader = await ReaderFactory.OpenAsyncReader(responseStream);
         try
         {
@@ -363,13 +510,19 @@ public class YtdlManager
                     continue;
 
                 Log.Debug("Extracting file {Name} ({Size} bytes)", reader.Entry.Key, reader.Entry.Size);
-                var path = Path.Join(Program.UtilsPath, reader.Entry.Key);
-                await using var outputStream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None);
-                await using var entryStream = await reader.OpenEntryStreamAsync();
-                await entryStream.CopyToAsync(outputStream);
+                var path = ResolveUtilsDestination(reader.Entry.Key);
+                if (path == null)
+                    continue;
+
+                await using (var outputStream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None))
+                await using (var entryStream = await reader.OpenEntryStreamAsync())
+                {
+                    await entryStream.CopyToAsync(outputStream);
+                }
+
+                FileTools.MarkFileExecutable(path);
                 Versions.CurrentVersion.Deno = json.tag_name;
                 Versions.Save();
-                FileTools.MarkFileExecutable(path);
                 Log.Information("Deno downloaded and extracted.");
                 return;
             }
@@ -377,6 +530,8 @@ public class YtdlManager
         finally
         {
             await reader.DisposeAsync();
+            await responseStream.DisposeAsync();
+            TryDeleteTemp(archivePath);
         }
 
         Log.Error("Failed to extract Deno files.");
@@ -393,14 +548,17 @@ public class YtdlManager
         }
         var latestVersion = (await response.Content.ReadAsStringAsync()).Trim();
         var url = $"{DenoFallBackDownloadURL}{latestVersion}/{assetName}";
-        using var downloadResponse = await DownloadHttpClient.GetAsync(url);
-        if (!downloadResponse.IsSuccessStatusCode)
+
+        // dl.deno.land publishes no digest, so this path is TLS-only. DownloadArchiveAsync
+        // logs that fact rather than letting it pass unnoticed.
+        var archivePath = await DownloadArchiveAsync(url, digest: null, "Deno (fallback)");
+        if (archivePath == null)
         {
-            Log.Error("Failed to download Deno from fallback URL: {ResponseStatusCode}", downloadResponse.StatusCode);
+            Log.Error("Failed to download Deno from fallback URL.");
             return;
         }
 
-        await using var responseStream = await downloadResponse.Content.ReadAsStreamAsync();
+        await using var responseStream = File.OpenRead(archivePath);
         var reader = await ReaderFactory.OpenAsyncReader(responseStream);
         try
         {
@@ -410,13 +568,19 @@ public class YtdlManager
                     continue;
 
                 Log.Debug("Extracting file {Name} ({Size} bytes)", reader.Entry.Key, reader.Entry.Size);
-                var path = Path.Join(Program.UtilsPath, reader.Entry.Key);
-                await using var outputStream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None);
-                await using var entryStream = await reader.OpenEntryStreamAsync();
-                await entryStream.CopyToAsync(outputStream);
+                var path = ResolveUtilsDestination(reader.Entry.Key);
+                if (path == null)
+                    continue;
+
+                await using (var outputStream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None))
+                await using (var entryStream = await reader.OpenEntryStreamAsync())
+                {
+                    await entryStream.CopyToAsync(outputStream);
+                }
+
+                FileTools.MarkFileExecutable(path);
                 Versions.CurrentVersion.Deno = latestVersion;
                 Versions.Save();
-                FileTools.MarkFileExecutable(path);
                 Log.Information("Deno downloaded and extracted.");
                 return;
             }
@@ -424,6 +588,8 @@ public class YtdlManager
         finally
         {
             await reader.DisposeAsync();
+            await responseStream.DisposeAsync();
+            TryDeleteTemp(archivePath);
         }
 
         Log.Error("Failed to extract Deno files from fallback download.");
@@ -433,9 +599,6 @@ public class YtdlManager
     {
         if (!Directory.Exists(Program.UtilsPath))
             throw new Exception("Failed to get Utils path");
-
-        if (!ConfigManager.Config.CacheYouTube)
-            return;
 
         try
         {
@@ -457,7 +620,7 @@ public class YtdlManager
             return;
         }
         var data = await apiResponse.Content.ReadAsStringAsync();
-        var json = JsonConvert.DeserializeObject<GitHubRelease>(data);
+        var json = Json.Deserialize<GitHubRelease>(data);
         if (json == null)
         {
             Log.Error("Failed to parse ffmpeg release response.");
@@ -517,18 +680,22 @@ public class YtdlManager
             Log.Error("Unsupported operating system {OperatingSystem}", Environment.OSVersion);
             return;
         }
-        var url = json.assets
-            .FirstOrDefault(assetVersion => assetVersion.name.EndsWith(assetSuffix, StringComparison.OrdinalIgnoreCase))
-            ?.browser_download_url ?? string.Empty;
-        if (string.IsNullOrEmpty(url))
+        var asset = json.assets
+            .FirstOrDefault(assetVersion => assetVersion.name.EndsWith(assetSuffix, StringComparison.OrdinalIgnoreCase));
+        if (asset == null || string.IsNullOrEmpty(asset.browser_download_url))
         {
             Log.Error("Unable to find ffmpeg asset for this platform.");
             return;
         }
         Log.Information("Downloading FFmpeg...");
 
-        using var response = await DownloadHttpClient.GetAsync(url);
-        await using var responseStream = await response.Content.ReadAsStreamAsync();
+        // Previously streamed straight into the archive reader without even checking the
+        // status code, so a 404 body was handed to SharpCompress as if it were an archive.
+        var archivePath = await DownloadArchiveAsync(asset.browser_download_url, asset.digest, "FFmpeg");
+        if (archivePath == null)
+            return;
+
+        await using var responseStream = File.OpenRead(archivePath);
         var reader = await ReaderFactory.OpenAsyncReader(responseStream);
         var success = false;
         try
@@ -541,12 +708,17 @@ public class YtdlManager
                 if (!reader.Entry.Key.Contains("/bin/"))
                     continue;
 
-                var fileName = Path.GetFileName(reader.Entry.Key);
-                Log.Debug("Extracting file {Name} ({Size} bytes)", fileName, reader.Entry.Size);
-                var path = Path.Join(Program.UtilsPath, fileName);
-                await using var outputStream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None);
-                await using var entryStream = await reader.OpenEntryStreamAsync();
-                await entryStream.CopyToAsync(outputStream);
+                Log.Debug("Extracting file {Name} ({Size} bytes)", reader.Entry.Key, reader.Entry.Size);
+                var path = ResolveUtilsDestination(reader.Entry.Key);
+                if (path == null)
+                    continue;
+
+                await using (var outputStream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None))
+                await using (var entryStream = await reader.OpenEntryStreamAsync())
+                {
+                    await entryStream.CopyToAsync(outputStream);
+                }
+
                 FileTools.MarkFileExecutable(path);
                 success = true;
             }
@@ -554,6 +726,8 @@ public class YtdlManager
         finally
         {
             await reader.DisposeAsync();
+            await responseStream.DisposeAsync();
+            TryDeleteTemp(archivePath);
         }
 
         if (!success)
@@ -599,7 +773,6 @@ public class YtdlManager
             if (assetVersion.name != assetName)
                 continue;
 
-            await using var stream = await DownloadHttpClient.GetStreamAsync(assetVersion.browser_download_url);
             if (string.IsNullOrEmpty(Program.UtilsPath))
                 throw new Exception("Failed to get YT-DLP path");
 
@@ -608,8 +781,28 @@ public class YtdlManager
             if (!string.IsNullOrEmpty(ytdlDir))
                 Directory.CreateDirectory(ytdlDir);
 
-            await using var fileStream = new FileStream(YtdlPath, FileMode.Create, FileAccess.Write, FileShare.None);
-            await stream.CopyToAsync(fileStream);
+            // Stage, verify, then move into place. This binary is marked executable and run
+            // on every video request, so an unverified body must never occupy the final
+            // path — not even briefly, and not even if the verification then fails.
+            var tempPath = YtdlPath + ".download";
+            try
+            {
+                await using (var stream = await DownloadHttpClient.GetStreamAsync(assetVersion.browser_download_url))
+                await using (var fileStream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                {
+                    await stream.CopyToAsync(fileStream);
+                }
+
+                if (!await FileHash.VerifyGitHubDigestAsync(tempPath, assetVersion.digest, "yt-dlp"))
+                    throw new Exception("yt-dlp download failed its digest check.");
+
+                File.Move(tempPath, YtdlPath, overwrite: true);
+            }
+            finally
+            {
+                TryDeleteTemp(tempPath);
+            }
+
             Log.Information("Downloaded YT-DLP.");
             FileTools.MarkFileExecutable(YtdlPath);
             Versions.CurrentVersion.Ytdlp = json.tag_name;
@@ -624,21 +817,12 @@ public class YtdlManager
         var processName = Path.GetFileNameWithoutExtension(path);
         try
         {
-            using var process = new System.Diagnostics.Process();
-            process.StartInfo = new System.Diagnostics.ProcessStartInfo
+            var (output, error, exitCode) = await ProcessRunner.RunAsync(new ProcessStartInfo
             {
                 FileName = path,
-                Arguments = arg,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-            process.Start();
-            var output = await process.StandardOutput.ReadToEndAsync();
-            var error = await process.StandardError.ReadToEndAsync();
-            await process.WaitForExitAsync();
-            if (process.ExitCode != 0)
+                Arguments = arg
+            });
+            if (exitCode != 0)
             {
                 Log.Error("Error starting {ProcessName}: {Output} {Error}", processName, output, error);
                 return false;

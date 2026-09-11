@@ -1,6 +1,4 @@
 using System.Diagnostics;
-using System.Security.Cryptography;
-using Newtonsoft.Json;
 using Semver;
 using Serilog;
 using VRCVideoCacher.Models;
@@ -10,7 +8,7 @@ namespace VRCVideoCacher;
 
 public class Updater
 {
-    private const string UpdateUrl = "https://api.github.com/repos/codeyumx/VRCVideoCacherPlus/releases/latest";
+    private const string UpdateUrl = Program.LatestReleaseApiUrl;
     private static readonly string ReleaseAssetName = OperatingSystem.IsWindows() ? "VRCVideoCacher.exe" : "VRCVideoCacher";
     private static readonly HttpClient HttpClient = new()
     {
@@ -25,6 +23,15 @@ public class Updater
 
     public static async Task<UpdateInfo?> CheckForUpdates()
     {
+        // The Settings toggle is the user's "don't bother me about updates" switch. Honouring
+        // it here covers both callers — the startup check and the UI banner — so turning it
+        // off actually suppresses the network call as well as the prompt.
+        if (!ConfigManager.Config.AutoUpdateVrcVideoCacher)
+        {
+            Log.Information("Update check disabled in config. Skipping.");
+            return null;
+        }
+
         Log.Information("Checking for updates...");
         var isDebug = false;
 #if DEBUG
@@ -58,7 +65,7 @@ public class Updater
             return null;
         }
 
-        var latestRelease = JsonConvert.DeserializeObject<GitHubRelease>(data);
+        var latestRelease = Json.Deserialize<GitHubRelease>(data);
         if (latestRelease == null)
         {
             Log.Warning("Failed to parse update response.");
@@ -140,7 +147,7 @@ public class Updater
                 await stream.CopyToAsync(fileStream);
             }
 
-            if (!await HashCheck(NewFilePath, asset.digest))
+            if (!await FileHash.VerifyGitHubDigestAsync(NewFilePath, asset.digest, ReleaseAssetName))
             {
                 Log.Warning("Hash check failed, aborting update.");
                 TryDelete(NewFilePath);
@@ -201,18 +208,6 @@ public class Updater
         // Hand off — the new process waits on our PID, then cleans up the .old file on startup.
         Environment.Exit(0);
         return true; // unreachable
-    }
-
-    private static async Task<bool> HashCheck(string path, string githubHash)
-    {
-        using var sha256 = SHA256.Create();
-        await using var stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-        var hashBytes = await sha256.ComputeHashAsync(stream);
-        var hashString = Convert.ToHexString(hashBytes);
-        var expected = githubHash.Contains(':') ? githubHash.Split(':')[1] : githubHash;
-        var match = string.Equals(expected, hashString, StringComparison.OrdinalIgnoreCase);
-        Log.Information("FileHash: {FileHash} GitHubHash: {GitHubHash} HashMatch: {HashMatches}", hashString, expected, match);
-        return match;
     }
 
     private static void TryDelete(string path)

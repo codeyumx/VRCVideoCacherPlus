@@ -48,28 +48,13 @@ public partial class SettingsViewModel : ViewModelBase
     private string _cachedAssetPath = string.Empty;
 
     [ObservableProperty]
-    private bool _cacheYouTube;
-
-    [ObservableProperty]
-    private int _cacheYouTubeMaxResolution;
-
-    [ObservableProperty]
     private bool _cacheYouTubePreferVp9;
 
     // Resolution options for the dropdown
     public int[] ResolutionOptions { get; } = [720, 1080, 1440, 2160];
 
     [ObservableProperty]
-    private int _cacheYouTubeMaxLength;
-
-    [ObservableProperty]
     private float _cacheMaxSizeInGb;
-
-    [ObservableProperty]
-    private bool _cachePyPyDance;
-
-    [ObservableProperty]
-    private bool _cacheVRDancing;
 
     [ObservableProperty]
     private bool _cacheHlsPlaylists;
@@ -99,9 +84,6 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty]
     private bool _patchVRC;
 
-    [ObservableProperty]
-    private bool _redirectVRDancing;
-
 
     // Updates
     [ObservableProperty]
@@ -114,15 +96,9 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty]
     private bool _startMinimized;
 
-    // Blocked URLs
-    public ObservableCollection<UrlEntry> BlockedUrls { get; } = [];
-
     // Video URLs pre-cached at startup (distinct from config.PreCacheUrls, which mirrors
     // JSON manifests of direct file downloads and has no UI).
     public ObservableCollection<UrlEntry> PreCacheVideos { get; } = [];
-
-    [ObservableProperty]
-    private string _blockRedirect = string.Empty;
 
     // Status
     [ObservableProperty]
@@ -165,10 +141,10 @@ public partial class SettingsViewModel : ViewModelBase
 
     public SettingsViewModel()
     {
-        BlockedUrls.CollectionChanged += OnUrlCollectionChanged;
         PreCacheVideos.CollectionChanged += OnUrlCollectionChanged;
+        // One file, one event. This used to subscribe to both managers and so ran
+        // LoadFromConfig twice for every save.
         ConfigManager.OnConfigChanged += LoadFromConfig;
-        PlusConfigManager.OnConfigChanged += LoadFromConfig;
         LoadFromConfig();
     }
 
@@ -182,12 +158,7 @@ public partial class SettingsViewModel : ViewModelBase
         YtdlAdditionalArgs = config.YtdlpAdditionalArgs;
         YtdlDubLanguage = config.YtdlpDubLanguage;
         CachedAssetPath = config.CachedAssetPath;
-        CacheYouTube = config.CacheYouTube;
-        CacheYouTubeMaxResolution = config.CacheYouTubeMaxResolution;
-        CacheYouTubeMaxLength = config.CacheYouTubeMaxLength;
         CacheMaxSizeInGb = config.CacheMaxSizeInGb;
-        CachePyPyDance = config.CachePyPyDance;
-        CacheVRDancing = config.CacheVrDancing;
         CacheHlsPlaylists = config.CacheHlsPlaylists;
         CacheHlsMaxLength = config.CacheHlsMaxLength;
         CacheOnly = config.CacheOnly;
@@ -203,14 +174,7 @@ public partial class SettingsViewModel : ViewModelBase
         StartMinimized = config.StartMinimized;
         StartWithSteamVr = config.StartWithSteamVr;
         ErrorPopups = config.ErrorPopups;
-        RedirectVRDancing = config.RedirectVRDancing;
         AutoUpdate = config.AutoUpdateVrcVideoCacher;
-        BlockedUrls.Clear();
-        foreach (var url in config.BlockedUrls)
-        {
-            BlockedUrls.Add(new UrlEntry(url));
-        }
-        BlockRedirect = config.BlockRedirect;
 
         PreCacheVideos.Clear();
         foreach (var url in config.PreCacheVideos)
@@ -273,13 +237,8 @@ public partial class SettingsViewModel : ViewModelBase
     partial void OnYtdlAdditionalArgsChanged(string value) => SetHasChanges();
     partial void OnYtdlDubLanguageChanged(string value) => SetHasChanges();
     partial void OnCachedAssetPathChanged(string value) => SetHasChanges();
-    partial void OnCacheYouTubeChanged(bool value) => SetHasChanges();
-    partial void OnCacheYouTubeMaxResolutionChanged(int value) => SetHasChanges();
     partial void OnCacheYouTubePreferVp9Changed(bool value) => SetHasChanges();
-    partial void OnCacheYouTubeMaxLengthChanged(int value) => SetHasChanges();
     partial void OnCacheMaxSizeInGbChanged(float value) => SetHasChanges();
-    partial void OnCachePyPyDanceChanged(bool value) => SetHasChanges();
-    partial void OnCacheVRDancingChanged(bool value) => SetHasChanges();
     partial void OnCacheHlsPlaylistsChanged(bool value) => SetHasChanges();
     partial void OnCacheHlsMaxLengthChanged(int value) => SetHasChanges();
     partial void OnCacheOnlyChanged(bool value) => SetHasChanges();
@@ -291,16 +250,20 @@ public partial class SettingsViewModel : ViewModelBase
     partial void OnPatchVRCChanged(bool value) => SetHasChanges();
     partial void OnCloseToTrayChanged(bool value) => SetHasChanges();
     partial void OnStartMinimizedChanged(bool value) => SetHasChanges();
-    partial void OnRedirectVRDancingChanged(bool value) => SetHasChanges();
     partial void OnAutoUpdateChanged(bool value) => SetHasChanges();
     partial void OnStartWithSteamVrChanged(bool value) => SetHasChanges();
     partial void OnErrorPopupsChanged(bool value) => SetHasChanges();
-    partial void OnBlockRedirectChanged(string value) => SetHasChanges();
 
     [RelayCommand]
     private void SaveSettings()
     {
         var config = ConfigManager.Config;
+
+        // CacheManager resolves its path once at type initialisation and the web server
+        // serves that directory, so this one genuinely cannot be applied live — say so
+        // rather than appearing to have taken effect.
+        var cachePathChanged = config.CachedAssetPath != CachedAssetPath;
+        var patchSettingsChanged = config.PatchVrChat != PatchVRC || config.PatchResonite != PatchResonite;
 
         if (config.YtdlpWebServerUrl != WebServerUrl)
         {
@@ -312,12 +275,7 @@ public partial class SettingsViewModel : ViewModelBase
         config.YtdlpAdditionalArgs = YtdlAdditionalArgs;
         config.YtdlpDubLanguage = YtdlDubLanguage;
         config.CachedAssetPath = CachedAssetPath;
-        config.CacheYouTube = CacheYouTube;
-        config.CacheYouTubeMaxResolution = CacheYouTubeMaxResolution;
-        config.CacheYouTubeMaxLength = CacheYouTubeMaxLength;
         config.CacheMaxSizeInGb = CacheMaxSizeInGb;
-        config.CachePyPyDance = CachePyPyDance;
-        config.CacheVrDancing = CacheVRDancing;
         config.CacheHlsPlaylists = CacheHlsPlaylists;
         config.CacheHlsMaxLength = CacheHlsMaxLength;
         config.CacheOnly = CacheOnly;
@@ -331,10 +289,6 @@ public partial class SettingsViewModel : ViewModelBase
         config.StartMinimized = StartMinimized;
         config.StartWithSteamVr = StartWithSteamVr;
         config.ErrorPopups = ErrorPopups;
-        config.BlockedUrls = BlockedUrls
-            .Select(item => item.Url)
-            .ToArray();
-        config.BlockRedirect = BlockRedirect;
         // One row may hold a whole pasted list; split it so each URL gets its own row.
         config.PreCacheVideos = VideoPreCache.SplitUrls(PreCacheVideos.Select(item => item.Url));
         if (!config.PreCacheVideos.SequenceEqual(PreCacheVideos.Select(item => item.Url)))
@@ -343,26 +297,29 @@ public partial class SettingsViewModel : ViewModelBase
             foreach (var url in config.PreCacheVideos)
                 PreCacheVideos.Add(new UrlEntry(url));
         }
-        config.RedirectVRDancing = RedirectVRDancing;
         config.AutoUpdateVrcVideoCacher = AutoUpdate;
 
         // Temporarily unhook config-changed events to avoid redundant LoadFromConfig calls during save
         ConfigManager.OnConfigChanged -= LoadFromConfig;
-        PlusConfigManager.OnConfigChanged -= LoadFromConfig;
         try
         {
             ConfigManager.TrySaveConfig();
-            PlusConfigManager.TrySaveConfig();
         }
         finally
         {
             ConfigManager.OnConfigChanged += LoadFromConfig;
-            PlusConfigManager.OnConfigChanged += LoadFromConfig;
         }
 
+        // Patch toggles are applied straight away; they used to sit inert until the next
+        // launch, with nothing saying so.
+        if (patchSettingsChanged)
+            FileTools.ApplyPatchSettings();
+
         HasChanges = false;
-        StatusMessage = Localizer.Get("SettingsSaved");
-        StatusMessageColor = "#81C784";
+        StatusMessage = cachePathChanged
+            ? Localizer.Get("SettingsSavedRestartRequired")
+            : Localizer.Get("SettingsSaved");
+        StatusMessageColor = cachePathChanged ? "#FFB74D" : "#81C784";
     }
 
     [RelayCommand]
@@ -371,18 +328,6 @@ public partial class SettingsViewModel : ViewModelBase
         LoadFromConfig();
         StatusMessage = Localizer.Get("SettingsReset");
         StatusMessageColor = "#81C784";
-    }
-
-    [RelayCommand]
-    private void AddBlockedUrl()
-    {
-        BlockedUrls.Add(new UrlEntry("https://"));
-    }
-
-    [RelayCommand]
-    private void RemoveBlockedUrl(UrlEntry url)
-    {
-        BlockedUrls.Remove(url);
     }
 
     [RelayCommand]
@@ -398,13 +343,10 @@ public partial class SettingsViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void OpenUtilsFolder()
-    {
-        if (OperatingSystem.IsWindows())
-            System.Diagnostics.Process.Start("explorer.exe", Program.UtilsPath);
-        else if (OperatingSystem.IsLinux())
-            System.Diagnostics.Process.Start("xdg-open", Program.UtilsPath);
-    }
+    private void OpenUtilsFolder() => OpenUrl.OpenFolder(Program.UtilsPath);
+
+    [RelayCommand]
+    private void OpenSettingsFolder() => OpenUrl.OpenFolder(Program.DataPath);
 
     [ObservableProperty]
     private bool _isRedownloading;
