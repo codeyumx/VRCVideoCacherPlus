@@ -2,12 +2,15 @@
 # Packages the browser extensions, and verifies the files shared between them have not
 # drifted apart.
 #
-#   ./build.sh          check shared files, then build both zips into dist/
+#   ./build.sh          check shared files, then build both zips and the signed .crx into dist/
 #   ./build.sh --check  check only, no packaging (this is what CI runs)
 #
 # chrome/ and firefox/ are separate load-unpacked targets, so the shared files have to
 # physically exist in both. That makes silent divergence easy — a fix applied to one copy
 # and not the other — which is what the check below exists to catch.
+#
+# The Chrome .crx is signed with the extension's private key, which is supplied through the
+# environment and never committed; see the CRX section below.
 set -euo pipefail
 
 cd "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -69,12 +72,69 @@ done
 cp "${DIST_DIR}/VRCVideoCacherPlusPlus-firefox-${chrome_version}.zip" "${DIST_DIR}/VRCVideoCacherPlusPlus-firefox-${chrome_version}.xpi"
 echo "  dist/VRCVideoCacherPlusPlus-firefox-${chrome_version}.xpi"
 
-# Build Chrome CRX
-if command -v npx >/dev/null; then
-    npx -y crx3 chrome -p chrome.pem -o "${DIST_DIR}/VRCVideoCacherPlusPlus-chrome-${chrome_version}.crx"
-    echo "  dist/VRCVideoCacherPlusPlus-chrome-${chrome_version}.crx"
+# Build Chrome CRX.
+#
+# The signing key is never in the repo — a .crx is identified by the key that signed it, so
+# the same key has to sign every release and it is the extension's identity. Supply it at
+# run time, in this order of preference:
+#
+#   CHROME_EXTENSION_PEM       the key itself: PEM text, or base64 when a secret holds it that way
+#   CHROME_EXTENSION_PEM_FILE  path to a PEM file
+#   ./chrome.pem               local key file, gitignored
+CRX_KEY="${CHROME_EXTENSION_PEM_FILE:-}"
+KEY_FILE=""
+
+cleanup() {
+    if [ -n "$KEY_FILE" ]; then
+        rm -f "$KEY_FILE"
+    fi
+    return 0
+}
+trap cleanup EXIT
+
+resolve_crx_key() {
+    if [ -n "$CRX_KEY" ]; then
+        [ -f "$CRX_KEY" ] || { echo "CHROME_EXTENSION_PEM_FILE=$CRX_KEY does not exist" >&2; exit 1; }
+        return
+    fi
+
+    case "${CHROME_EXTENSION_PEM:-}" in
+        "")
+            if [ -f chrome.pem ]; then
+                CRX_KEY="chrome.pem"
+            fi
+            return 0
+            ;;
+        *"-----BEGIN"*)
+            KEY_FILE="$(mktemp)"
+            chmod 600 "$KEY_FILE"
+            printf '%s\n' "$CHROME_EXTENSION_PEM" > "$KEY_FILE"
+            ;;
+        *)
+            # Secrets are often stored base64-encoded; say so rather than failing cryptically.
+            KEY_FILE="$(mktemp)"
+            chmod 600 "$KEY_FILE"
+            if ! printf '%s' "$CHROME_EXTENSION_PEM" | base64 -d > "$KEY_FILE" 2>/dev/null; then
+                echo "CHROME_EXTENSION_PEM is neither PEM text nor valid base64" >&2
+                exit 1
+            fi
+            ;;
+    esac
+
+    grep -q 'PRIVATE KEY' "$KEY_FILE" \
+        || { echo "CHROME_EXTENSION_PEM does not contain a private key" >&2; exit 1; }
+    CRX_KEY="$KEY_FILE"
+}
+
+resolve_crx_key
+if [ -z "$CRX_KEY" ]; then
+    echo "WARNING: no Chrome signing key (CHROME_EXTENSION_PEM, CHROME_EXTENSION_PEM_FILE or ./chrome.pem), skipping CRX packaging" >&2
+elif ! command -v npx >/dev/null; then
+    echo "ERROR: a Chrome signing key was supplied but npx (crx3) is not installed" >&2
+    exit 1
 else
-    echo "WARNING: npx not found, skipping CRX packaging" >&2
+    npx -y crx3 chrome -p "$CRX_KEY" -o "${DIST_DIR}/VRCVideoCacherPlusPlus-chrome-${chrome_version}.crx"
+    echo "  dist/VRCVideoCacherPlusPlus-chrome-${chrome_version}.crx"
 fi
 
 # The .zip files stay in dist/ as byproducts — .xpi is a copy of the Firefox zip and the
