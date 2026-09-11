@@ -248,10 +248,6 @@ internal sealed class Program
 
         YtdlpHash = GetOurYtdlpHash();
 
-        // Nothing below needs the message of the day, so don't hold the application behind
-        // a network round trip to fetch it.
-        RunDetached(VvcConfigService.GetConfig(), "Config API fetch");
-
         if (ConfigManager.Config.YtdlpAutoUpdate && !LaunchArgs.UseGlobalPath)
         {
             // Awaited deliberately: yt-dlp and Deno have to be on disk before the web

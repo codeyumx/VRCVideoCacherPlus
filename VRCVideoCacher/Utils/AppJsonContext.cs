@@ -23,7 +23,6 @@ namespace VRCVideoCacher.Utils;
 [JsonSerializable(typeof(ConfigModel))]
 [JsonSerializable(typeof(VersionJson))]
 [JsonSerializable(typeof(GitHubRelease))]
-[JsonSerializable(typeof(VvcConfig))]
 [JsonSerializable(typeof(VRDSongInfo))]
 [JsonSerializable(typeof(List<UriRule>))]
 [JsonSerializable(typeof(List<BulkPreCache.DownloadInfo>))]
