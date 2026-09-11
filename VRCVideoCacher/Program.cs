@@ -489,11 +489,9 @@ internal sealed class Program
             }
         };
 
-        AppDomain.CurrentDomain.ProcessExit += (_, _) =>
-        {
-            Logger.Information("ProcessExit signal received, performing shutdown tasks...");
-            Log.CloseAndFlush();
-        };
+        // No ProcessExit handler here: this runs before InitVrcVideoCacher registers OnAppQuit,
+        // ProcessExit handlers run in registration order, and a flush here closes the log
+        // pipeline before OnAppQuit restores the yt-dlp shim and writes its last lines.
     }
 
     public static void SaveCrashReport(Exception ex, string source)
