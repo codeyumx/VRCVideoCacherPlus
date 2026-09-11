@@ -278,6 +278,23 @@ public class VideoDownloader
 
     public static void QueueDownload(VideoInfo videoInfo)
     {
+        // Rules decide whether a URL is handled at all, and the request path is not the only way
+        // in: History's Save-to-cache, the manual queue and the startup pre-cache all end up here.
+        // Enforcing only in the HTTP handler meant "Block" blocked playback but still downloaded.
+        var evaluation = Services.RuleEngine.EvaluateUrl(videoInfo.VideoUrl);
+        switch (evaluation.Action)
+        {
+            case RuleAction.Block:
+                Log.Information("Not queueing {VideoId}: blocked by rule '{RuleName}'.",
+                    videoInfo.VideoId, evaluation.MatchedRule?.Name);
+                return;
+
+            case RuleAction.Direct:
+                Log.Information("Not queueing {VideoId}: rule '{RuleName}' bypasses caching.",
+                    videoInfo.VideoId, evaluation.MatchedRule?.Name);
+                return;
+        }
+
         lock (StateLock)
         {
             if (_currentDownload?.VideoId == videoInfo.VideoId && _currentDownload?.DownloadFormat == videoInfo.DownloadFormat)
