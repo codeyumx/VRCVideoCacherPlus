@@ -1,32 +1,33 @@
-using Newtonsoft.Json;
 using VRCVideoCacher.Models;
 using Xunit;
 
 namespace VRCVideoCacher.Tests;
 
-// The per-site settings the rule engine replaced are gone from ConfigModel, so their JSON
-// keys are ignored on load and erased on the next save. These tests pin the one-time
-// translation of those values into rules: without it an upgrade silently drops a user's
-// blocked URLs and turns their cache opt-outs back on, because the seeded defaults cache.
+// The per-site settings the rule engine replaced are gone from ConfigModel, so their JSON keys
+// are ignored on load and erased on the next save. These tests pin the one-time translation of
+// those values into rules: without it an upgrade silently drops a user's blocked URLs and turns
+// their cache opt-outs back on, because the seeded defaults cache.
 public class LegacyConfigMigrationTests
 {
-    private static Dictionary<string, object> Legacy(string json) =>
-        JsonConvert.DeserializeObject<Dictionary<string, object>>(json)!;
+    private static ConfigModel Migrated(string json)
+    {
+        var config = new ConfigModel();
+        PlusConfigManager.ApplyLegacyRuleSettings(json, config);
+        return config;
+    }
 
-    private static UriRule Rule(PlusConfigModel config, string name) =>
+    private static UriRule Rule(ConfigModel config, string name) =>
         Assert.Single(config.UriRules, r => r.Name == name);
 
     [Fact]
     public void BlockedUrlsBecomeRulesThatStillHitTheOldRedirectTarget()
     {
-        var config = new PlusConfigModel();
-
-        PlusConfigManager.MigrateLegacyRuleSettings(Legacy("""
+        var config = Migrated("""
             {
               "BlockedUrls": ["https://example.com/bad", "https://na2.vrdancing.club/sampleurl.mp4"],
               "BlockRedirect": "https://www.youtube.com/watch?v=byv2bKekeWQ"
             }
-            """), config);
+            """);
 
         var rule = Rule(config, "Block https://example.com/bad");
         Assert.Equal(RuleAction.Redirect, rule.Action);
@@ -43,9 +44,7 @@ public class LegacyConfigMigrationTests
     [Fact]
     public void WithoutARedirectTargetBlockedUrlsAreBlocked()
     {
-        var config = new PlusConfigModel();
-
-        PlusConfigManager.MigrateLegacyRuleSettings(Legacy("""{ "BlockedUrls": ["https://example.com/bad"] }"""), config);
+        var config = Migrated("""{ "BlockedUrls": ["https://example.com/bad"] }""");
 
         Assert.Equal(RuleAction.Block, Rule(config, "Block https://example.com/bad").Action);
     }
@@ -53,12 +52,7 @@ public class LegacyConfigMigrationTests
     [Fact]
     public void CacheOptOutsSurviveInsteadOfBeingInvertedByTheSeededDefaults()
     {
-        var config = new PlusConfigModel();
-        Assert.True(Rule(config, "VRDancing").Cache); // the default this has to override
-
-        PlusConfigManager.MigrateLegacyRuleSettings(Legacy("""
-            { "CacheVrDancing": false, "CachePyPyDance": false, "CacheYouTube": false }
-            """), config);
+        var config = Migrated("""{ "CacheVrDancing": false, "CachePyPyDance": false, "CacheYouTube": false }""");
 
         Assert.False(Rule(config, "VRDancing").Cache);
         Assert.False(Rule(config, "PyPyDance").Cache);
@@ -68,11 +62,9 @@ public class LegacyConfigMigrationTests
     [Fact]
     public void ResolutionCapsAndTheDancingRedirectKeepTheirValues()
     {
-        var config = new PlusConfigModel();
-
-        PlusConfigManager.MigrateLegacyRuleSettings(Legacy("""
+        var config = Migrated("""
             { "CacheYouTubeMaxResolution": 2160, "CacheYouTubeMaxLength": 45, "RedirectVRDancing": true }
-            """), config);
+            """);
 
         var youTube = Rule(config, "YouTube");
         Assert.Equal(2160, youTube.MaxResolution);
@@ -83,12 +75,11 @@ public class LegacyConfigMigrationTests
     [Fact]
     public void RunningTwiceDoesNotDuplicateMigratedRules()
     {
-        var config = new PlusConfigModel();
-        var json = Legacy("""{ "BlockedUrls": ["https://example.com/bad"] }""");
+        const string json = """{ "BlockedUrls": ["https://example.com/bad"] }""";
 
-        PlusConfigManager.MigrateLegacyRuleSettings(json, config);
+        var config = Migrated(json);
         var afterFirst = config.UriRules.Count;
-        PlusConfigManager.MigrateLegacyRuleSettings(json, config);
+        PlusConfigManager.ApplyLegacyRuleSettings(json, config);
 
         Assert.Equal(afterFirst, config.UriRules.Count);
     }
@@ -96,11 +87,20 @@ public class LegacyConfigMigrationTests
     [Fact]
     public void AConfigWithNothingToMigrateLeavesTheRuleListAlone()
     {
-        var config = new PlusConfigModel();
-        var before = config.UriRules.Count;
+        var expected = new ConfigModel().UriRules.Count;
 
-        PlusConfigManager.MigrateLegacyRuleSettings(Legacy("""{ "Language": "ja", "CacheOnly": true }"""), config);
+        var config = Migrated("""{ "Language": "ja", "CacheOnly": true }""");
 
-        Assert.Equal(before, config.UriRules.Count);
+        Assert.Equal(expected, config.UriRules.Count);
+    }
+
+    [Fact]
+    public void AMalformedConfigIsIgnoredRatherThanFatal()
+    {
+        var expected = new ConfigModel().UriRules.Count;
+
+        var config = Migrated("{ \"BlockedUrls\": [ \"https://example.com/bad\" ");
+
+        Assert.Equal(expected, config.UriRules.Count);
     }
 }
