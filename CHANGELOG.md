@@ -6,8 +6,8 @@ It caches the videos VRChat plays so they can be replayed from disk instead of r
 Releases are bare version tags — `2026.8.14` — that match `<Version>` in
 `VRCVideoCacher/VRCVideoCacher.csproj`, and each one attaches `VRCVideoCacher.exe` (win-x64)
 and `VRCVideoCacher` (linux-x64); a tag carrying a suffix, `2026.9.1-rc1`, is a pre-release.
-A workflow that publishes them from GitHub Actions is on branch `ci/release-workflow` and not
-merged yet, so releases are still built and uploaded by hand. Newest release first; every entry
+A GitHub Actions workflow (`.github/workflows/release.yml`) publishes them: pushing a tag builds
+both binaries and the signed browser extension and publishes the release. Newest release first; every entry
 names the commits it came from so the history stays checkable.
 
 Everything up to and including `2026.5.2` is upstream work the fork merged in, listed at the
@@ -27,26 +27,13 @@ bottom as tags only. The fork's own releases start at `2026.6.17`.
 
 ## Unreleased
 
-### Fixed
+## [2026.9.11] — 2026-09-11
 
-- **Manual Download no longer freezes the UI when a playlist is queued.** Every queued video
-  fired a queue-changed event and each event rebuilt the whole list with one SQLite title
-  query per row — O(N²) queries for an N-video playlist. Titles are now looked up in one
-  batched query, event bursts coalesce into a single refresh, and the enqueue loop yields
-  every 25 items. The same commit fixed a yt-dlp pipe deadlock in `RunYtdlpAsync` and
-  `GetPlaylistVideoInfos`, which read stdout to EOF before touching stderr. (`c0f054e`)
+Everything from [PR #1](https://github.com/codeyumx/VRCVideoCacherPlus/pull/1)
+by [@Bluscream](https://github.com/Bluscream), curated down from its 138 commits, plus fixes on
+top. Published as a pre-release first because of the size of the change.
 
-### Internal
-
-- `BrowserExtension/chrome.pem` is ignored, so a signing key cannot be committed again; the
-  extension is signed from the `CHROME_EXTENSION_PEM` repository secret. (`46a22b0`)
-
-### In progress — not merged
-
-Branch `pr1-keep-complete` carries [PR #1](https://github.com/codeyumx/VRCVideoCacherPlus/pull/1)
-by [@Bluscream](https://github.com/Bluscream), curated down from its 138 commits: the fork
-build/release plumbing, the message-of-the-day banner (this fork does not ship MOTD) and the
-binaries it carried were dropped, the rest is in. Nothing below is released yet.
+### Added
 
 - **Regex URI rules engine.** `Cache`, `Resolve`, `Redirect`, `Rewrite`, `Block` and `Direct`
   actions with capture-group substitution, a Rules tab with a live Test URL matcher, priority
@@ -61,13 +48,24 @@ binaries it carried were dropped, the rest is in. Nothing below is released yet.
 - **VRChat log monitor, Now Playing card and Active Connections grid.**
 - Smaller UI: yt-dlp/Deno/FFmpeg tools card, transfer rate and time remaining in the download
   queue, Open File / Copy File Path in the cache browser, "Show" to open the settings folder.
+
+### Fixed
+
+- **Manual Download no longer freezes the UI when a playlist is queued.** Every queued video
+  fired a queue-changed event and each event rebuilt the whole list with one SQLite title
+  query per row — O(N²) queries for an N-video playlist. Titles are now looked up in one
+  batched query, event bursts coalesce into a single refresh, and the enqueue loop yields
+  every 25 items. The same commit fixed a yt-dlp pipe deadlock in `RunYtdlpAsync` and
+  `GetPlaylistVideoInfos`, which read stdout to EOF before touching stderr. (`c0f054e`)
 - Hardening: zip-slip and manifest validation, GitHub digest checks for downloaded tools,
   `yt-dlp` arguments passed via `ArgumentList` instead of a command line, CORS restricted to
   the origins that need it, link-local/SSRF rejection, atomic config writes, cache eviction
   fixes, database race fixes, and a schema reconciler for columns added by a new build.
-- A release workflow (`.github/workflows/release.yml`) on branch `ci/release-workflow` that
-  publishes tags as releases or pre-releases with the two binaries and the signed browser
-  extension.
+
+### Internal
+
+- `BrowserExtension/chrome.pem` is ignored, so a signing key cannot be committed again; the
+  extension is signed from the `CHROME_EXTENSION_PEM` repository secret. (`46a22b0`)
 
 ## [2026.8.14] — 2026-08-14
 
