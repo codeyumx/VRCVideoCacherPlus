@@ -131,11 +131,16 @@ public static class ActiveStreamTracker
         }
     }
 
-    public static void ClearActiveVideoIps()
+    /// <summary>
+    /// Drops only the addresses a caller actually dealt with. Clearing the whole set after a
+    /// sever would also discard connections tracked while that sever was in flight.
+    /// </summary>
+    public static void RemoveActiveVideoIps(IEnumerable<string> addresses)
     {
         lock (IpsLock)
         {
-            _activeVideoIps.Clear();
+            foreach (var address in addresses)
+                _activeVideoIps.Remove(address);
         }
     }
 
@@ -201,9 +206,13 @@ public static class ActiveStreamTracker
             if (_urlInfoMap.TryGetValue(url, out info))
                 return true;
 
+            // No exact hit: the same video addressed with different query parameters. Compare
+            // scheme/host/path only — the previous bidirectional Contains() let two videos that
+            // share a CDN path prefix borrow each other's title and duration.
+            var requested = WithoutQuery(url);
             foreach (var kv in _urlInfoMap)
             {
-                if (url.Contains(kv.Key) || kv.Key.Contains(url))
+                if (WithoutQuery(kv.Key) == requested)
                 {
                     info = kv.Value;
                     return true;
@@ -211,6 +220,12 @@ public static class ActiveStreamTracker
             }
             return false;
         }
+    }
+
+    private static string WithoutQuery(string url)
+    {
+        var query = url.IndexOf('?');
+        return query >= 0 ? url[..query] : url;
     }
 
     public static void AddOrUpdateSession(ActiveVideoSession session)

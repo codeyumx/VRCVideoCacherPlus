@@ -136,7 +136,12 @@ public static class ConnectionSevering
         if (outcome == SeverOutcome.NotPermitted && allowElevation)
             (severed, outcome) = await SeverElevatedAsync(targets);
 
-        YTDL.ActiveStreamTracker.ClearActiveVideoIps();
+        // Only what this call dealt with: clearing the whole set would drop connections tracked
+        // while the (possibly prompted, possibly elevated) sever was in flight, and they would
+        // never be severed at all.
+        if (severed > 0)
+            YTDL.ActiveStreamTracker.RemoveActiveVideoIps(targets);
+
         LogOutcome(outcome, severed, targets.Count);
 
         return new SeverResult(localClosed, severed, outcome);
