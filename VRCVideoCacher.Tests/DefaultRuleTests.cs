@@ -66,6 +66,13 @@ public class DefaultRuleTests
                 "https://drive.google.com/uc?export=download&id=ABC123")]
     [InlineData("https://drive.google.com/file/d/ABC123",
                 "https://drive.google.com/uc?export=download&id=ABC123")]
+    // The form Drive's own Share button copies: the query follows the id directly, which the
+    // original "([^\/]+)" swallowed into the id ("...&id=ABC123?usp=sharing").
+    [InlineData("https://drive.google.com/file/d/ABC123?usp=sharing",
+                "https://drive.google.com/uc?export=download&id=ABC123")]
+    // A fragment must not end up in the id either.
+    [InlineData("https://drive.google.com/file/d/ABC123#t=10",
+                "https://drive.google.com/uc?export=download&id=ABC123")]
     public void GoogleDriveRule_RewritesToDirectDownload(string input, string expected)
     {
         Assert.Equal(expected, ApplyRewrites(input));

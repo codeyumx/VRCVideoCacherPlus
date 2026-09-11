@@ -75,7 +75,10 @@ public static class DefaultRules
             new UriRule
             {
                 Name = "Google Drive File Rewrite",
-                Pattern = @"^https?:\/\/drive\.google\.com\/file\/d\/([^\/]+)(?:\/.*)?$",
+                // The id group stops at ? and # as well as /, and the tail accepts a bare query or
+                // fragment: without that, ".../d/<id>?usp=sharing" folded the parameter into the
+                // id and produced "...&id=<id>?usp=sharing".
+                Pattern = @"^https?:\/\/drive\.google\.com\/file\/d\/([^\/?#]+)(?:[/?#].*)?$",
                 Action = RuleAction.Rewrite,
                 RedirectTarget = "https://drive.google.com/uc?export=download&id=$1",
                 Enabled = true
