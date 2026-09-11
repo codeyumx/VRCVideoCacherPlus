@@ -1,0 +1,189 @@
+name: Release
+
+# Publishes a release the way this repository has always published one: `VRCVideoCacher.exe`
+# and `VRCVideoCacher` attached to a bare version tag such as `2026.8.14`.
+#
+#   push a tag `2026.8.14`             publishes it
+#   push a tag `2026.9.1-rc1`          publishes it as a pre-release (any tag with a suffix)
+#   Actions -> Release -> Run workflow publishes a tag that already exists on the remote,
+#                                      pre-release chosen by hand
+#
+# The tag must match <Version> in VRCVideoCacher/VRCVideoCacher.csproj, so the version the app
+# reports and the version users download cannot drift apart.
+#
+# `CHANGELOG.md` must already have a section for the tag: the first job fails the run if it
+# does not, and the release body is that section rather than GitHub's generated notes. So a
+# release is written up before it is published, and the changelog is the single source for
+# both. A tag with a suffix falls back to the section of its base version.
+#
+# When the checked-out tree has `BrowserExtension/build.sh`, the Chrome `.crx` and Firefox
+# `.xpi` are packaged too — the `.crx` signed with the CHROME_EXTENSION_PEM secret, never with
+# a key in the repository — and attached alongside the two binaries. On a tree without that
+# script the step is skipped and the release carries the binaries alone.
+
+on:
+  push:
+    tags: ['*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to publish, e.g. 2026.8.14
+        required: true
+      prerelease:
+        description: Publish as a pre-release
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  # Runs first so an unwritten changelog fails the run before two publishes are spent.
+  changelog:
+    name: changelog
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Check CHANGELOG.md has an entry for this tag
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: ./scripts/release-notes.sh "$TAG" > /dev/null
+
+  build:
+    name: ${{ matrix.rid }}
+    needs: changelog
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: win-x64
+            asset: VRCVideoCacher.exe
+          - rid: linux-x64
+            asset: VRCVideoCacher
+    steps:
+      - name: Check the tag exists
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git ls-remote --exit-code --tags "${{ github.server_url }}/${{ github.repository }}" "refs/tags/${{ inputs.tag }}" \
+            || { echo "::error::no tag ${{ inputs.tag }} on the remote - push it first"; exit 1; }
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Publish ${{ matrix.rid }}
+        run: >
+          dotnet publish VRCVideoCacher/VRCVideoCacher.csproj
+          -c Release -r ${{ matrix.rid }}
+          -o out/${{ matrix.rid }}
+
+      # A publish that produced nothing is a broken release, not a smaller one.
+      - name: Check ${{ matrix.asset }} was produced
+        run: |
+          test -f "out/${{ matrix.rid }}/${{ matrix.asset }}" \
+            || { echo "::error::${{ matrix.asset }} is missing"; ls -la "out/${{ matrix.rid }}"; exit 1; }
+          chmod +x "out/${{ matrix.rid }}/${{ matrix.asset }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: out/${{ matrix.rid }}/${{ matrix.asset }}
+          if-no-files-found: error
+
+  release:
+    needs: [build, changelog]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+
+      - name: Check the tag matches <Version>
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          version=$(grep -oP '(?<=<Version>)[^<]+' VRCVideoCacher/VRCVideoCacher.csproj)
+          case "$TAG" in
+            "$version"|"$version"-*) echo "tag $TAG matches version $version" ;;
+            *) echo "::error::tag $TAG does not match <Version> $version in VRCVideoCacher.csproj"; exit 1 ;;
+          esac
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Package and sign the browser extension
+        if: ${{ hashFiles('BrowserExtension/build.sh') != '' }}
+        env:
+          CHROME_EXTENSION_PEM: ${{ secrets.CHROME_EXTENSION_PEM }}
+        run: ./BrowserExtension/build.sh
+
+      - name: Build the release notes from CHANGELOG.md
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          ./scripts/release-notes.sh "$TAG" > notes.md
+
+          # Same trailing link the earlier releases carry, so the diff against the previous
+          # release is one click away.
+          previous=$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || true)
+          if [ -n "$previous" ]; then
+            {
+              echo
+              echo "**Full Changelog**: ${{ github.server_url }}/${{ github.repository }}/compare/${previous}...${TAG}"
+            } >> notes.md
+          fi
+
+          echo "--- release notes ---"
+          cat notes.md
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+          EVENT: ${{ github.event_name }}
+          DISPATCH_PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          set -euo pipefail
+
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            prerelease="$DISPATCH_PRERELEASE"
+          else
+            case "$TAG" in
+              *-*) prerelease=true ;;
+              *)   prerelease=false ;;
+            esac
+          fi
+
+          flags=(--title "$TAG" --verify-tag --notes-file notes.md)
+          if [ "$prerelease" = "true" ]; then
+            flags+=(--prerelease --latest=false)
+            echo "Publishing $TAG as a pre-release."
+          else
+            echo "Publishing $TAG."
+          fi
+
+          gh release create "$TAG" \
+            "assets/VRCVideoCacher.exe/VRCVideoCacher.exe" \
+            "assets/VRCVideoCacher/VRCVideoCacher" \
+            "${flags[@]}"
+
+          # Secondary assets: present only when this tree can build the extension.
+          for extension in dist/*.crx dist/*.xpi; do
+            if [ -e "$extension" ]; then
+              gh release upload "$TAG" "$extension" --clobber
+            fi
+          done
