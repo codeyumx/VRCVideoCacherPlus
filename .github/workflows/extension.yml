@@ -1,0 +1,35 @@
+name: Browser extension
+
+# Packages chrome/ and firefox/ and signs the Chrome .crx with the CHROME_EXTENSION_PEM
+# repository secret, so a release never depends on the signing key sitting on a disk
+# somewhere. The same key has to be used for every run: it is what gives the extension its
+# stable ID, and Chrome refuses to update an unpacked-by-ID extension signed with another.
+on:
+  workflow_dispatch:
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # The shared files live in both chrome/ and firefox/, so they drift silently.
+      - name: Check shared extension files
+        run: ./BrowserExtension/build.sh --check
+
+      - name: Package and sign
+        env:
+          CHROME_EXTENSION_PEM: ${{ secrets.CHROME_EXTENSION_PEM }}
+        run: ./BrowserExtension/build.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: browser-extension
+          path: |
+            dist/*.crx
+            dist/*.xpi
+          retention-days: 14

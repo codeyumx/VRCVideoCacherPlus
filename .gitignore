@@ -15,6 +15,9 @@ publish/
 *.log
 nul
 
+# Release artifacts
+/dist/
+
 # Signing keys
 BrowserExtension/chrome.pem
 
