@@ -11,6 +11,11 @@ name: Release
 # The tag must match <Version> in VRCVideoCacher/VRCVideoCacher.csproj, so the version the app
 # reports and the version users download cannot drift apart.
 #
+# `CHANGELOG.md` must already have a section for the tag: the first job fails the run if it
+# does not, and the release body is that section rather than GitHub's generated notes. So a
+# release is written up before it is published, and the changelog is the single source for
+# both. A tag with a suffix falls back to the section of its base version.
+#
 # When the checked-out tree has `BrowserExtension/build.sh`, the Chrome `.crx` and Firefox
 # `.xpi` are packaged too — the `.crx` signed with the CHROME_EXTENSION_PEM secret, never with
 # a key in the repository — and attached alongside the two binaries. On a tree without that
@@ -33,8 +38,23 @@ permissions:
   contents: write
 
 jobs:
+  # Runs first so an unwritten changelog fails the run before two publishes are spent.
+  changelog:
+    name: changelog
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Check CHANGELOG.md has an entry for this tag
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: ./scripts/release-notes.sh "$TAG" > /dev/null
+
   build:
     name: ${{ matrix.rid }}
+    needs: changelog
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -79,7 +99,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    needs: build
+    needs: [build, changelog]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -110,6 +130,26 @@ jobs:
           CHROME_EXTENSION_PEM: ${{ secrets.CHROME_EXTENSION_PEM }}
         run: ./BrowserExtension/build.sh
 
+      - name: Build the release notes from CHANGELOG.md
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          ./scripts/release-notes.sh "$TAG" > notes.md
+
+          # Same trailing link the earlier releases carry, so the diff against the previous
+          # release is one click away.
+          previous=$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || true)
+          if [ -n "$previous" ]; then
+            {
+              echo
+              echo "**Full Changelog**: ${{ github.server_url }}/${{ github.repository }}/compare/${previous}...${TAG}"
+            } >> notes.md
+          fi
+
+          echo "--- release notes ---"
+          cat notes.md
+
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -128,7 +168,7 @@ jobs:
             esac
           fi
 
-          flags=(--title "$TAG" --verify-tag --generate-notes)
+          flags=(--title "$TAG" --verify-tag --notes-file notes.md)
           if [ "$prerelease" = "true" ]; then
             flags+=(--prerelease --latest=false)
             echo "Publishing $TAG as a pre-release."
