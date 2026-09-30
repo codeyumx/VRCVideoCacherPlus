@@ -27,7 +27,7 @@ bottom as tags only. The fork's own releases start at `2026.6.17`.
 
 ## Unreleased
 
-## [2026.9.11] — 2026-09-11
+## [2026.9.30] — 2026-09-30
 
 Everything from [PR #1](https://github.com/codeyumx/VRCVideoCacherPlus/pull/1)
 by [@Bluscream](https://github.com/Bluscream), curated down from its 138 commits, plus fixes on
