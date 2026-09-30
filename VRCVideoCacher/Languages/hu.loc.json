@@ -213,7 +213,7 @@
   "SkipReasonTruncated": "A letöltés hiányos volt",
   "DownloadTimeRemaining": "{0} van hátra",
   "SharedConfigNoticeTitle": "A beállítások mostantól közösek",
-  "SharedConfigNotice": "A VRCVideoCacherPlusPlus a beállításait ugyanabban a Config.json fájlban tárolja, mint az eredeti VRCVideoCacher, nem külön fájlban.\n\nHa futtatod az eredeti VRCVideoCachert (vagy a Plus verziót), az felülírja ezt a fájlt, és eltávolítja a PlusPlus beállításokat – beleértve az URL-szabályaidat is. Ezek visszaállnának az alapértelmezettre.\n\nHa régebbi PlusPlus verzióról váltasz, a korábbi beállításaid továbbra is megtalálhatók a PlusConfig.json fájlban ugyanabban a mappában. Ezt a fájlt már nem olvassuk be, de a helyén hagyjuk, hogy bármit átmásolhass belőle.",
+  "SharedConfigNotice": "A VRCVideoCacherPlus a beállításait ugyanabban a Config.json fájlban tárolja, mint az eredeti VRCVideoCacher, nem külön fájlban.\n\nHa futtatod az eredeti VRCVideoCachert (vagy a PlusPlus forkot), az felülírja ezt a fájlt, és eltávolítja a Plus beállításokat – beleértve az URL-szabályaidat is. Ezek visszaállnának az alapértelmezettre.\n\nHa a VRCVideoCacherPlus 2026.8.14-ig kiadott verziójáról váltasz, a PlusConfig.json beállításai átkerültek a Config.json fájlba, és az eredeti fájlt PlusConfig.json.bak névre neveztük át.",
   "SeverSucceeded": "{0} kapcsolat leállítva.",
   "SeverNeedsPrivileges": "A gyorsítótárazott videók leálltak. A VRChat közvetlen kapcsolatainak lezárásához rendszergazda/root jogosultság kell, így a már futó stream a végéig játszódik.",
   "SeverUnsupported": "Ezen a platformon nem lehet lezárni a VRChat közvetlen kapcsolatait.",

@@ -1,0 +1,46 @@
+name: CI
+
+# Everything that has to hold before a tag is worth pushing: the solution builds, the test
+# suite passes, and the browser extension's shared files have not drifted apart.
+#
+#   push to main, or a pull request    runs both jobs
+#
+# Feature branches are covered by their pull request, and a tag push by the release workflow,
+# so neither runs the suite twice.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: build and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build
+        run: dotnet build VRCVideoCacher.sln -c Release --nologo
+
+      - name: Test
+        run: dotnet test VRCVideoCacher.Tests/VRCVideoCacher.Tests.csproj -c Release --nologo
+
+  extension:
+    name: browser extension
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # chrome/ and firefox/ are separate load-unpacked targets, so the files they share exist
+      # twice and can silently diverge. This is the check that catches it; packaging itself is
+      # the release workflow's job.
+      - name: Check the shared extension files match
+        run: ./BrowserExtension/build.sh --check

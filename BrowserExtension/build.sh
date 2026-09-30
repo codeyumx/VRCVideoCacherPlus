@@ -53,24 +53,23 @@ fi
 
 command -v zip >/dev/null || { echo "zip is not installed" >&2; exit 1; }
 
-# Shared with the application's release artifacts, so only this script's own outputs may
-# be cleared here. `rm -rf "$DIST_DIR"` would delete the VRCVideoCacher-*.zip files that
-# ../build.sh --artifacts puts in the same directory, and whichever ran second would win.
+# dist/ also holds the application's release artifacts, so only this script's own outputs may
+# be cleared here — `rm -rf "$DIST_DIR"` would take those with it.
 DIST_DIR="$(pwd)/../dist"
 echo "=== Packaging ==="
 mkdir -p "$DIST_DIR"
-rm -f "${DIST_DIR}"/VRCVideoCacherPlusPlus-*.zip \
-      "${DIST_DIR}"/VRCVideoCacherPlusPlus-*.xpi \
-      "${DIST_DIR}"/VRCVideoCacherPlusPlus-*.crx
+rm -f "${DIST_DIR}"/VRCVideoCacherPlus-*.zip \
+      "${DIST_DIR}"/VRCVideoCacherPlus-*.xpi \
+      "${DIST_DIR}"/VRCVideoCacherPlus-*.crx
 for browser in chrome firefox; do
-    out="${DIST_DIR}/VRCVideoCacherPlusPlus-${browser}-${chrome_version}.zip"
+    out="${DIST_DIR}/VRCVideoCacherPlus-${browser}-${chrome_version}.zip"
     (cd "$browser" && zip -qr "$out" . -x '.*')
     echo "  dist/$(basename "$out")"
 done
 
 # Copy Firefox zip to xpi
-cp "${DIST_DIR}/VRCVideoCacherPlusPlus-firefox-${chrome_version}.zip" "${DIST_DIR}/VRCVideoCacherPlusPlus-firefox-${chrome_version}.xpi"
-echo "  dist/VRCVideoCacherPlusPlus-firefox-${chrome_version}.xpi"
+cp "${DIST_DIR}/VRCVideoCacherPlus-firefox-${chrome_version}.zip" "${DIST_DIR}/VRCVideoCacherPlus-firefox-${chrome_version}.xpi"
+echo "  dist/VRCVideoCacherPlus-firefox-${chrome_version}.xpi"
 
 # Build Chrome CRX.
 #
@@ -133,11 +132,13 @@ elif ! command -v npx >/dev/null; then
     echo "ERROR: a Chrome signing key was supplied but npx (crx3) is not installed" >&2
     exit 1
 else
-    npx -y crx3 chrome -p "$CRX_KEY" -o "${DIST_DIR}/VRCVideoCacherPlusPlus-chrome-${chrome_version}.crx"
-    echo "  dist/VRCVideoCacherPlusPlus-chrome-${chrome_version}.crx"
+    # Pinned: this runs at release time with the extension's signing key in hand, so it must not
+    # be whatever the registry served that day.
+    npx -y crx3@2.0.0 chrome -p "$CRX_KEY" -o "${DIST_DIR}/VRCVideoCacherPlus-chrome-${chrome_version}.crx"
+    echo "  dist/VRCVideoCacherPlus-chrome-${chrome_version}.crx"
 fi
 
-# The .zip files stay in dist/ as byproducts — .xpi is a copy of the Firefox zip and the
-# .crx is built from chrome/ — but ../build.sh --release attaches only the four real
-# assets, so a release does not list the same extension twice in two formats.
+# The .zip files stay in dist/ as byproducts — .xpi is a copy of the Firefox zip and the .crx
+# is built from chrome/ — and the release attaches only the .crx and .xpi, so it does not list
+# the same extension twice in two formats.
 echo "=== Done ==="

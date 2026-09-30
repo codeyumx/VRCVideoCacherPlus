@@ -4,8 +4,8 @@
 
 ### Download
 
-- [Windows — VRCVideoCacher.exe](https://github.com/codeyumx/VRCVideoCacherPlus/releases/latest/download/VRCVideoCacher.exe)
-- [Linux — VRCVideoCacher](https://github.com/codeyumx/VRCVideoCacherPlus/releases/latest/download/VRCVideoCacher)
+- [Windows — VRCVideoCacherPlus.exe](https://github.com/codeyumx/VRCVideoCacherPlus/releases/latest/download/VRCVideoCacherPlus.exe)
+- [Linux — VRCVideoCacherPlus](https://github.com/codeyumx/VRCVideoCacherPlus/releases/latest/download/VRCVideoCacherPlus)
 
 **Install the original VRCVideoCacher cookie extension** (default — use these):
 - [Chrome Extension](https://chromewebstore.google.com/detail/vrcvideocacher-cookies-ex/kfgelknbegappcajiflgfbjbdpbpokge)

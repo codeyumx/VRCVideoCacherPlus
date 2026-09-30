@@ -39,17 +39,17 @@ public class OpenVRService
                 switch (initError)
                 {
                     case EVRInitError.None:
-                        // Builds we may have previously registered as. The upstream EllyVR build
-                        // (including its Steam release) uses "com.github.ellyvr.vrcvideocacher"; the
-                        // codeyumx Plus fork — which this fork used to identify as — uses its own key.
-                        // If SteamVR still has either set to auto-launch it tries to start them via
+                        // Builds we may have previously registered as: the upstream EllyVR build
+                        // (including its Steam release) uses "com.github.ellyvr.vrcvideocacher", and
+                        // the PlusPlus fork this project merged work from had its own key. If
+                        // SteamVR still has either set to auto-launch it tries to start them via
                         // Steam, which pops the store page when the app isn't owned. Clear both.
                         string[] legacyAppKeys =
                         [
                             "com.github.ellyvr.vrcvideocacher",
-                            "com.github.codeyumx.vrcvideocacherplus"
+                            "com.github.bluscream.vrcvideocacherplusplus"
                         ];
-                        const string ForkAppKey = "com.github.bluscream.vrcvideocacherplusplus";
+                        const string ForkAppKey = "com.github.codeyumx.vrcvideocacherplus";
                         foreach (var legacyAppKey in legacyAppKeys)
                         {
                             try

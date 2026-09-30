@@ -4,8 +4,8 @@
 
 ### Letöltés
 
-- [Windows — VRCVideoCacher.exe](https://github.com/codeyumx/VRCVideoCacherPlus/releases/latest/download/VRCVideoCacher.exe)
-- [Linux — VRCVideoCacher](https://github.com/codeyumx/VRCVideoCacherPlus/releases/latest/download/VRCVideoCacher)
+- [Windows — VRCVideoCacherPlus.exe](https://github.com/codeyumx/VRCVideoCacherPlus/releases/latest/download/VRCVideoCacherPlus.exe)
+- [Linux — VRCVideoCacherPlus](https://github.com/codeyumx/VRCVideoCacherPlus/releases/latest/download/VRCVideoCacherPlus)
 
 **Telepítsd az eredeti VRCVideoCacher cookie-bővítményt** (alapértelmezett — ezeket használd):
 - [Chrome bővítmény](https://chromewebstore.google.com/detail/vrcvideocacher-cookies-ex/kfgelknbegappcajiflgfbjbdpbpokge)

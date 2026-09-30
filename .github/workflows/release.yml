@@ -1,7 +1,7 @@
 name: Release
 
-# Publishes a release the way this repository has always published one: `VRCVideoCacher.exe`
-# and `VRCVideoCacher` attached to a bare version tag such as `2026.8.14`.
+# Publishes a release for a bare version tag such as `2026.8.14`; a tag carrying a suffix,
+# `2026.9.1-rc1`, publishes as a pre-release.
 #
 #   push a tag `2026.8.14`             publishes it
 #   push a tag `2026.9.1-rc1`          publishes it as a pre-release (any tag with a suffix)
@@ -9,17 +9,28 @@ name: Release
 #                                      pre-release chosen by hand
 #
 # The tag must match <Version> in VRCVideoCacher/VRCVideoCacher.csproj, so the version the app
-# reports and the version users download cannot drift apart.
+# reports and the version users download cannot drift apart. That check is its own job and runs
+# before the test and publish jobs, so a mismatched tag costs seconds rather than two publishes.
 #
-# `CHANGELOG.md` must already have a section for the tag: the first job fails the run if it
-# does not, and the release body is that section rather than GitHub's generated notes. So a
-# release is written up before it is published, and the changelog is the single source for
-# both. A tag with a suffix falls back to the section of its base version.
+# Each binary is attached under two names:
+#
+#   VRCVideoCacherPlus[.exe]   what this fork publishes from now on
+#   VRCVideoCacher[.exe]       the name every build released before the rename looks for
+#
+# The updater matches a release asset by exact name, so dropping the second name would strand
+# every installed 2026.9.x build with "No matching asset" and no way to update itself. Both
+# entries are the same binary. Remove the VRCVideoCacher[.exe] entries once the download_count
+# of that asset (`gh api repos/{owner}/{repo}/releases/latest --jq '.assets[]|[.name,.download_count]'`)
+# stops growing between releases: that means nothing old is left to update.
+#
+# `docs/updates.md` must already have a section for the tag: the version job fails the run if
+# it does not, and the release body is that section. A tag with a suffix falls back to the
+# section of its base version.
 #
 # When the checked-out tree has `BrowserExtension/build.sh`, the Chrome `.crx` and Firefox
 # `.xpi` are packaged too — the `.crx` signed with the CHROME_EXTENSION_PEM secret, never with
-# a key in the repository — and attached alongside the two binaries. On a tree without that
-# script the step is skipped and the release carries the binaries alone.
+# a key in the repository — and attached alongside the binaries. On a tree without that script
+# the step is skipped and the release carries the binaries alone.
 
 on:
   push:
@@ -38,38 +49,71 @@ permissions:
   contents: write
 
 jobs:
-  # Runs first so an unwritten changelog fails the run before two publishes are spent.
-  changelog:
-    name: changelog
+  version:
+    name: version
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.tag || github.ref }}
 
-      - name: Check CHANGELOG.md has an entry for this tag
+      - name: Check the tag matches <Version>
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          version=$(grep -oP '(?<=<Version>)[^<]+' VRCVideoCacher/VRCVideoCacher.csproj)
+          case "$TAG" in
+            "$version"|"$version"-*) echo "tag $TAG matches version $version" ;;
+            *) echo "::error::tag $TAG does not match <Version> $version in VRCVideoCacher.csproj"; exit 1 ;;
+          esac
+
+      - name: Check docs/updates.md has an entry for this tag
         env:
           TAG: ${{ inputs.tag || github.ref_name }}
         run: ./scripts/release-notes.sh "$TAG" > /dev/null
 
+  test:
+    name: test
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # A release carries binaries that have to work; nothing else in CI runs these.
+      - name: Run the test suite
+        run: dotnet test VRCVideoCacher.Tests/VRCVideoCacher.Tests.csproj -c Release --nologo
+
   build:
     name: ${{ matrix.rid }}
-    needs: changelog
+    needs: test
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         include:
           - rid: win-x64
-            asset: VRCVideoCacher.exe
+            bin: VRCVideoCacher.exe
+            asset: VRCVideoCacherPlus.exe
           - rid: linux-x64
-            asset: VRCVideoCacher
+            bin: VRCVideoCacher
+            asset: VRCVideoCacherPlus
     steps:
       - name: Check the tag exists
         if: github.event_name == 'workflow_dispatch'
+        env:
+          TAG: ${{ inputs.tag }}
         run: |
-          git ls-remote --exit-code --tags "${{ github.server_url }}/${{ github.repository }}" "refs/tags/${{ inputs.tag }}" \
-            || { echo "::error::no tag ${{ inputs.tag }} on the remote - push it first"; exit 1; }
+          set -euo pipefail
+          git ls-remote --exit-code --tags "${{ github.server_url }}/${{ github.repository }}" "refs/tags/$TAG" \
+            || { echo "::error::no tag $TAG on the remote - push it first"; exit 1; }
 
       - uses: actions/checkout@v4
         with:
@@ -85,60 +129,92 @@ jobs:
           -c Release -r ${{ matrix.rid }}
           -o out/${{ matrix.rid }}
 
-      # A publish that produced nothing is a broken release, not a smaller one.
-      - name: Check ${{ matrix.asset }} was produced
+      # A publish that produced nothing is a broken release, not a smaller one. The binary
+      # keeps the assembly name (VRCVideoCacher); the fork-named copy is what the fork's own
+      # downloads link to.
+      - name: Assemble ${{ matrix.asset }} and ${{ matrix.bin }}
         run: |
-          test -f "out/${{ matrix.rid }}/${{ matrix.asset }}" \
-            || { echo "::error::${{ matrix.asset }} is missing"; ls -la "out/${{ matrix.rid }}"; exit 1; }
-          chmod +x "out/${{ matrix.rid }}/${{ matrix.asset }}"
+          set -euo pipefail
+
+          built="out/${{ matrix.rid }}/${{ matrix.bin }}"
+          test -f "$built" \
+            || { echo "::error::${{ matrix.bin }} is missing"; ls -la "out/${{ matrix.rid }}"; exit 1; }
+
+          cp "$built" "out/${{ matrix.rid }}/${{ matrix.asset }}"
+          chmod +x "$built" "out/${{ matrix.rid }}/${{ matrix.asset }}"
 
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.asset }}
-          path: out/${{ matrix.rid }}/${{ matrix.asset }}
+          path: |
+            out/${{ matrix.rid }}/${{ matrix.asset }}
+            out/${{ matrix.rid }}/${{ matrix.bin }}
           if-no-files-found: error
 
   release:
-    needs: [build, changelog]
+    name: publish
+    needs: [version, test, build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
 
       - uses: actions/download-artifact@v4
         with:
           path: assets
 
-      - name: Check the tag matches <Version>
-        env:
-          TAG: ${{ inputs.tag || github.ref_name }}
-        run: |
-          version=$(grep -oP '(?<=<Version>)[^<]+' VRCVideoCacher/VRCVideoCacher.csproj)
-          case "$TAG" in
-            "$version"|"$version"-*) echo "tag $TAG matches version $version" ;;
-            *) echo "::error::tag $TAG does not match <Version> $version in VRCVideoCacher.csproj"; exit 1 ;;
-          esac
-
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
 
+      # Packaging the extension cannot be allowed to cost a release whose binaries are already
+      # built, so a failure here is carried to the check below rather than failing the job. The
+      # check is what decides whether that failure mattered.
       - name: Package and sign the browser extension
+        id: extension
         if: ${{ hashFiles('BrowserExtension/build.sh') != '' }}
+        continue-on-error: true
         env:
           CHROME_EXTENSION_PEM: ${{ secrets.CHROME_EXTENSION_PEM }}
+          CHROME_EXTENSION_PEM_FILE: ${{ secrets.CHROME_EXTENSION_PEM_FILE }}
         run: ./BrowserExtension/build.sh
 
-      - name: Build the release notes from CHANGELOG.md
+      # With a signing key configured the extension assets are part of what this workflow
+      # advertises, so their absence is a failure rather than a quiet omission. Without one they
+      # are deliberately skipped.
+      - name: Verify the extension assets
+        env:
+          PEM: ${{ secrets.CHROME_EXTENSION_PEM }}
+          PEM_FILE: ${{ secrets.CHROME_EXTENSION_PEM_FILE }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          if [ -z "$PEM" ] && [ -z "$PEM_FILE" ]; then
+            echo "::warning::No Chrome signing key configured; publishing the binaries without the extension assets."
+            exit 0
+          fi
+
+          crx=(dist/*.crx)
+          xpi=(dist/*.xpi)
+          if [ "${#crx[@]}" -eq 0 ] || [ "${#xpi[@]}" -eq 0 ]; then
+            echo "::error::A Chrome signing key is configured but dist/ holds no .crx/.xpi - the packaging step failed"
+            ls -la dist 2>/dev/null || true
+            exit 1
+          fi
+
+          echo "Extension assets ready: ${crx[*]} ${xpi[*]}"
+
+      - name: Write the release notes
         env:
           TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           set -euo pipefail
           ./scripts/release-notes.sh "$TAG" > notes.md
 
-          # Same trailing link the earlier releases carry, so the diff against the previous
-          # release is one click away.
+          # A trailing link so the diff against the previous release is one click away.
           previous=$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || true)
           if [ -n "$previous" ]; then
             {
@@ -176,9 +252,13 @@ jobs:
             echo "Publishing $TAG."
           fi
 
+          # Both names per binary: the fork's, and the one builds released before the rename
+          # look for by exact name in the updater.
           gh release create "$TAG" \
-            "assets/VRCVideoCacher.exe/VRCVideoCacher.exe" \
-            "assets/VRCVideoCacher/VRCVideoCacher" \
+            "assets/VRCVideoCacherPlus.exe/VRCVideoCacherPlus.exe" \
+            "assets/VRCVideoCacherPlus.exe/VRCVideoCacher.exe" \
+            "assets/VRCVideoCacherPlus/VRCVideoCacherPlus" \
+            "assets/VRCVideoCacherPlus/VRCVideoCacher" \
             "${flags[@]}"
 
           # Secondary assets: present only when this tree can build the extension.

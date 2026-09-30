@@ -4,8 +4,8 @@
 
 ### ダウンロード
 
-- [Windows — VRCVideoCacher.exe](https://github.com/codeyumx/VRCVideoCacherPlus/releases/latest/download/VRCVideoCacher.exe)
-- [Linux — VRCVideoCacher](https://github.com/codeyumx/VRCVideoCacherPlus/releases/latest/download/VRCVideoCacher)
+- [Windows — VRCVideoCacherPlus.exe](https://github.com/codeyumx/VRCVideoCacherPlus/releases/latest/download/VRCVideoCacherPlus.exe)
+- [Linux — VRCVideoCacherPlus](https://github.com/codeyumx/VRCVideoCacherPlus/releases/latest/download/VRCVideoCacherPlus)
 
 **VRCVideoCacher 本家のクッキー拡張機能をインストールしてください**（デフォルト — こちらを使用）:
 - [Chrome 拡張機能](https://chromewebstore.google.com/detail/vrcvideocacher-cookies-ex/kfgelknbegappcajiflgfbjbdpbpokge)

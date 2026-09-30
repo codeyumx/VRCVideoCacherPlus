@@ -4,8 +4,8 @@
 
 ### 다운로드
 
-- [Windows — VRCVideoCacher.exe](https://github.com/codeyumx/VRCVideoCacherPlus/releases/latest/download/VRCVideoCacher.exe)
-- [Linux — VRCVideoCacher](https://github.com/codeyumx/VRCVideoCacherPlus/releases/latest/download/VRCVideoCacher)
+- [Windows — VRCVideoCacherPlus.exe](https://github.com/codeyumx/VRCVideoCacherPlus/releases/latest/download/VRCVideoCacherPlus.exe)
+- [Linux — VRCVideoCacherPlus](https://github.com/codeyumx/VRCVideoCacherPlus/releases/latest/download/VRCVideoCacherPlus)
 
 **원본 VRCVideoCacher 쿠키 확장 프로그램을 설치하세요**(기본값 — 이것을 사용):
 - [Chrome 확장 프로그램](https://chromewebstore.google.com/detail/vrcvideocacher-cookies-ex/kfgelknbegappcajiflgfbjbdpbpokge)

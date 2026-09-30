@@ -4,8 +4,8 @@ VRCVideoCacherPlus is codeyumx's fork of [EllyVR/VRCVideoCacher](https://github.
 It caches the videos VRChat plays so they can be replayed from disk instead of re-downloaded.
 
 Releases are bare version tags — `2026.8.14` — that match `<Version>` in
-`VRCVideoCacher/VRCVideoCacher.csproj`, and each one attaches `VRCVideoCacher.exe` (win-x64)
-and `VRCVideoCacher` (linux-x64); a tag carrying a suffix, `2026.9.1-rc1`, is a pre-release.
+`VRCVideoCacher/VRCVideoCacher.csproj`, and each one attaches `VRCVideoCacherPlus.exe` (win-x64)
+and `VRCVideoCacherPlus` (linux-x64); a tag carrying a suffix, `2026.9.1-rc1`, is a pre-release.
 A GitHub Actions workflow (`.github/workflows/release.yml`) publishes them: pushing a tag builds
 both binaries and the signed browser extension and publishes the release. Newest release first; every entry
 names the commits it came from so the history stays checkable.
@@ -48,6 +48,21 @@ top. Published as a pre-release first because of the size of the change.
 - **VRChat log monitor, Now Playing card and Active Connections grid.**
 - Smaller UI: yt-dlp/Deno/FFmpeg tools card, transfer rate and time remaining in the download
   queue, Open File / Copy File Path in the cache browser, "Show" to open the settings folder.
+
+### Changed
+
+- Release assets are named `VRCVideoCacherPlus.exe` / `VRCVideoCacherPlus`; the updater, README
+  links and extension packages follow. The SteamVR app key is now
+  `com.github.codeyumx.vrcvideocacherplus`, and the PlusPlus fork's key is cleared as legacy.
+- Builds up to 2026.8.14 kept the download rate limit, idle timeout and VP9 preference in
+  `PlusConfig.json`. They are now read from it once into `Config.json`, and the file is renamed
+  to `PlusConfig.json.bak`.
+
+### Deprecated
+
+- The `VRCVideoCacher.exe` / `VRCVideoCacher` release assets are kept only so installs from before
+  the rename can still self-update. Remove them from `release.yml` once their download count
+  stops growing.
 
 ### Fixed
 

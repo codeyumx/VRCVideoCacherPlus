@@ -9,7 +9,7 @@ namespace VRCVideoCacher;
 public class Updater
 {
     private const string UpdateUrl = Program.LatestReleaseApiUrl;
-    private static readonly string ReleaseAssetName = OperatingSystem.IsWindows() ? "VRCVideoCacher.exe" : "VRCVideoCacher";
+    private static readonly string ReleaseAssetName = OperatingSystem.IsWindows() ? "VRCVideoCacherPlus.exe" : "VRCVideoCacherPlus";
     private static readonly HttpClient HttpClient = new()
     {
         DefaultRequestHeaders = { { "User-Agent", "VRCVideoCacher.Updater" } }

@@ -119,7 +119,6 @@
           <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
           <TargetPath>libopenvr_api.so</TargetPath>
         </None>
-        <EmbeddedResource Include="manifest.vrmanifest" />
     </ItemGroup>
 
     <ItemGroup>

@@ -83,11 +83,9 @@ public class SharedConfigMigrationTests
         var notice = document.RootElement.GetProperty("SharedConfigNotice").GetString();
 
         Assert.NotNull(notice);
-        // Migrations were removed deliberately, so nothing writes a .bak; the previous
-        // PlusConfig.json is simply left in place. The message must name that file, not
-        // a backup that never gets created.
-        Assert.Contains("PlusConfig.json", notice!);
-        Assert.DoesNotContain(".bak", notice!);
+        // The one-time migration renames PlusConfig.json to PlusConfig.json.bak, so the message
+        // must name that file.
+        Assert.Contains("PlusConfig.json.bak", notice!);
         Assert.Contains("Config.json", notice!);
     }
 

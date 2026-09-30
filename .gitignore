@@ -5,6 +5,7 @@
 **/bin/
 **/obj/
 publish/
+/out/
 
 # IDE
 .idea/
@@ -17,24 +18,15 @@ publish/
 # Runtime files
 *.log
 nul
-
-# Release artifacts
-/dist/
-
-# Signing keys
-BrowserExtension/chrome.pem
-
-# Build files
-/Build
-/Build/linux-x64/VRCVideoCacher.pdb
-/Build/linux-x64/yt-dlp-stub.exe
-/Build/win-x64/VRCVideoCacher.pdb
 notepad.md
+
+# Release artifacts, including what BrowserExtension/build.sh writes
+/dist/
+/Build
 output_linux_release/
 output_steam_linux/
 output_win_release/
-VRCVideoCacher-*-x64.zip
+VRCVideoCacherPlus-*-x64.zip
 
-# Browser extension packages (produced by BrowserExtension/build.sh)
-/dist/
-/out/
+# Signing keys — a committed key is the extension's permanent identity
+BrowserExtension/chrome.pem

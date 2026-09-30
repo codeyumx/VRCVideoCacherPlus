@@ -103,4 +103,32 @@ public class LegacyConfigMigrationTests
 
         Assert.Equal(expected, config.UriRules.Count);
     }
+
+    // Builds up to 2026.8.14 kept these three in PlusConfig.json; dropping them on upgrade would
+    // reset a user's rate limit and codec choice without any sign it had happened.
+    [Fact]
+    public void PlusConfigFileValuesLandOnTheMainConfig()
+    {
+        var config = new ConfigModel();
+
+        PlusConfigManager.ApplyPlusConfigFile(
+            """{ "CacheDownloadRateLimitMBs": 5, "CacheDownloadIdleSeconds": 0, "CacheYouTubePreferVp9": false }""",
+            config);
+
+        Assert.Equal(5, config.CacheDownloadRateLimitMBs);
+        Assert.Equal(0, config.CacheDownloadIdleSeconds);
+        Assert.False(config.CacheYouTubePreferVp9);
+    }
+
+    [Fact]
+    public void PlusConfigFileKeysThatAreMissingKeepTheirDefaults()
+    {
+        var config = new ConfigModel();
+
+        PlusConfigManager.ApplyPlusConfigFile("""{ "CacheDownloadRateLimitMBs": 5 }""", config);
+
+        Assert.Equal(5, config.CacheDownloadRateLimitMBs);
+        Assert.Equal(new ConfigModel().CacheDownloadIdleSeconds, config.CacheDownloadIdleSeconds);
+        Assert.Equal(new ConfigModel().CacheYouTubePreferVp9, config.CacheYouTubePreferVp9);
+    }
 }

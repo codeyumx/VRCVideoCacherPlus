@@ -34,8 +34,9 @@ internal sealed class Program
     // Single source of truth for this fork's identity. The updater downloads and swaps in a
     // release asset from here, so pointing it at the wrong repo silently replaces the user's
     // install with a different build — keep every repo reference derived from these two.
-    public const string RepoOwner = "Bluscream";
-    public const string RepoName = "VRCVideoCacherPlusPlus";
+    // PlusPlus is the fork whose work was merged in; this repository is VRCVideoCacherPlus.
+    public const string RepoOwner = "codeyumx";
+    public const string RepoName = "VRCVideoCacherPlus";
     public const string RepoUrl = $"https://github.com/{RepoOwner}/{RepoName}";
     public const string LatestReleaseUrl = $"{RepoUrl}/releases/latest";
     public const string LatestReleaseApiUrl = $"https://api.github.com/repos/{RepoOwner}/{RepoName}/releases/latest";

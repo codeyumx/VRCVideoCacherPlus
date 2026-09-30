@@ -213,7 +213,7 @@ public class ConfigModel
     public bool HasShownTrayNotice = false;
     public bool HasShownSharedConfigNotice = false;
 
-    // PlusPlus settings (flattened)
+    // Plus settings (flattened)
     public int CacheDownloadRateLimitMBs = 0; // 0 = unlimited
     public int CacheDownloadIdleSeconds = 30; // 0 = disabled
     public bool CacheYouTubePreferVp9 = true; // VP9+aac in mp4 instead of h264+aac

@@ -213,7 +213,7 @@
   "SkipReasonTruncated": "Download was incomplete",
   "DownloadTimeRemaining": "{0} left",
   "SharedConfigNoticeTitle": "Settings are now shared",
-  "SharedConfigNotice": "VRCVideoCacherPlusPlus keeps its settings in the same Config.json as the original VRCVideoCacher, rather than a separate file.\n\nIf you run the original VRCVideoCacher (or the Plus version), it will rewrite that file and drop the PlusPlus settings — including your URL rules. They would go back to defaults.\n\nIf you are coming from an older PlusPlus build, your previous settings are still in PlusConfig.json in the same folder. That file is no longer read, but it is left in place so you can copy anything you want back out of it.",
+  "SharedConfigNotice": "VRCVideoCacherPlus keeps its settings in the same Config.json as the original VRCVideoCacher, rather than a separate file.\n\nIf you run the original VRCVideoCacher (or the PlusPlus fork), it will rewrite that file and drop the Plus settings — including your URL rules. They would go back to defaults.\n\nIf you are coming from a VRCVideoCacherPlus build up to 2026.8.14, the settings from its PlusConfig.json were carried over into Config.json, and that file was renamed to PlusConfig.json.bak.",
   "SeverSucceeded": "Stopped {0} connection(s).",
   "SeverNeedsPrivileges": "Cached videos were stopped. Closing VRChat's direct connections needs administrator/root, so a video already streaming will keep playing until it ends.",
   "SeverUnsupported": "This platform has no way to close VRChat's direct connections.",

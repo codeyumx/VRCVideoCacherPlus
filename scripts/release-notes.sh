@@ -10,7 +10,7 @@
 set -euo pipefail
 
 tag="${1:?usage: release-notes.sh <tag> [changelog]}"
-changelog="${2:-CHANGELOG.md}"
+changelog="${2:-docs/updates.md}"
 
 if [ ! -f "$changelog" ]; then
     echo "error: $changelog does not exist" >&2

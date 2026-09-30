@@ -213,7 +213,7 @@
   "SkipReasonTruncated": "ダウンロードが不完全でした",
   "DownloadTimeRemaining": "残り {0}",
   "SharedConfigNoticeTitle": "設定が共有されるようになりました",
-  "SharedConfigNotice": "VRCVideoCacherPlusPlus は、専用ファイルではなくオリジナルの VRCVideoCacher と同じ Config.json に設定を保存します。\n\nオリジナルの VRCVideoCacher（または Plus 版）を実行すると、そのファイルが書き換えられ、URL ルールを含む PlusPlus の設定が削除され、既定値に戻ります。\n\n以前の PlusPlus からの移行であれば、以前の設定は同じフォルダーの PlusConfig.json に残っています。このファイルはもう読み込まれませんが、必要な内容を取り出せるようそのまま残してあります。",
+  "SharedConfigNotice": "VRCVideoCacherPlus は、専用ファイルではなくオリジナルの VRCVideoCacher と同じ Config.json に設定を保存します。\n\nオリジナルの VRCVideoCacher（または PlusPlus フォーク）を実行すると、そのファイルが書き換えられ、URL ルールを含む Plus の設定が削除され、既定値に戻ります。\n\n2026.8.14 までの VRCVideoCacherPlus からの移行であれば、その PlusConfig.json の設定は Config.json に引き継がれ、元のファイルは PlusConfig.json.bak にリネームされました。",
   "SeverSucceeded": "{0} 件の接続を停止しました。",
   "SeverNeedsPrivileges": "キャッシュ済み動画は停止しました。VRChat の直接接続を切断するには管理者/root 権限が必要なため、再生中のストリームは最後まで続きます。",
   "SeverUnsupported": "このプラットフォームでは VRChat の直接接続を切断できません。",

@@ -7,7 +7,7 @@ using VRCVideoCacher.Utils;
 namespace VRCVideoCacher;
 
 /// <summary>
-/// The PlusPlus-only settings, and the rule seeding that goes with them.
+/// The Plus-only settings, and the rule seeding that goes with them.
 ///
 /// These live as flat top-level fields inside the main ConfigModel.
 /// </summary>
@@ -28,11 +28,60 @@ public static class PlusConfigManager
     /// </summary>
     internal static void Initialize(ConfigModel config)
     {
+        // TODO: Remove later - one-time move of the settings builds up to 2026.8.14 kept in PlusConfig.json.
+        MigratePlusConfigFile(config);
         // TODO: Remove later - one-time migration of the settings the rule engine replaced.
         MigrateLegacyRuleSettings(config);
         // TODO: Remove later - Migrating/repairing broken Dropbox rule pattern for existing users
         MigrateBrokenDefaultRules(config);
         EnsureDefaultRules(config);
+    }
+
+    /// <summary>
+    /// Builds up to 2026.8.14 kept the three Plus settings in their own PlusConfig.json. They now
+    /// live in Config.json, so the file is read once and renamed to PlusConfig.json.bak: left
+    /// under its own name it would be re-read every launch and overwrite later changes. A
+    /// Config.json that already carries the keys was written by a build that owns them, so the
+    /// file is stale and is only set aside.
+    /// </summary>
+    private static void MigratePlusConfigFile(ConfigModel config)
+    {
+        var path = Path.Join(Program.DataPath, "PlusConfig.json");
+        if (!File.Exists(path))
+            return;
+
+        try
+        {
+            var configPath = Path.Join(Program.DataPath, "Config.json");
+            var configOwnsTheKeys = File.Exists(configPath) &&
+                                    File.ReadAllText(configPath).Contains("\"CacheDownloadRateLimitMBs\"");
+            if (!configOwnsTheKeys)
+                ApplyPlusConfigFile(File.ReadAllText(path), config);
+
+            File.Move(path, path + ".bak", overwrite: true);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Could not carry the settings in PlusConfig.json over to Config.json.");
+        }
+    }
+
+    internal static void ApplyPlusConfigFile(string? json, ConfigModel config)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return;
+
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+        if (root.ValueKind != JsonValueKind.Object)
+            return;
+
+        if (TryInt(root, "CacheDownloadRateLimitMBs", out var rate))
+            config.CacheDownloadRateLimitMBs = rate;
+        if (TryInt(root, "CacheDownloadIdleSeconds", out var idle))
+            config.CacheDownloadIdleSeconds = idle;
+        if (TryBool(root, "CacheYouTubePreferVp9", out var vp9))
+            config.CacheYouTubePreferVp9 = vp9;
     }
 
     /// <summary>
