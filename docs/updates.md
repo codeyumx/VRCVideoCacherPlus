@@ -7,7 +7,7 @@ Releases are bare version tags — `2026.8.14` — that match `<Version>` in
 `VRCVideoCacher/VRCVideoCacher.csproj`, and each one attaches `VRCVideoCacherPlus.exe` (win-x64)
 and `VRCVideoCacherPlus` (linux-x64); a tag carrying a suffix, `2026.9.1-rc1`, is a pre-release.
 A GitHub Actions workflow (`.github/workflows/release.yml`) publishes them: pushing a tag builds
-both binaries and the signed browser extension and publishes the release. Newest release first; every entry
+both binaries and publishes the release. Newest release first; every entry
 names the commits it came from so the history stays checkable.
 
 Everything up to and including `2026.5.2` is upstream work the fork merged in, listed at the
