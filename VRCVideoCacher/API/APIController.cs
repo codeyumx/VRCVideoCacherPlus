@@ -113,6 +113,16 @@ public class ApiController : WebApiController
     {
         ApplyCorsHeaders();
 
+        // CORS response headers only control what a browser lets the page read; a no-cors
+        // text/plain POST is still delivered, so a foreign origin must be refused here.
+        var origin = HttpContext.Request.Headers["Origin"];
+        if (!string.IsNullOrEmpty(origin) && !IsAllowedCookieOrigin(origin))
+        {
+            Log.Warning("Rejected cookie upload from disallowed origin {Origin}.", origin);
+            await SendBlockedAsync("Origin not allowed.");
+            return;
+        }
+
         using var reader = new StreamReader(HttpContext.OpenRequestStream(), Encoding.UTF8);
         var cookies = await reader.ReadToEndAsync();
         cookies = FilterCookies(cookies);

@@ -155,8 +155,7 @@ public class YtdlManager
             "--ignore-config",
             "--no-playlist",
             "--no-warnings",
-            "--no-mtime",
-            "--no-progress"
+            "--no-mtime"
         ]);
 
         if (File.Exists(FfmpegPath))
@@ -794,7 +793,11 @@ public class YtdlManager
                 }
 
                 if (!await FileHash.VerifyGitHubDigestAsync(tempPath, assetVersion.digest, "yt-dlp"))
-                    throw new Exception("yt-dlp download failed its digest check.");
+                {
+                    // Not fatal: the staged file is discarded and any existing binary stays.
+                    Log.Error("yt-dlp download failed its digest check; keeping the existing binary.");
+                    return;
+                }
 
                 File.Move(tempPath, YtdlPath, overwrite: true);
             }

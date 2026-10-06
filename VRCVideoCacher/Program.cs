@@ -48,6 +48,17 @@ internal sealed class Program
     public static event Action? OnCookiesUpdated;
     private const string SingleInstanceMutexName = @"Local\VRCVideoCacher_SingleInstance";
     private static Mutex? _singleInstanceMutex;
+    private const string LegacyImageName = "VRCVideoCacher";
+
+    /// <summary>
+    /// Whether a process name is one of the given image names. Linux truncates the kernel
+    /// process name to 15 characters, so a 15-character name also matches as a prefix.
+    /// </summary>
+    internal static bool MatchesImageName(string processName, IEnumerable<string> imageNames) =>
+        imageNames.Any(name => name.Length > 0 &&
+            (string.Equals(processName, name, StringComparison.OrdinalIgnoreCase) ||
+             (processName.Length == 15 && name.Length > 15 &&
+              name.StartsWith(processName, StringComparison.OrdinalIgnoreCase))));
 
     private static readonly CancellationTokenSource ShutdownCts = new();
 
@@ -130,9 +141,14 @@ internal sealed class Program
             if (LaunchArgs.KillExistingInstance)
             {
                 // Documented-as-destructive escape hatch; corrupts history when triggered by auto-launchers.
-                foreach (var process in Process.GetProcessesByName("VRCVideoCacher"))
+                var imageNames = new[]
                 {
-                    if (process.Id == Environment.ProcessId)
+                    Path.GetFileNameWithoutExtension(Environment.ProcessPath) ?? string.Empty,
+                    LegacyImageName
+                };
+                foreach (var process in Process.GetProcesses())
+                {
+                    if (process.Id == Environment.ProcessId || !MatchesImageName(process.ProcessName, imageNames))
                     {
                         process.Dispose();
                         continue;

@@ -65,6 +65,8 @@ public class VideoId
     private static async Task<(string Output, string Error, int ExitCode)> RunYtdlpAsync(List<string> args, string url, bool includeCookies = true)
     {
         // "--" so a URL that happens to start with a dash is never taken for a flag.
+        // Metadata runs have no use for progress output.
+        args.Add("--no-progress");
         var arguments = YtdlManager.GenerateYtdlArgs(args, ["--", url], includeCookies);
         Log.Information("Starting yt-dlp with args: {args:l}", string.Join(' ', arguments));
         var (output, error, exitCode) = await ProcessRunner.RunAsync(YtdlManager.YtdlPath, arguments);
@@ -75,12 +77,19 @@ public class VideoId
     public static async Task<VideoInfo?> GetVideoId(string url, bool avPro)
     {
         url = url.Trim();
-        url = await IntegrationRegistry.ApplyRewrites(url);
+        // A rule that forces an integration is matched against the URL as given. Rewriting
+        // first (redirect-walking in particular) would move the URL off the rule's pattern.
+        var matchedRule = Services.RuleEngine.EvaluateUrl(url).MatchedRule;
+        if (string.IsNullOrEmpty(matchedRule.Integration))
+        {
+            url = await IntegrationRegistry.ApplyRewrites(url);
+            matchedRule = Services.RuleEngine.EvaluateUrl(url).MatchedRule;
+        }
 
         var uri = ToUri(url);
         if (uri == null) return null;
 
-        var handler = await IntegrationRegistry.ResolveAsync(url, uri, Services.RuleEngine.EvaluateUrl(url).MatchedRule);
+        var handler = await IntegrationRegistry.ResolveAsync(url, uri, matchedRule);
         return handler == null ? null : await handler.GetVideoInfo(url, uri, avPro);
     }
 

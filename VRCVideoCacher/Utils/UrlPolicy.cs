@@ -34,8 +34,13 @@ public static class UrlPolicy
     /// those from a request an untrusted party chose is the classic SSRF payoff, and
     /// nothing legitimate serves video from 169.254/16 or fe80::/10.
     /// </summary>
-    public static bool IsBlockedAddress(IPAddress address) =>
-        address.IsIPv4LinkLocal() || address.IsIPv6LinkLocal;
+    public static bool IsBlockedAddress(IPAddress address)
+    {
+        // ::ffff:a.b.c.d is reachable as a.b.c.d through a dual-mode socket.
+        if (address.IsIPv4MappedToIPv6)
+            address = address.MapToIPv4();
+        return address.IsIPv4LinkLocal() || address.IsIPv6LinkLocal;
+    }
 
     private static bool IsIPv4LinkLocal(this IPAddress address)
     {

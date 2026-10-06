@@ -75,6 +75,16 @@ top. Published as a pre-release first because of the size of the change.
   `yt-dlp` arguments passed via `ArgumentList` instead of a command line, CORS restricted to
   the origins that need it, link-local/SSRF rejection, atomic config writes, cache eviction
   fixes, database race fixes, and a schema reconciler for columns added by a new build.
+- `POST /youtube-cookies` refuses requests from origins outside the allow-list instead of only
+  withholding CORS headers; the SSRF guard also covers IPv4-mapped IPv6 addresses.
+- yt-dlp progress, rate and ETA reach the download queue again (`--no-progress` is now limited
+  to metadata calls), and a failed yt-dlp digest check keeps the existing binary instead of
+  stopping start-up.
+- A rule that forces an integration is no longer bypassed by redirect-walking, and
+  `--kill-existing-instance` finds the renamed process.
+- Restored the Stats and Error Popups translations the merge dropped.
+- A `-rc` tag now builds a binary that reports the tag as its version, so release candidates
+  update to the final release.
 
 ### Internal
 
