@@ -11,13 +11,10 @@ namespace VRCVideoCacher.API;
 /// This is the reliable half of severing: the socket is ours, so closing it needs no
 /// privileges and works identically on every platform.
 ///
-/// EmbedIO gives a module no "request finished" callback when it is not the final handler,
-/// so completion cannot be observed directly. The previous version simply never removed
-/// anything, which made this an unbounded leak — one retained IHttpContext per video
-/// request, for the lifetime of the process, and far worse for HLS where every segment is
-/// its own request. Instead, entries are pruned by liveness: once EmbedIO has finished a
-/// response it disposes the output stream, so a stream that can no longer be written to is
-/// a stream that is done.
+/// Entries are removed through <see cref="IHttpContext.OnClose"/> when EmbedIO finishes
+/// processing the request, so everything still registered is a response in flight. Output
+/// stream state cannot be used for this: EmbedIO's stream reports CanWrite regardless of
+/// whether the response is complete.
 /// </summary>
 public static class LocalStreamRegistry
 {
@@ -28,8 +25,8 @@ public static class LocalStreamRegistry
     private static readonly ConcurrentDictionary<Guid, Entry> Streams = new();
 
     /// <summary>
-    /// Backstop for anything the liveness check somehow misses. No legitimate cached-video
-    /// response stays open for hours.
+    /// Backstop in case a close callback never fires. No legitimate cached-video response
+    /// stays open for hours.
     /// </summary>
     private static readonly TimeSpan MaxStreamAge = TimeSpan.FromHours(6);
 
@@ -37,16 +34,15 @@ public static class LocalStreamRegistry
 
     public static void Register(IHttpContext context, string path)
     {
-        // Pruning here rather than on a timer keeps the dictionary bounded by the number of
-        // genuinely concurrent streams, at the cost of a cheap sweep per media request.
         Prune();
-        Streams[Guid.NewGuid()] = new Entry(context, path, DateTime.UtcNow);
+
+        var id = Guid.NewGuid();
+        Streams[id] = new Entry(context, path, DateTime.UtcNow);
+        context.OnClose(ctx => Streams.TryRemove(id, out _));
     }
 
     /// <summary>
-    /// Closes every stream currently being served and returns how many were actually live.
-    /// Entries that had already finished are discarded rather than counted, so the number
-    /// reported to the user reflects what was really interrupted.
+    /// Closes every stream currently being served and returns how many were actually closed.
     /// </summary>
     public static int CloseAll()
     {
@@ -54,13 +50,7 @@ public static class LocalStreamRegistry
 
         foreach (var key in Streams.Keys.ToList())
         {
-            if (!Streams.TryRemove(key, out var entry))
-                continue;
-
-            if (!IsLive(entry))
-                continue;
-
-            if (Close(entry))
+            if (Streams.TryRemove(key, out var entry) && Close(entry))
                 closed++;
         }
 
@@ -86,26 +76,8 @@ public static class LocalStreamRegistry
     {
         foreach (var pair in Streams)
         {
-            if (IsLive(pair.Value) && DateTime.UtcNow - pair.Value.StartedAt < MaxStreamAge)
-                continue;
-
-            Streams.TryRemove(pair.Key, out _);
-        }
-    }
-
-    /// <summary>
-    /// A finished response has had its output stream disposed by EmbedIO, which makes it
-    /// unwritable — and touching a disposed stream throws, which is equally conclusive.
-    /// </summary>
-    private static bool IsLive(Entry entry)
-    {
-        try
-        {
-            return entry.Context.Response.OutputStream.CanWrite;
-        }
-        catch
-        {
-            return false;
+            if (DateTime.UtcNow - pair.Value.StartedAt >= MaxStreamAge)
+                Streams.TryRemove(pair.Key, out _);
         }
     }
 }

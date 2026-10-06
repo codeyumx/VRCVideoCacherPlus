@@ -65,12 +65,17 @@ public static class ConnectionSevering
     private const string PermissionDeniedMarker = "Operation not permitted";
 
     // Exit codes of the elevated helper, read back by the unprivileged parent. Deliberately
-    // outside the 0-1 range so an unrelated crash is never mistaken for a real outcome.
-    private const int HelperSevered = 0;
+    // outside 0-1 and the 126/127 that pkexec reserves, so a wrapper that merely returned
+    // (a terminal-emulator fallback, a crash) is never mistaken for a real outcome.
+    private const int HelperSevered = 20;
     private const int HelperNothingToDo = 10;
     private const int HelperNotPermitted = 11;
     private const int HelperUnsupported = 12;
     private const int HelperFailed = 13;
+
+    // pkexec: 126 = dismissed or not authorised, 127 = authorisation could not be obtained.
+    private const int PkexecNotAuthorized = 126;
+    private const int PkexecNoAuthorization = 127;
 
     /// <summary>
     /// Entry point for the short-lived privileged instance spawned by
@@ -219,24 +224,31 @@ public static class ConnectionSevering
             case HelperNotPermitted:
                 Log.Warning("Even with elevation the kernel refused to close the connection.");
                 return (0, SeverOutcome.NotPermitted);
+            case PkexecNotAuthorized:
+            case PkexecNoAuthorization:
+                Log.Information("Elevation was declined or unavailable (pkexec exit {Code}). {Hint}", exitCode, CapabilityHint);
+                return (0, SeverOutcome.NotPermitted);
             default:
-                Log.Warning("Elevated sever helper exited with {Code}.", exitCode);
+                // Includes 0: a wrapper that returns before the helper has run (terminal
+                // emulators detach) says nothing about whether anything was closed.
+                Log.Warning("Elevated sever helper exited with {Code}; the result is unconfirmed.", exitCode);
                 return (0, SeverOutcome.Failed);
         }
     }
 
     /// <summary>
-    /// The one-off alternative to being prompted every time. CAP_NET_ADMIN is exactly the
-    /// privilege SOCK_DESTROY requires, so granting it to the binary removes the need for
-    /// root entirely — this is the "do we still need sudo" answer, and the answer is no.
+    /// The one-off alternative to being prompted every time. CAP_NET_ADMIN is what SOCK_DESTROY
+    /// requires, but file capabilities are not inherited across exec: granting it to this
+    /// binary would not reach the `ss` child that does the work, so it has to go on `ss`
+    /// itself. The trade-off is that every user on the machine can then run `ss -K`.
     ///
-    /// It has to be re-applied after an update, because the updater replaces the binary and
-    /// file capabilities live on the inode.
+    /// Package updates to iproute2 replace the binary and drop the capability.
     /// </summary>
     public static string CapabilityHint =>
         OperatingSystem.IsLinux()
-            ? $"To close connections without a password prompt, grant the capability once: " +
-              $"sudo setcap cap_net_admin+ep \"{Environment.ProcessPath}\" (re-apply after each update)."
+            ? "To close connections without a password prompt, grant the capability to ss once: " +
+              "sudo setcap cap_net_admin+ep \"$(command -v ss)\" " +
+              "(lets any local user run `ss -K`; re-apply after iproute2 updates)."
             : "Run VRCVideoCacher as administrator to close connections without a prompt.";
 
     private static bool IsLoopback(string address) =>
@@ -395,6 +407,10 @@ public static class ConnectionSevering
 
     private static async Task<(int, SeverOutcome)> SeverRemoteLinuxAsync(IReadOnlyCollection<string> addresses)
     {
+        // `ss -K` alone destroys every matching socket on the machine, so it is aimed at
+        // VRChat's sockets only, resolved through procfs (readable as the owning user, and as
+        // root in the elevated helper).
+        var sockets = NetworkConnections.ListVrChatSocketsLinux();
         var severed = 0;
         var denied = false;
 
@@ -403,19 +419,22 @@ public static class ConnectionSevering
             if (string.IsNullOrWhiteSpace(address))
                 continue;
 
-            var outcome = await RunSsKillAsync(address);
-
-            switch (outcome)
+            foreach (var socket in sockets.Where(s => SameAddress(s.RemoteAddress, address)))
             {
-                case SeverOutcome.Severed:
-                    severed++;
-                    break;
-                case SeverOutcome.NotPermitted:
-                    denied = true;
-                    break;
-                case SeverOutcome.Unsupported:
-                    // ss is not installed; no point trying the remaining addresses.
-                    return (severed, severed > 0 ? SeverOutcome.Severed : SeverOutcome.Unsupported);
+                var outcome = await RunSsKillAsync(BuildSsKillArgs(socket.RemoteAddress, socket.LocalPort, socket.RemotePort), address);
+
+                switch (outcome)
+                {
+                    case SeverOutcome.Severed:
+                        severed++;
+                        break;
+                    case SeverOutcome.NotPermitted:
+                        denied = true;
+                        break;
+                    case SeverOutcome.Unsupported:
+                        // ss is not installed; no point trying the remaining sockets.
+                        return (severed, severed > 0 ? SeverOutcome.Severed : SeverOutcome.Unsupported);
+                }
             }
         }
 
@@ -425,6 +444,20 @@ public static class ConnectionSevering
             return (0, SeverOutcome.NotPermitted);
 
         return (0, SeverOutcome.NothingToDo);
+    }
+
+    /// <summary>Compares addresses as addresses, so an IPv4-mapped IPv6 form equals its IPv4 form.</summary>
+    internal static bool SameAddress(string a, string b)
+    {
+        if (!IPAddress.TryParse(a, out var left) || !IPAddress.TryParse(b, out var right))
+            return false;
+
+        if (left.IsIPv4MappedToIPv6)
+            left = left.MapToIPv4();
+        if (right.IsIPv4MappedToIPv6)
+            right = right.MapToIPv4();
+
+        return left.Equals(right);
     }
 
     /// <summary>
@@ -438,7 +471,14 @@ public static class ConnectionSevering
         IsIpV6(address) ? $"[{address}]" : address;
 
     /// <summary>
-    /// Runs `ss -t -K dst ADDRESS` and works out what really happened.
+    /// The `ss` arguments that destroy exactly one socket: the remote address plus both ports
+    /// pin it to a single VRChat connection.
+    /// </summary>
+    internal static string[] BuildSsKillArgs(string remoteAddress, int localPort, int remotePort) =>
+        ["-t", "-K", "dst", FormatSsDestination(remoteAddress), "sport", "=", $":{localPort}", "dport", "=", $":{remotePort}"];
+
+    /// <summary>
+    /// Runs `ss -K` with <paramref name="args"/> and works out what really happened.
     ///
     /// Unlike Windows, Linux closes IPv6 sockets through the very same SOCK_DESTROY call, so
     /// there is nothing extra to implement — only the filter has to be spelled correctly.
@@ -448,11 +488,11 @@ public static class ConnectionSevering
     /// anything. What does: the permission error on stderr, and whether any socket rows were
     /// printed beneath the header.
     /// </summary>
-    private static async Task<SeverOutcome> RunSsKillAsync(string address)
+    private static async Task<SeverOutcome> RunSsKillAsync(IEnumerable<string> args, string address)
     {
         try
         {
-            var result = await ProcessRunner.RunAsync("ss", ["-t", "-K", "dst", FormatSsDestination(address)]);
+            var result = await ProcessRunner.RunAsync("ss", args);
 
             if (result.Error.Contains(PermissionDeniedMarker, StringComparison.OrdinalIgnoreCase))
             {

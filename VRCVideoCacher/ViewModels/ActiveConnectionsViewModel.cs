@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Text.RegularExpressions;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Input.Platform;
@@ -153,29 +154,31 @@ public partial class ActiveConnectionsViewModel : ViewModelBase, IDisposable
     /// </summary>
     private void ReportSeverResult(SeverResult result)
     {
+        var (message, color) = DescribeSeverResult(result);
+        SetStatus(message, color);
+    }
+
+    internal static (string Message, string ColorHex) DescribeSeverResult(SeverResult result)
+    {
         switch (result.RemoteOutcome)
         {
             case SeverOutcome.NotPermitted:
-                SetStatus(Localizer.Get("SeverNeedsPrivileges"), "#FFB74D");
-                return;
+                return (Localizer.Get("SeverNeedsPrivileges"), "#FFB74D");
 
             case SeverOutcome.Unsupported when result.LocalStreamsClosed == 0:
-                SetStatus(Localizer.Get("SeverUnsupported"), "#FFB74D");
-                return;
+                return (Localizer.Get("SeverUnsupported"), "#FFB74D");
 
             case SeverOutcome.Failed:
-                SetStatus(Localizer.Get("SeverFailed"), "#E57373");
-                return;
+                return (Localizer.Get("SeverFailed"), "#E57373");
         }
 
         if (result.AnythingClosed)
         {
             var total = result.LocalStreamsClosed + result.RemoteSocketsSevered;
-            SetStatus(string.Format(Localizer.Get("SeverSucceeded"), total), "#81C784");
-            return;
+            return (string.Format(Localizer.Get("SeverSucceeded"), total), "#81C784");
         }
 
-        SetStatus(Localizer.Get("SeverNothingToDo"), "#888888");
+        return (Localizer.Get("SeverNothingToDo"), "#888888");
     }
 
     [RelayCommand]
@@ -184,7 +187,11 @@ public partial class ActiveConnectionsViewModel : ViewModelBase, IDisposable
         if (connection == null)
             return;
 
-        var pattern = !string.IsNullOrEmpty(connection.AssociatedUrl) ? connection.AssociatedUrl : connection.RemoteAddress;
+        // Rule patterns are regular expressions; a URL contains '.', '?' and '+', which would
+        // otherwise match far more than this one address. An IP is matched anywhere in a URL.
+        var pattern = !string.IsNullOrEmpty(connection.AssociatedUrl)
+            ? "^" + Regex.Escape(connection.AssociatedUrl)
+            : Regex.Escape(connection.RemoteAddress);
         if (Application.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime lifetime)
             return;
 

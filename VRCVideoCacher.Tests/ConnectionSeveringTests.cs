@@ -57,14 +57,41 @@ public class ConnectionSeveringTests
     }
 
     [Fact]
-    public void CapabilityHintNamesTheRealBinary()
+    public void CapabilityHintTargetsSsNotThisBinary()
     {
+        // File capabilities are not inherited across exec, so granting them to our own binary
+        // never reaches the `ss` child that destroys the socket.
         var hint = ConnectionSevering.CapabilityHint;
         Assert.False(string.IsNullOrWhiteSpace(hint));
         if (OperatingSystem.IsLinux())
         {
             Assert.Contains("cap_net_admin", hint);
-            Assert.Contains(Environment.ProcessPath!, hint);
+            Assert.Contains("command -v ss", hint);
+            Assert.DoesNotContain(Environment.ProcessPath!, hint);
         }
+    }
+
+    [Fact]
+    public void SsKillIsScopedToOneSocket()
+    {
+        // `ss -K dst <ip>` alone would destroy that host's sockets for every process on the
+        // machine; the ports pin it to the one VRChat owns.
+        Assert.Equal(
+            ["-t", "-K", "dst", "1.2.3.4", "sport", "=", ":40000", "dport", "=", ":443"],
+            ConnectionSevering.BuildSsKillArgs("1.2.3.4", 40000, 443));
+        Assert.Equal(
+            ["-t", "-K", "dst", "[2001:db8::1]", "sport", "=", ":50000", "dport", "=", ":80"],
+            ConnectionSevering.BuildSsKillArgs("2001:db8::1", 50000, 80));
+    }
+
+    [Theory]
+    [InlineData("1.2.3.4", "1.2.3.4", true)]
+    [InlineData("::ffff:1.2.3.4", "1.2.3.4", true)]
+    [InlineData("2001:db8::1", "2001:DB8:0:0:0:0:0:1", true)]
+    [InlineData("1.2.3.4", "1.2.3.5", false)]
+    [InlineData("not-an-address", "1.2.3.4", false)]
+    public void ComparesAddressesAsAddresses(string a, string b, bool expected)
+    {
+        Assert.Equal(expected, ConnectionSevering.SameAddress(a, b));
     }
 }

@@ -195,7 +195,14 @@ public static class NetworkConnections
     /// <summary>Windows reports ports in network byte order packed into a DWORD.</summary>
     private static int NetworkPort(uint value) => (ushort)IPAddress.NetworkToHostOrder((short)(ushort)value);
 
-    private static List<ActiveConnectionInfo> ListLinux()
+    /// <summary>
+    /// Every TCP socket owned by VRChat regardless of port, un-annotated. Severing works from
+    /// this rather than <see cref="List"/> so a CDN on a non-standard port is still found, and
+    /// so `ss` can be pointed at exactly VRChat's sockets and nobody else's.
+    /// </summary>
+    internal static List<ActiveConnectionInfo> ListVrChatSocketsLinux() => ListLinux(onlyInterestingPorts: false);
+
+    private static List<ActiveConnectionInfo> ListLinux(bool onlyInterestingPorts = true)
     {
         var list = new List<ActiveConnectionInfo>();
         var processes = GetVrChatProcesses();
@@ -215,7 +222,7 @@ public static class NetworkConnections
                 if (!socketInodes.TryGetValue(entry.Inode, out var pid))
                     continue;
 
-                if (!InterestingPorts.Contains(entry.LocalPort) && !InterestingPorts.Contains(entry.RemotePort))
+                if (onlyInterestingPorts && !InterestingPorts.Contains(entry.LocalPort) && !InterestingPorts.Contains(entry.RemotePort))
                     continue;
 
                 var info = new ActiveConnectionInfo
@@ -228,7 +235,8 @@ public static class NetworkConnections
                     ProcessName = processes.TryGetValue(pid, out var name) ? name : "VRChat"
                 };
 
-                Annotate(info);
+                if (onlyInterestingPorts)
+                    Annotate(info);
                 list.Add(info);
             }
         }
@@ -248,11 +256,13 @@ public static class NetworkConnections
 
             try
             {
-                foreach (var fd in Directory.EnumerateFiles(fdDir))
+                foreach (var fd in Directory.EnumerateFileSystemEntries(fdDir))
                 {
                     try
                     {
-                        var target = File.ResolveLinkTarget(fd, true)?.FullName;
+                        // The raw readlink text: ResolveLinkTarget would resolve "socket:[N]"
+                        // as a relative path and return "/proc/<pid>/fd/socket:[N]".
+                        var target = new FileInfo(fd).LinkTarget;
                         if (target == null || !target.StartsWith("socket:[", StringComparison.Ordinal) || !target.EndsWith(']'))
                             continue;
 

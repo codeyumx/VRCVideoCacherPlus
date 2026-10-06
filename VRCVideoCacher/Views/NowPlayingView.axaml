@@ -12,6 +12,9 @@
         <StackPanel Grid.Row="0" Margin="0,0,0,20">
             <TextBlock Text="{l:Localize NowPlaying}" FontSize="24" FontWeight="Bold" Foreground="White"/>
             <TextBlock Text="Monitor and control active VRChat video playback streams" FontSize="12" Foreground="#888888" Margin="0,5,0,0"/>
+            <TextBlock Text="{Binding StatusMessage}" Margin="0,8,0,0"
+                       IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                       Foreground="{Binding StatusMessageColor}"/>
         </StackPanel>
 
         <!-- No Streams Active Placeholder -->

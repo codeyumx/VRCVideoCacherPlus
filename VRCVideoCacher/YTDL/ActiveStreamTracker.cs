@@ -258,7 +258,9 @@ public static class ActiveStreamTracker
         lock (SessionsLock)
         {
             var existing = _activeSessions.FirstOrDefault(s => s.ResolvedUrl == url || s.OriginalUrl == url);
-            if (existing == null && status == "Playing")
+            // The log's playback and error lines carry no URL, so they refer to the session
+            // that is still loading.
+            if (existing == null && status is "Playing" or "Failed")
             {
                 existing = _activeSessions.LastOrDefault(s => s.Status == "Loading");
             }

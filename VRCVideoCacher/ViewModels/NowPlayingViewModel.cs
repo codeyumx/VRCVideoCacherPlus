@@ -1,6 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -19,6 +20,12 @@ public partial class NowPlayingViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty]
     private bool _hasActiveSessions;
+
+    [ObservableProperty]
+    private string _statusMessage = string.Empty;
+
+    [ObservableProperty]
+    private string _statusMessageColor = "#81C784";
 
     private readonly DispatcherTimer _timer;
 
@@ -82,10 +89,18 @@ public partial class NowPlayingViewModel : ViewModelBase, IDisposable
     {
         if (item == null) return;
 
-        if (!string.IsNullOrEmpty(item.RemoteIp))
-            await ConnectionSevering.SeverAddressAsync(item.RemoteIp, allowElevation: true);
+        // A cached video streams from our own server (no remote address); anything else is a
+        // direct CDN connection.
+        var result = string.IsNullOrEmpty(item.RemoteIp)
+            ? new SeverResult(API.LocalStreamRegistry.CloseAll(), 0, SeverOutcome.NothingToDo)
+            : await ConnectionSevering.SeverAddressAsync(item.RemoteIp, allowElevation: true);
 
-        ActiveStreamTracker.RemoveSessionByUrl(item.ResolvedUrl);
+        var (message, color) = ActiveConnectionsViewModel.DescribeSeverResult(result);
+        StatusMessage = message;
+        StatusMessageColor = color;
+
+        if (result.AnythingClosed)
+            ActiveStreamTracker.RemoveSessionByUrl(item.ResolvedUrl);
     }
 
     [RelayCommand]
@@ -96,7 +111,8 @@ public partial class NowPlayingViewModel : ViewModelBase, IDisposable
         if (lifetime?.MainWindow?.DataContext is MainWindowViewModel mainVm)
         {
             await mainVm.NavigateToRulesCommand.ExecuteAsync(null);
-            await mainVm.Rules.AddRuleWithPattern(item.OriginalUrl);
+            // Rule patterns are regular expressions, so the URL must be escaped to match literally.
+            await mainVm.Rules.AddRuleWithPattern("^" + Regex.Escape(item.OriginalUrl));
         }
     }
 
