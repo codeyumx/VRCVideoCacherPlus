@@ -58,11 +58,10 @@ top. Published as a pre-release first because of the size of the change.
   `PlusConfig.json`. They are now read from it once into `Config.json`, and the file is renamed
   to `PlusConfig.json.bak`.
 
-### Deprecated
+### Removed
 
-- The `VRCVideoCacher.exe` / `VRCVideoCacher` release assets are kept only so installs from before
-  the rename can still self-update. Remove them from `release.yml` once their download count
-  stops growing.
+- The `VRCVideoCacher.exe` / `VRCVideoCacher` release assets. Installs from 2026.8.14 or earlier
+  look for those names and cannot self-update to this release; download it manually once.
 
 ### Fixed
 
