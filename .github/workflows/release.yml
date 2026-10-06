@@ -12,25 +12,9 @@ name: Release
 # reports and the version users download cannot drift apart. That check is its own job and runs
 # before the test and publish jobs, so a mismatched tag costs seconds rather than two publishes.
 #
-# Each binary is attached under two names:
-#
-#   VRCVideoCacherPlus[.exe]   what this fork publishes from now on
-#   VRCVideoCacher[.exe]       the name every build released before the rename looks for
-#
-# The updater matches a release asset by exact name, so dropping the second name would strand
-# every installed 2026.9.x build with "No matching asset" and no way to update itself. Both
-# entries are the same binary. Remove the VRCVideoCacher[.exe] entries once the download_count
-# of that asset (`gh api repos/{owner}/{repo}/releases/latest --jq '.assets[]|[.name,.download_count]'`)
-# stops growing between releases: that means nothing old is left to update.
-#
 # `docs/updates.md` must already have a section for the tag: the version job fails the run if
 # it does not, and the release body is that section. A tag with a suffix falls back to the
 # section of its base version.
-#
-# When the checked-out tree has `BrowserExtension/build.sh`, the Chrome `.crx` and Firefox
-# `.xpi` are packaged too — the `.crx` signed with the CHROME_EXTENSION_PEM secret, never with
-# a key in the repository — and attached alongside the binaries. On a tree without that script
-# the step is skipped and the release carries the binaries alone.
 
 on:
   push:
@@ -130,9 +114,8 @@ jobs:
           -o out/${{ matrix.rid }}
 
       # A publish that produced nothing is a broken release, not a smaller one. The binary
-      # keeps the assembly name (VRCVideoCacher); the fork-named copy is what the fork's own
-      # downloads link to.
-      - name: Assemble ${{ matrix.asset }} and ${{ matrix.bin }}
+      # keeps the assembly name (VRCVideoCacher) and is attached under the fork's name.
+      - name: Assemble ${{ matrix.asset }}
         run: |
           set -euo pipefail
 
@@ -140,15 +123,13 @@ jobs:
           test -f "$built" \
             || { echo "::error::${{ matrix.bin }} is missing"; ls -la "out/${{ matrix.rid }}"; exit 1; }
 
-          cp "$built" "out/${{ matrix.rid }}/${{ matrix.asset }}"
-          chmod +x "$built" "out/${{ matrix.rid }}/${{ matrix.asset }}"
+          mv "$built" "out/${{ matrix.rid }}/${{ matrix.asset }}"
+          chmod +x "out/${{ matrix.rid }}/${{ matrix.asset }}"
 
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.asset }}
-          path: |
-            out/${{ matrix.rid }}/${{ matrix.asset }}
-            out/${{ matrix.rid }}/${{ matrix.bin }}
+          path: out/${{ matrix.rid }}/${{ matrix.asset }}
           if-no-files-found: error
 
   release:
@@ -164,48 +145,6 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: assets
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      # Packaging the extension cannot be allowed to cost a release whose binaries are already
-      # built, so a failure here is carried to the check below rather than failing the job. The
-      # check is what decides whether that failure mattered.
-      - name: Package and sign the browser extension
-        id: extension
-        if: ${{ hashFiles('BrowserExtension/build.sh') != '' }}
-        continue-on-error: true
-        env:
-          CHROME_EXTENSION_PEM: ${{ secrets.CHROME_EXTENSION_PEM }}
-          CHROME_EXTENSION_PEM_FILE: ${{ secrets.CHROME_EXTENSION_PEM_FILE }}
-        run: ./BrowserExtension/build.sh
-
-      # With a signing key configured the extension assets are part of what this workflow
-      # advertises, so their absence is a failure rather than a quiet omission. Without one they
-      # are deliberately skipped.
-      - name: Verify the extension assets
-        env:
-          PEM: ${{ secrets.CHROME_EXTENSION_PEM }}
-          PEM_FILE: ${{ secrets.CHROME_EXTENSION_PEM_FILE }}
-        run: |
-          set -euo pipefail
-          shopt -s nullglob
-
-          if [ -z "$PEM" ] && [ -z "$PEM_FILE" ]; then
-            echo "::warning::No Chrome signing key configured; publishing the binaries without the extension assets."
-            exit 0
-          fi
-
-          crx=(dist/*.crx)
-          xpi=(dist/*.xpi)
-          if [ "${#crx[@]}" -eq 0 ] || [ "${#xpi[@]}" -eq 0 ]; then
-            echo "::error::A Chrome signing key is configured but dist/ holds no .crx/.xpi - the packaging step failed"
-            ls -la dist 2>/dev/null || true
-            exit 1
-          fi
-
-          echo "Extension assets ready: ${crx[*]} ${xpi[*]}"
 
       - name: Write the release notes
         env:
@@ -252,18 +191,7 @@ jobs:
             echo "Publishing $TAG."
           fi
 
-          # Both names per binary: the fork's, and the one builds released before the rename
-          # look for by exact name in the updater.
           gh release create "$TAG" \
             "assets/VRCVideoCacherPlus.exe/VRCVideoCacherPlus.exe" \
-            "assets/VRCVideoCacherPlus.exe/VRCVideoCacher.exe" \
             "assets/VRCVideoCacherPlus/VRCVideoCacherPlus" \
-            "assets/VRCVideoCacherPlus/VRCVideoCacher" \
             "${flags[@]}"
-
-          # Secondary assets: present only when this tree can build the extension.
-          for extension in dist/*.crx dist/*.xpi; do
-            if [ -e "$extension" ]; then
-              gh release upload "$TAG" "$extension" --clobber
-            fi
-          done

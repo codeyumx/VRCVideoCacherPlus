@@ -132,13 +132,10 @@ elif ! command -v npx >/dev/null; then
     echo "ERROR: a Chrome signing key was supplied but npx (crx3) is not installed" >&2
     exit 1
 else
-    # Pinned: this runs at release time with the extension's signing key in hand, so it must not
+    # Pinned: this runs with the extension's signing key in hand, so it must not
     # be whatever the registry served that day.
     npx -y crx3@2.0.0 chrome -p "$CRX_KEY" -o "${DIST_DIR}/VRCVideoCacherPlus-chrome-${chrome_version}.crx"
     echo "  dist/VRCVideoCacherPlus-chrome-${chrome_version}.crx"
 fi
 
-# The .zip files stay in dist/ as byproducts — .xpi is a copy of the Firefox zip and the .crx
-# is built from chrome/ — and the release attaches only the .crx and .xpi, so it does not list
-# the same extension twice in two formats.
 echo "=== Done ==="
