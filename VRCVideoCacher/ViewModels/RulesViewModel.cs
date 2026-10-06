@@ -127,6 +127,8 @@ public partial class RuleEntryViewModel : ObservableObject
 
 public partial class RulesViewModel : ViewModelBase
 {
+    private const string VideoPlayersRuleName = "Block all Videos";
+
     private bool _isLoading;
 
     public ObservableCollection<RuleEntryViewModel> Rules { get; } = [];
@@ -145,9 +147,60 @@ public partial class RulesViewModel : ViewModelBase
 
     public RulesViewModel()
     {
-        ConfigManager.OnConfigChanged += LoadFromConfig;
+        ConfigManager.OnConfigChanged += HandleConfigChanged;
         Services.RuleEngine.OnRuleMatched += HandleRuleMatched;
         LoadFromConfig();
+    }
+
+    // Any config save fires this, rules or not (tray toggles, tray notice flag, ...). Reloading
+    // would silently throw away edits the user has not saved yet.
+    private void HandleConfigChanged()
+    {
+        if (HasChanges)
+            SyncVideoPlayersRule();
+        else
+            LoadFromConfig();
+    }
+
+    // ConfigManager.SetVideoPlayersEnabled owns this rule outside the editor. Mirror its live
+    // state into the pending list so a later Save does not write a stale copy over it.
+    private void SyncVideoPlayersRule()
+    {
+        var live = PlusConfigManager.Config.UriRules?.FirstOrDefault(r => r.Name == VideoPlayersRuleName);
+        if (live == null)
+            return;
+
+        _isLoading = true;
+        var entry = Rules.FirstOrDefault(r => r.Name == VideoPlayersRuleName);
+        if (entry == null)
+        {
+            Rules.Insert(0, CreateEntry(live.Clone()));
+        }
+        else
+        {
+            entry.Rule.Enabled = live.Enabled;
+            entry.RefreshProperties();
+            var index = Rules.IndexOf(entry);
+            if (live.Enabled && index > 0)
+                Rules.Move(index, 0);
+        }
+        _isLoading = false;
+        EvaluateTestUrl();
+    }
+
+    private int NewRuleIndex(UriRule rule)
+    {
+        // A block must win over every site rule, as the old BlockedUrls check did.
+        if (rule.Action == RuleAction.Block)
+            return 0;
+
+        for (var i = 0; i < Rules.Count; i++)
+        {
+            if (Rules[i].Name == PlusConfigManager.CatchAllRuleName)
+                return i;
+        }
+
+        return Rules.Count;
     }
 
     private void HandleRuleMatched(string ruleId)
@@ -268,6 +321,10 @@ public partial class RulesViewModel : ViewModelBase
         var dialog = Views.PopupWindow.CreateConfirm(message, Localizer.Get("Save"), Localizer.Get("Discard"));
         await dialog.ShowDialog(parentWindow);
 
+        // Closing the window (X, Alt+F4) is neither answer: keep the edits and stay put.
+        if (!dialog.Answered)
+            return false;
+
         if (dialog.Confirmed)
         {
             SaveToConfig();
@@ -295,7 +352,7 @@ public partial class RulesViewModel : ViewModelBase
         if (result)
         {
             var newEntry = CreateEntry(editVm.RuleResult);
-            Rules.Add(newEntry);
+            Rules.Insert(NewRuleIndex(newEntry.Rule), newEntry);
             EvaluateTestUrl();
             SetHasChanges();
         }
@@ -323,7 +380,7 @@ public partial class RulesViewModel : ViewModelBase
         if (result)
         {
             var newEntry = CreateEntry(editVm.RuleResult);
-            Rules.Add(newEntry);
+            Rules.Insert(NewRuleIndex(newEntry.Rule), newEntry);
             EvaluateTestUrl();
             SetHasChanges();
         }

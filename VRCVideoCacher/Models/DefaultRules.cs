@@ -36,6 +36,16 @@ public static class DefaultRules
     internal const string LegacyDropboxPattern =
         @"^https?:\/\/(?:[a-zA-Z0-9-]+\.)*dropbox\.com\/(.*?)(?:\?dl=0)?$";
 
+    // yt.illumination.media serves YouTube-backed videos that have to be resolved and cached, so
+    // it stays out of the direct-play rule; every other illumination.media host plays raw.
+    internal const string IlluminationPattern =
+        @"^https?:\/\/(?!yt\.illumination\.media(?:[\/?#:]|$))(?:[a-zA-Z0-9-]+\.)*(?:imvrcdn\.com|illumination\.media)(?:[\/?#]|$)";
+
+    // Shipped without the yt.illumination.media exclusion; repaired for existing installs by
+    // PlusConfigManager.MigrateBrokenDefaultRules.
+    internal const string LegacyIlluminationPattern =
+        @"^https?:\/\/(?:[a-zA-Z0-9-]+\.)*(?:imvrcdn\.com|illumination\.media)(?:[\/?#]|$)";
+
     public static List<UriRule> Create()
     {
         return
@@ -93,7 +103,7 @@ public static class DefaultRules
             new UriRule
             {
                 Name = "Illumination Media Direct",
-                Pattern = @"^https?:\/\/(?:[a-zA-Z0-9-]+\.)*(?:imvrcdn\.com|illumination\.media)(?:[\/?#]|$)",
+                Pattern = IlluminationPattern,
                 Action = RuleAction.Direct,
                 Enabled = true
             },

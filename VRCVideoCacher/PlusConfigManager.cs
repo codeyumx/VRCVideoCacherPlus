@@ -164,6 +164,7 @@ public static class PlusConfigManager
             }
 
             TryString(root, "BlockRedirect", out var blockRedirect);
+            var migratedBlockRules = 0;
             if (root.TryGetProperty("BlockedUrls", out var blockedUrls) && blockedUrls.ValueKind == JsonValueKind.Array)
             {
                 foreach (var entry in blockedUrls.EnumerateArray())
@@ -176,23 +177,21 @@ public static class PlusConfigManager
                     if (config.UriRules.Any(r => r.Pattern == pattern))
                         continue;
 
-                    // Pre-rules builds replaced a blocked URL with BlockRedirect and played that, so
-                    // a configured redirect keeps working; without one the request is refused
-                    // outright, which is what Block means in the engine.
+                    // Pre-rules builds checked BlockedUrls before any site handling, then replaced a
+                    // blocked URL with BlockRedirect and resolved that as usual. So the rule goes to
+                    // the top, and a configured redirect is a Rewrite: evaluation carries on with the
+                    // new URL instead of handing the player an unresolved page. Without a redirect
+                    // the request is refused outright, which is what Block means in the engine.
                     var rule = new UriRule
                     {
                         Name = $"Block {url}",
                         Pattern = pattern,
                         Enabled = true,
-                        Action = string.IsNullOrWhiteSpace(blockRedirect) ? RuleAction.Block : RuleAction.Redirect,
+                        Action = string.IsNullOrWhiteSpace(blockRedirect) ? RuleAction.Block : RuleAction.Rewrite,
                         RedirectTarget = blockRedirect ?? string.Empty
                     };
 
-                    var catchAllIndex = config.UriRules.FindIndex(r => r.Name == CatchAllRuleName);
-                    if (catchAllIndex >= 0)
-                        config.UriRules.Insert(catchAllIndex, rule);
-                    else
-                        config.UriRules.Add(rule);
+                    config.UriRules.Insert(migratedBlockRules++, rule);
 
                     migrated++;
                     Log.Information("Migrated blocked URL '{Url}' into a {Action} rule.", url, rule.Action);
@@ -246,6 +245,13 @@ public static class PlusConfigManager
 
         foreach (var rule in config.UriRules)
         {
+            if (rule.Pattern == DefaultRules.LegacyIlluminationPattern)
+            {
+                Log.Information("Repairing default rule '{RuleName}' (yt.illumination.media must resolve).", rule.Name);
+                rule.Pattern = DefaultRules.IlluminationPattern;
+                continue;
+            }
+
             if (rule.Pattern != DefaultRules.LegacyDropboxPattern)
                 continue;
 
@@ -256,7 +262,7 @@ public static class PlusConfigManager
     }
 
     // The catch-all rule stays last; new defaults are inserted above it.
-    private const string CatchAllRuleName = "Everything else";
+    internal const string CatchAllRuleName = "Everything else";
 
     public static void EnsureDefaultRules() => EnsureDefaultRules(Config);
 

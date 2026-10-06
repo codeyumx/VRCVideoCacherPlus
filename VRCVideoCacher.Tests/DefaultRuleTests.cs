@@ -127,4 +127,20 @@ public class DefaultRuleTests
         Assert.Matches(regex, "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ");
         Assert.DoesNotMatch(regex, "https://notyoutube.com/watch?v=dQw4w9WgXcQ");
     }
+
+    // yt.illumination.media is YouTube-backed and was always resolved and cached; the rest of
+    // illumination.media and imvrcdn.com play raw.
+    [Theory]
+    [InlineData("https://anime.illumination.media/video.mp4", true)]
+    [InlineData("https://cdn.imvrcdn.com/video.mp4", true)]
+    [InlineData("https://illumination.media/", true)]
+    [InlineData("https://yt.illumination.media/abc", false)]
+    [InlineData("https://yt.illumination.media", false)]
+    [InlineData("http://yt.illumination.media?x=1", false)]
+    public void IlluminationRuleSkipsTheResolvedYoutubeHost(string url, bool direct)
+    {
+        var regex = RuleEngine.GetRegex(Rule("Illumination Media Direct").Pattern);
+
+        Assert.Equal(direct, regex.IsMatch(url));
+    }
 }

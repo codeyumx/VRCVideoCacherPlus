@@ -30,7 +30,7 @@ public class LegacyConfigMigrationTests
             """);
 
         var rule = Rule(config, "Block https://example.com/bad");
-        Assert.Equal(RuleAction.Redirect, rule.Action);
+        Assert.Equal(RuleAction.Rewrite, rule.Action);
         Assert.Equal("https://www.youtube.com/watch?v=byv2bKekeWQ", rule.RedirectTarget);
         Assert.True(rule.Enabled);
 
@@ -47,6 +47,51 @@ public class LegacyConfigMigrationTests
         var config = Migrated("""{ "BlockedUrls": ["https://example.com/bad"] }""");
 
         Assert.Equal(RuleAction.Block, Rule(config, "Block https://example.com/bad").Action);
+    }
+
+    // Pre-rules builds checked BlockedUrls before any site handling. A migrated rule below the
+    // YouTube/PyPyDance defaults is never reached, so the block would silently stop working.
+    [Fact]
+    public void MigratedBlockRulesComeBeforeEverySiteRuleInTheirOriginalOrder()
+    {
+        var config = Migrated("""
+            { "BlockedUrls": ["https://www.youtube.com/watch?v=abc", "https://pypy.dance/x"] }
+            """);
+
+        Assert.Equal("Block https://www.youtube.com/watch?v=abc", config.UriRules[0].Name);
+        Assert.Equal("Block https://pypy.dance/x", config.UriRules[1].Name);
+    }
+
+    // A redirect rule hands its target to the player verbatim; the old behaviour resolved the
+    // replacement like any other URL, so the migrated rule has to let evaluation continue.
+    [Fact]
+    public void ABlockedUrlIsReplacedByTheRedirectAndThenResolvedLikeAnyOther()
+    {
+        const string redirect = "https://www.youtube.com/watch?v=byv2bKekeWQ";
+        var config = Migrated($$"""
+            { "BlockedUrls": ["https://www.youtube.com/watch?v=abc"], "BlockRedirect": "{{redirect}}" }
+            """);
+
+        var url = "https://www.youtube.com/watch?v=abc&t=5";
+        foreach (var rule in config.UriRules.Where(r => r.Enabled))
+        {
+            var match = Services.RuleEngine.GetRegex(rule.Pattern).Match(url);
+            if (!match.Success)
+                continue;
+
+            if (rule.Action == RuleAction.Rewrite)
+            {
+                url = Services.RuleEngine.ExpandTemplate(rule.RedirectTarget, url, match);
+                continue;
+            }
+
+            Assert.Equal("YouTube", rule.Name);
+            Assert.Equal(RuleAction.Resolve, rule.Action);
+            Assert.Equal(redirect, url);
+            return;
+        }
+
+        Assert.Fail("No terminal rule matched.");
     }
 
     [Fact]

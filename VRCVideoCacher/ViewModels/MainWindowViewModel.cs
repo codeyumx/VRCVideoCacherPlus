@@ -109,7 +109,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         {
             var lifetime = Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime;
             var parentWindow = lifetime?.MainWindow;
-            await _rules.Value.CheckUnsavedChangesAsync(parentWindow);
+            if (!await _rules.Value.CheckUnsavedChangesAsync(parentWindow))
+                return;
         }
 
         CurrentView = targetView;

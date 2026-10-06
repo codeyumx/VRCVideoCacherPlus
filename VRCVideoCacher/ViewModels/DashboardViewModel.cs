@@ -144,6 +144,7 @@ public partial class DashboardViewModel : ViewModelBase
     {
         Dispatcher.UIThread.InvokeAsync(() =>
         {
+            VideoPlayersEnabled = ConfigManager.Config.VideoPlayersEnabled;
             ServerUrl = ConfigManager.Config.YtdlpWebServerUrl;
             MaxCacheSize = ConfigManager.Config.CacheMaxSizeInGb;
         });

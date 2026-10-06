@@ -7,6 +7,9 @@ public partial class PopupWindow : Window
 {
     public bool Confirmed { get; private set; }
 
+    /// <summary>True once a button was pressed; false when the window was dismissed (X, Alt+F4).</summary>
+    public bool Answered { get; private set; }
+
     private string? _folderPath;
 
     public PopupWindow() : this(string.Empty)
@@ -47,12 +50,14 @@ public partial class PopupWindow : Window
     private void OkButton_Click(object? sender, RoutedEventArgs e)
     {
         Confirmed = true;
+        Answered = true;
         this.Close();
     }
 
     private void CancelButton_Click(object? sender, RoutedEventArgs e)
     {
         Confirmed = false;
+        Answered = true;
         this.Close();
     }
 }
