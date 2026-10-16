@@ -104,4 +104,40 @@ public class CookieFileTests
     {
         Assert.Null(CookieFile.ParseLoginExpiryUtc([]));
     }
+
+    // HasYouTubeLogin gates every write of the cookie jar, including uploads from anything on
+    // the machine that can reach the local API, so it must parse rows rather than search text.
+    [Fact]
+    public void AcceptsYouTubeLoginRow()
+    {
+        Assert.True(CookieFile.HasYouTubeLogin(["# Netscape HTTP Cookie File", Line("LOGIN_INFO", Expiry2030.ToString())]));
+    }
+
+    [Fact]
+    public void AcceptsHttpOnlyLoginRowWithCrlf()
+    {
+        Assert.True(CookieFile.HasYouTubeLogin([Line("LOGIN_INFO", Expiry2030.ToString(), domain: "#HttpOnly_.youtube.com") + "\r"]));
+    }
+
+    [Fact]
+    public void RejectsTextThatOnlyMentionsTheNames()
+    {
+        Assert.False(CookieFile.HasYouTubeLogin(["youtube.com LOGIN_INFO"]));
+        Assert.False(CookieFile.HasYouTubeLogin(["# youtube.com", Line("LOGIN_INFO", "0", domain: ".example.com")]));
+    }
+
+    [Theory]
+    [InlineData(".notyoutube.com")]
+    [InlineData(".youtube.com.example.com")]
+    public void RejectsLookalikeDomains(string domain)
+    {
+        Assert.False(CookieFile.HasYouTubeLogin([Line("LOGIN_INFO", Expiry2030.ToString(), domain)]));
+    }
+
+    [Fact]
+    public void RejectsEmptyLoginValue()
+    {
+        var row = string.Join('\t', ".youtube.com", "TRUE", "/", "TRUE", Expiry2030.ToString(), "LOGIN_INFO", "");
+        Assert.False(CookieFile.HasYouTubeLogin([row]));
+    }
 }

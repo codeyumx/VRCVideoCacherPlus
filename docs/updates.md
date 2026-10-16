@@ -27,6 +27,21 @@ bottom as tags only. The fork's own releases start at `2026.6.17`.
 
 ## Unreleased
 
+### Fixed
+
+- **Cookies:** an upload or pasted cookie file is accepted only if it has an actual
+  `LOGIN_INFO` row for `youtube.com`. Before, any text that contained both words passed. The
+  cookie file is written atomically, so yt-dlp never reads half a file and two browsers
+  can't interleave writes. On Linux/macOS it is owner-only (`0600`).
+- **Beta extension:** after a failure it waits longer each time, from 5 s up to 60 s, instead
+  of retrying every 5 s forever while the app is closed or the browser is logged out of
+  YouTube. Reload the unpacked extension to pick this up.
+
+### Removed
+
+- The unused `GET /api/youtube-cookies/refresh-needed` endpoint. The beta extension uses
+  `refresh-wait`.
+
 ## [2026.9.30-rc3] — 2026-10-16
 
 Fixes on top of `2026.9.30-rc2`. (`fe32cc3`)

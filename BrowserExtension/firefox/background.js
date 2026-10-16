@@ -26,21 +26,36 @@ function isYouTubeUrl(url) {
 // and click Send. This runs regardless of the auto-share toggle, because it only ever sends
 // when the app (i.e. the user, via the app) explicitly asks. The loop re-arms itself; the
 // alarm/startup hooks restart it if it ever stops.
+// Waits after a failure grow from 5 s to a 60 s cap (the alarm period, so a suspended worker
+// loses nothing by sleeping through them) and reset once the app answers normally or cookies
+// go through. That covers the app not running and the app asking while the browser is logged
+// out of YouTube, both of which otherwise retried every 5 s indefinitely.
+const MIN_BACKOFF_MS = 5000;
+const MAX_BACKOFF_MS = 60000;
 let refreshLooping = false;
 async function refreshLoop() {
   if (refreshLooping) return;
   refreshLooping = true;
+  let backoff = MIN_BACKOFF_MS;
+  const failed = async () => {
+    await delay(backoff);
+    backoff = Math.min(backoff * 2, MAX_BACKOFF_MS);
+  };
   try {
     while (true) {
       try {
         const res = await fetch(ENDPOINT + "/refresh-wait", { headers: EXT_HEADER });
-        if (res.ok && (await res.text()).trim() === "1") {
-          // If we couldn't send (e.g. not logged in), back off so we don't hot-loop while
-          // the app keeps asking.
-          if ((await sendCookies()) !== "ok") await delay(5000);
+        if (!res.ok) {
+          await failed();
+        } else if ((await res.text()).trim() !== "1") {
+          backoff = MIN_BACKOFF_MS;
+        } else if ((await sendCookies()) === "ok") {
+          backoff = MIN_BACKOFF_MS;
+        } else {
+          await failed(); // Not logged in, or the app rejected them.
         }
       } catch (e) {
-        await delay(5000); // App not running — retry later.
+        await failed(); // App not running.
       }
     }
   } finally {

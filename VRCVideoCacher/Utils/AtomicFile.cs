@@ -22,15 +22,32 @@ public static class AtomicFile
     // removes any chance of two writers interleaving on the same temp path.
     private static readonly object WriteLock = new();
 
-    public static void WriteAllText(string path, string contents)
+    /// <param name="unixMode">
+    /// Unix permissions for the file, or null for the defaults; ignored on Windows. The temp
+    /// file is created with them, so the contents are never on disk with wider permissions,
+    /// and the rename carries them over to <paramref name="path"/>.
+    /// </param>
+    public static void WriteAllText(string path, string contents, UnixFileMode? unixMode = null)
     {
         var tempPath = path + ".tmp";
+        var options = new FileStreamOptions { Mode = FileMode.Create, Access = FileAccess.Write, Share = FileShare.None };
+        var useUnixMode = false;
+        if (unixMode is { } mode && !OperatingSystem.IsWindows())
+        {
+            options.UnixCreateMode = mode;
+            useUnixMode = true;
+        }
 
         lock (WriteLock)
         {
             try
             {
-                using (var stream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                // The create mode only applies to a new file; a temp left by a crash would
+                // keep its old permissions.
+                if (useUnixMode)
+                    File.Delete(tempPath);
+
+                using (var stream = new FileStream(tempPath, options))
                 using (var writer = new StreamWriter(stream))
                 {
                     writer.Write(contents);

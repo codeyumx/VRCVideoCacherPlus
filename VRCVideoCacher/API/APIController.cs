@@ -54,7 +54,6 @@ public class ApiController : WebApiController
     // cookies, regardless of which Chromium-based browser the user has the extension in.
     [Route(HttpVerbs.Options, "/youtube-cookies")]
     [Route(HttpVerbs.Options, "/youtube-cookies/refresh-wait")]
-    [Route(HttpVerbs.Options, "/youtube-cookies/refresh-needed")]
     public Task ReceiveYoutubeCookiesOptions()
     {
         ApplyCorsHeaders();
@@ -63,17 +62,6 @@ public class ApiController : WebApiController
         HttpContext.Response.Headers["Access-Control-Max-Age"] = "86400";
         HttpContext.Response.StatusCode = 204;
         return Task.CompletedTask;
-    }
-
-    // [NEW EXTENSION ONLY] New extension polls this; "1" means the app wants fresh cookies
-    // pushed (e.g. just started). Only the new extension is answered "1" — anything without
-    // the header (including the old extension) gets "0", so the old extension is unaffected.
-    [Route(HttpVerbs.Get, "/youtube-cookies/refresh-needed")]
-    public async Task CookieRefreshNeeded()
-    {
-        ApplyCorsHeaders();
-        var needed = _cookieRefreshRequested && IsNewExtension;
-        await HttpContext.SendStringAsync(needed ? "1" : "0", "text/plain", Encoding.UTF8);
     }
 
     // [NEW EXTENSION ONLY] Long-poll: the new extension holds this open; it returns "1" the
@@ -135,7 +123,7 @@ public class ApiController : WebApiController
             return;
         }
 
-        await File.WriteAllTextAsync(YtdlManager.CookiesPath, cookies);
+        Program.WriteCookieFile(cookies);
         // Only the new extension participates in the refresh-flag lifecycle; the old
         // extension's POST is handled identically to before (it never touches this flag).
         if (IsNewExtension)

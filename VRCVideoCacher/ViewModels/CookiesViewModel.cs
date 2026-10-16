@@ -214,7 +214,7 @@ public partial class CookiesViewModel : ViewModelBase
             return;
         }
 
-        await File.WriteAllTextAsync(YtdlManager.CookiesPath, cookies);
+        Program.WriteCookieFile(cookies);
         Program.NotifyCookiesUpdated();
 
         var live = await Program.ValidateCookiesAsync();

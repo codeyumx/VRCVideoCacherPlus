@@ -374,16 +374,14 @@ internal sealed class Program
         return IsCookiesValid(cookies);
     }
 
-    public static bool IsCookiesValid(string cookies)
-    {
-        if (string.IsNullOrEmpty(cookies))
-            return false;
+    public static bool IsCookiesValid(string cookies) =>
+        !string.IsNullOrEmpty(cookies) && CookieFile.HasYouTubeLogin(cookies.Split('\n'));
 
-        if (cookies.Contains("youtube.com") && cookies.Contains("LOGIN_INFO"))
-            return true;
-
-        return false;
-    }
+    // The jar is a live YouTube session, so it is written owner-only on Unix (yt-dlp runs as
+    // the same user), and atomically, so yt-dlp never reads a half-written file and two
+    // browsers answering the same refresh cannot interleave.
+    public static void WriteCookieFile(string cookies) =>
+        AtomicFile.WriteAllText(YtdlManager.CookiesPath, cookies, UnixFileMode.UserRead | UnixFileMode.UserWrite);
 
     // Expiry of the login cookie on disk, or null when there is no cookie file or no
     // expiring LOGIN_INFO line. Parsing rules live in CookieFile.
