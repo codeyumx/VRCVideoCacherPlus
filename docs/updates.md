@@ -28,6 +28,10 @@ bottom as tags only. The fork's own releases start at `2026.6.17`.
 
 ## Unreleased
 
+## [2026.9.30-rc6] — 2026-10-16
+
+`2026.9.30-rc5` with the Chrome extension as a `.zip`. (`fd0ca40`)
+
 ### Changed
 
 - Releases attach the Chrome extension as a `.zip` to extract and load unpacked, instead of a
