@@ -27,6 +27,10 @@ bottom as tags only. The fork's own releases start at `2026.6.17`.
 
 ## Unreleased
 
+## [2026.9.30-rc4] — 2026-10-16
+
+Cookie hardening on top of `2026.9.30-rc3`. (`8b9fd65`)
+
 ### Fixed
 
 - **Cookies:** an upload or pasted cookie file is accepted only if it has an actual
