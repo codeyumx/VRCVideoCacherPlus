@@ -27,6 +27,10 @@ bottom as tags only. The fork's own releases start at `2026.6.17`.
 
 ## Unreleased
 
+## [2026.9.30-rc3] — 2026-10-16
+
+Fixes on top of `2026.9.30-rc2`. (`fe32cc3`)
+
 ### Fixed
 
 - **YouTube URLs:** channel live pages (`/@handle/live`) no longer become `watch?v=live` and fail
