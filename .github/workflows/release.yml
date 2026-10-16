@@ -2,7 +2,7 @@ name: Release
 
 # Publishes a release for a bare version tag such as `2026.8.14`; a tag carrying a suffix,
 # `2026.9.1-rc1`, publishes as a pre-release. Each release attaches both app binaries and the
-# browser extension (signed Chrome .crx, Firefox .xpi).
+# browser extension (Chrome .zip to load unpacked, Firefox .xpi).
 #
 #   push a tag `2026.8.14`             publishes it
 #   push a tag `2026.9.1-rc1`          publishes it as a pre-release (any tag with a suffix)
@@ -104,9 +104,10 @@ jobs:
           path: out/yt-dlp-stub/yt-dlp-stub.exe
           if-no-files-found: error
 
-  # The browser extension ships with every release: the signed Chrome .crx and the Firefox
-  # .xpi. The .crx is signed with the CHROME_EXTENSION_PEM secret; the key is the extension's
-  # identity, so a release without it fails here instead of publishing an unsigned build.
+  # The browser extension ships with every release, in the forms users can actually load: a
+  # Chrome .zip to extract and "Load unpacked" (Chromium browsers refuse a .crx from outside
+  # their store, even dragged in) and the Firefox .xpi for "Load Temporary Add-on". No signing
+  # key is involved; extension.yml still builds a signed .crx on demand.
   extension:
     name: browser extension
     needs: version
@@ -116,23 +117,14 @@ jobs:
         with:
           ref: ${{ inputs.tag || github.ref }}
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Package and sign
-        env:
-          CHROME_EXTENSION_PEM: ${{ secrets.CHROME_EXTENSION_PEM }}
-        run: |
-          set -euo pipefail
-          [ -n "$CHROME_EXTENSION_PEM" ] || { echo "::error::CHROME_EXTENSION_PEM is not set"; exit 1; }
-          ./BrowserExtension/build.sh
+      - name: Package
+        run: ./BrowserExtension/build.sh
 
       - uses: actions/upload-artifact@v4
         with:
           name: browser-extension
           path: |
-            dist/VRCVideoCacherPlus-chrome-*.crx
+            dist/VRCVideoCacherPlus-chrome-*.zip
             dist/VRCVideoCacherPlus-firefox-*.xpi
           if-no-files-found: error
 
@@ -271,8 +263,8 @@ jobs:
           fi
 
           shopt -s nullglob
-          extension=(assets/extension/*.crx assets/extension/*.xpi)
-          [ "${#extension[@]}" -eq 2 ] || { echo "::error::expected one .crx and one .xpi, got: ${extension[*]}"; exit 1; }
+          extension=(assets/extension/*.zip assets/extension/*.xpi)
+          [ "${#extension[@]}" -eq 2 ] || { echo "::error::expected one .zip and one .xpi, got: ${extension[*]}"; exit 1; }
 
           gh release create "$TAG" \
             "assets/VRCVideoCacherPlus.exe/VRCVideoCacherPlus.exe" \

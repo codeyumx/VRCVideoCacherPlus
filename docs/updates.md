@@ -5,10 +5,10 @@ It caches the videos VRChat plays so they can be replayed from disk instead of r
 
 Releases are bare version tags — `2026.8.14` — that match `<Version>` in
 `VRCVideoCacher/VRCVideoCacher.csproj`, and each one attaches `VRCVideoCacherPlus.exe` (win-x64),
-`VRCVideoCacherPlus` (linux-x64) and the browser extension (`VRCVideoCacherPlus-chrome-*.crx`,
-signed, and `VRCVideoCacherPlus-firefox-*.xpi`); a tag carrying a suffix, `2026.9.1-rc1`, is a
+`VRCVideoCacherPlus` (linux-x64) and the browser extension (`VRCVideoCacherPlus-chrome-*.zip` to
+load unpacked, and `VRCVideoCacherPlus-firefox-*.xpi`); a tag carrying a suffix, `2026.9.1-rc1`, is a
 pre-release. A GitHub Actions workflow (`.github/workflows/release.yml`) publishes them: pushing
-a tag builds both binaries and the signed extension and publishes the release. Newest release first; every entry
+a tag builds both binaries and the extension packages and publishes the release. Newest release first; every entry
 names the commits it came from so the history stays checkable.
 
 Everything up to and including `2026.5.2` is upstream work the fork merged in, listed at the
@@ -27,6 +27,12 @@ bottom as tags only. The fork's own releases start at `2026.6.17`.
 ---
 
 ## Unreleased
+
+### Changed
+
+- Releases attach the Chrome extension as a `.zip` to extract and load unpacked, instead of a
+  `.crx`. Chromium browsers, Brave included, refuse a `.crx` from outside their store even
+  when it is dragged in. The Firefox `.xpi` stays.
 
 ## [2026.9.30-rc5] — 2026-10-16
 

@@ -16,17 +16,20 @@ The VRCVideoCacherPlus extensions ([BrowserExtension/](BrowserExtension/)) are i
 <details>
 <summary>How to install the unpacked extension (Chrome / Firefox)</summary>
 
-Download or clone this repo so you have the `BrowserExtension/` folder locally.
+Download the extension from the [latest release](https://github.com/codeyumx/VRCVideoCacherPlus/releases): `VRCVideoCacherPlus-chrome-*.zip` or `VRCVideoCacherPlus-firefox-*.xpi`. You can also clone this repo and use the `BrowserExtension/` folder.
 
 **Chrome (and Chromium-based browsers like Edge, Brave):**
-1. Open `chrome://extensions`
-2. Enable **Developer mode** (top right)
-3. Click **Load unpacked** and select the `BrowserExtension/chrome/` folder OR drag and drop the `BrowserExtension/chrome/` into the extensions window
+1. Extract `VRCVideoCacherPlus-chrome-*.zip` into a folder you'll keep. The browser loads it from there, so don't delete it.
+2. Open `chrome://extensions`
+3. Enable **Developer mode** (top right)
+4. Click **Load unpacked** and select the extracted folder (the one containing `manifest.json`), or `BrowserExtension/chrome/` from a clone
+
+Chromium browsers only install a `.crx` from their web store, so there is no `.crx` in the release.
 
 **Firefox:**
 1. Open `about:debugging#/runtime/this-firefox`
-2. Click **Load Temporary Add-on…** and select `BrowserExtension/firefox/manifest.json`
-3. Note: temporary add-ons are removed when Firefox closes and must be re-loaded each time. For a persistent install, use [Firefox Developer Edition or Nightly](https://www.mozilla.org/firefox/channel/desktop/) with `xpinstall.signatures.required` set to `false` in `about:config`, zip the `BrowserExtension/firefox/` folder contents, and install the zip via `about:addons`
+2. Click **Load Temporary Add-on…** and select the downloaded `.xpi`, or `BrowserExtension/firefox/manifest.json` from a clone
+3. Note: temporary add-ons are removed when Firefox closes and must be re-loaded each time. For a persistent install, use [Firefox Developer Edition or Nightly](https://www.mozilla.org/firefox/channel/desktop/) with `xpinstall.signatures.required` set to `false` in `about:config`, and install the `.xpi` via `about:addons`
 
 </details>
 
