@@ -107,10 +107,10 @@ public static class ConnectionSevering
             return;
         }
 
-        var (severed, outcome) = SeverRemoteAsync(addresses).GetAwaiter().GetResult();
-        Log.Information("Elevated sever helper closed {Count} socket(s): {Outcome}", severed, outcome);
+        var remote = SeverRemoteAsync(addresses).GetAwaiter().GetResult();
+        Log.Information("Elevated sever helper closed {Count} socket(s): {Outcome}", remote.Severed, remote.Outcome);
 
-        Environment.Exit(outcome switch
+        Environment.Exit(remote.Outcome switch
         {
             SeverOutcome.Severed => HelperSevered,
             SeverOutcome.NothingToDo => HelperNothingToDo,
@@ -136,20 +136,20 @@ public static class ConnectionSevering
             Log.Information("Closed {Count} cached-video stream(s) served by this application.", localClosed);
 
         var targets = YTDL.ActiveStreamTracker.GetActiveVideoIps();
-        var (severed, outcome) = await SeverRemoteAsync(targets);
+        var remote = await SeverRemoteAsync(targets);
 
-        if (outcome == SeverOutcome.NotPermitted && allowElevation)
-            (severed, outcome) = await SeverElevatedAsync(targets);
+        if (remote.Outcome == SeverOutcome.NotPermitted && allowElevation)
+            remote = await SeverElevatedAsync(targets);
 
-        // Only what this call dealt with: clearing the whole set would drop connections tracked
-        // while the (possibly prompted, possibly elevated) sever was in flight, and they would
-        // never be severed at all.
-        if (severed > 0)
-            YTDL.ActiveStreamTracker.RemoveActiveVideoIps(targets);
+        // Only the addresses that were actually closed. Clearing the whole set would drop
+        // connections tracked while the (possibly prompted, possibly elevated) sever was in
+        // flight, and dropping targets that were not matched or failed to close would make
+        // them unseverable by the next attempt.
+        YTDL.ActiveStreamTracker.RemoveActiveVideoIps(remote.SeveredAddresses);
 
-        LogOutcome(outcome, severed, targets.Count);
+        LogOutcome(remote.Outcome, remote.Severed, targets.Count);
 
-        return new SeverResult(localClosed, severed, outcome);
+        return new SeverResult(localClosed, remote.Severed, remote.Outcome);
     }
 
     /// <summary>
@@ -171,13 +171,13 @@ public static class ConnectionSevering
             return new SeverResult(closed, 0, SeverOutcome.NothingToDo);
         }
 
-        var (severed, outcome) = await SeverRemoteAsync([address]);
+        var remote = await SeverRemoteAsync([address]);
 
-        if (outcome == SeverOutcome.NotPermitted && allowElevation)
-            (severed, outcome) = await SeverElevatedAsync([address]);
+        if (remote.Outcome == SeverOutcome.NotPermitted && allowElevation)
+            remote = await SeverElevatedAsync([address]);
 
-        LogOutcome(outcome, severed, 1);
-        return new SeverResult(0, severed, outcome);
+        LogOutcome(remote.Outcome, remote.Severed, 1);
+        return new SeverResult(0, remote.Severed, remote.Outcome);
     }
 
     /// <summary>
@@ -188,7 +188,7 @@ public static class ConnectionSevering
     /// Users who would rather never see the prompt can grant the capability once instead;
     /// <see cref="CapabilityHint"/> spells out how.
     /// </summary>
-    private static async Task<(int, SeverOutcome)> SeverElevatedAsync(IReadOnlyCollection<string> addresses)
+    private static async Task<RemoteSever> SeverElevatedAsync(IReadOnlyCollection<string> addresses)
     {
         var targets = addresses
             .Where(a => IPAddress.TryParse(a, out _))
@@ -196,7 +196,7 @@ public static class ConnectionSevering
             .ToList();
 
         if (targets.Count == 0)
-            return (0, SeverOutcome.NothingToDo);
+            return RemoteSever.None(SeverOutcome.NothingToDo);
 
         Log.Information("Requesting elevated privileges to close {Count} connection(s).", targets.Count);
 
@@ -208,31 +208,33 @@ public static class ConnectionSevering
             // No elevation mechanism, or the user dismissed the prompt. Either way the
             // original refusal still stands — say so rather than inventing a new failure.
             Log.Information("Elevation was declined or unavailable. {Hint}", CapabilityHint);
-            return (0, SeverOutcome.NotPermitted);
+            return RemoteSever.None(SeverOutcome.NotPermitted);
         }
 
         switch (exitCode)
         {
             case HelperSevered:
-                // The helper does not report a count across the process boundary; one
-                // confirmed close is enough for the UI to say the connection was cut.
-                return (targets.Count, SeverOutcome.Severed);
+                // The helper reports neither a count nor which addresses it closed across the
+                // process boundary. One close is all that is confirmed, and no address is
+                // reported as severed: leaving a closed one tracked costs a no-op retry, while
+                // dropping one still open would make it unseverable.
+                return new RemoteSever(1, SeverOutcome.Severed, []);
             case HelperNothingToDo:
-                return (0, SeverOutcome.NothingToDo);
+                return RemoteSever.None(SeverOutcome.NothingToDo);
             case HelperUnsupported:
-                return (0, SeverOutcome.Unsupported);
+                return RemoteSever.None(SeverOutcome.Unsupported);
             case HelperNotPermitted:
                 Log.Warning("Even with elevation the kernel refused to close the connection.");
-                return (0, SeverOutcome.NotPermitted);
+                return RemoteSever.None(SeverOutcome.NotPermitted);
             case PkexecNotAuthorized:
             case PkexecNoAuthorization:
                 Log.Information("Elevation was declined or unavailable (pkexec exit {Code}). {Hint}", exitCode, CapabilityHint);
-                return (0, SeverOutcome.NotPermitted);
+                return RemoteSever.None(SeverOutcome.NotPermitted);
             default:
                 // Includes 0: a wrapper that returns before the helper has run (terminal
                 // emulators detach) says nothing about whether anything was closed.
                 Log.Warning("Elevated sever helper exited with {Code}; the result is unconfirmed.", exitCode);
-                return (0, SeverOutcome.Failed);
+                return RemoteSever.None(SeverOutcome.Failed);
         }
     }
 
@@ -285,10 +287,35 @@ public static class ConnectionSevering
         }
     }
 
-    private static async Task<(int Severed, SeverOutcome Outcome)> SeverRemoteAsync(IReadOnlyCollection<string> addresses)
+    /// <summary>
+    /// What a remote sever closed. <see cref="SeveredAddresses"/> lists only the target
+    /// addresses at least one socket was actually closed for, so callers never forget an
+    /// address that was unmatched, refused or failed.
+    /// </summary>
+    private readonly record struct RemoteSever(int Severed, SeverOutcome Outcome, IReadOnlyCollection<string> SeveredAddresses)
+    {
+        public static RemoteSever None(SeverOutcome outcome) => new(0, outcome, []);
+    }
+
+    /// <summary>
+    /// Folds per-socket attempts into one outcome: any close is a success; otherwise a refusal
+    /// is reported as such (it is what an elevation prompt can fix); otherwise any other
+    /// failure; and only when nothing was attempted, nothing to do.
+    /// </summary>
+    internal static SeverOutcome ClassifyAttempts(int severed, bool denied, bool failed)
+    {
+        if (severed > 0)
+            return SeverOutcome.Severed;
+        if (denied)
+            return SeverOutcome.NotPermitted;
+
+        return failed ? SeverOutcome.Failed : SeverOutcome.NothingToDo;
+    }
+
+    private static async Task<RemoteSever> SeverRemoteAsync(IReadOnlyCollection<string> addresses)
     {
         if (addresses.Count == 0)
-            return (0, SeverOutcome.NothingToDo);
+            return RemoteSever.None(SeverOutcome.NothingToDo);
 
         if (OperatingSystem.IsWindows())
         {
@@ -300,7 +327,7 @@ public static class ConnectionSevering
             var v6 = addresses.Where(IsIpV6).ToList();
             var v4 = addresses.Where(a => !IsIpV6(a)).ToList();
 
-            var result = v4.Count > 0 ? SeverRemoteWindows(v4) : (0, SeverOutcome.NothingToDo);
+            var result = v4.Count > 0 ? SeverRemoteWindows(v4) : RemoteSever.None(SeverOutcome.NothingToDo);
 
             if (v6.Count > 0)
             {
@@ -310,8 +337,8 @@ public static class ConnectionSevering
 
                 // Only downgrade when nothing else happened — an IPv4 sever that worked is
                 // still a success, it just did not cover everything.
-                if (result.Item2 == SeverOutcome.NothingToDo)
-                    result = (result.Item1, SeverOutcome.Unsupported);
+                if (result.Outcome == SeverOutcome.NothingToDo)
+                    result = result with { Outcome = SeverOutcome.Unsupported };
             }
 
             return result;
@@ -320,7 +347,7 @@ public static class ConnectionSevering
         if (OperatingSystem.IsLinux())
             return await SeverRemoteLinuxAsync(addresses);
 
-        return (0, SeverOutcome.Unsupported);
+        return RemoteSever.None(SeverOutcome.Unsupported);
     }
 
     private static bool IsIpV6(string address) =>
@@ -328,28 +355,31 @@ public static class ConnectionSevering
         parsed.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6;
 
     [SupportedOSPlatform("windows")]
-    private static (int, SeverOutcome) SeverRemoteWindows(IReadOnlyCollection<string> addresses)
+    private static RemoteSever SeverRemoteWindows(IReadOnlyCollection<string> addresses)
     {
-        var processes = NetworkConnections.GetVrChatProcesses();
+        // Fresh, not the UI's cached list: a restarted VRChat would be missed, and a PID
+        // reused by another process since the last lookup would be targeted.
+        var processes = NetworkConnections.GetVrChatProcesses(bypassCache: true);
         if (processes.Count == 0)
-            return (0, SeverOutcome.NothingToDo);
+            return RemoteSever.None(SeverOutcome.NothingToDo);
 
         var wanted = new HashSet<string>(addresses, StringComparer.OrdinalIgnoreCase);
+        var severedAddresses = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var severed = 0;
         var denied = false;
-        var attempted = 0;
+        var failed = false;
 
         const int afInet = 2;
         uint bufferSize = 0;
         GetExtendedTcpTable(IntPtr.Zero, ref bufferSize, false, afInet, TCP_TABLE_CLASS.TCP_TABLE_OWNER_PID_ALL);
         if (bufferSize == 0)
-            return (0, SeverOutcome.NothingToDo);
+            return RemoteSever.None(SeverOutcome.NothingToDo);
 
         var buffer = Marshal.AllocHGlobal((int)bufferSize);
         try
         {
             if (GetExtendedTcpTable(buffer, ref bufferSize, false, afInet, TCP_TABLE_CLASS.TCP_TABLE_OWNER_PID_ALL) != 0)
-                return (0, SeverOutcome.Failed);
+                return RemoteSever.None(SeverOutcome.Failed);
 
             var count = Marshal.ReadInt32(buffer);
             var rowPtr = buffer + sizeof(int);
@@ -364,10 +394,9 @@ public static class ConnectionSevering
                     continue;
 
                 var remote = new IPAddress((long)row.dwRemoteAddr).ToString();
-                if (!wanted.Contains(remote))
+                if (!wanted.TryGetValue(remote, out var target))
                     continue;
 
-                attempted++;
                 var closing = new MIB_TCPROW
                 {
                     dwState = MIB_TCP_STATE.MIB_TCP_STATE_DELETE_TCB,
@@ -381,15 +410,21 @@ public static class ConnectionSevering
                 if (result.Succeeded)
                 {
                     severed++;
+                    severedAddresses.Add(target);
                     continue;
                 }
 
                 // ERROR_ACCESS_DENIED is the ordinary outcome without elevation, and it is
                 // the whole reason this feature appears to do nothing for most users.
                 if (result == Win32Error.ERROR_ACCESS_DENIED)
+                {
                     denied = true;
+                }
                 else
+                {
+                    failed = true;
                     Log.Debug("SetTcpEntry failed for PID {Pid}: {Error}", row.dwOwningPid, result);
+                }
             }
         }
         finally
@@ -397,22 +432,19 @@ public static class ConnectionSevering
             Marshal.FreeHGlobal(buffer);
         }
 
-        if (severed > 0)
-            return (severed, SeverOutcome.Severed);
-        if (denied)
-            return (0, SeverOutcome.NotPermitted);
-
-        return (0, attempted == 0 ? SeverOutcome.NothingToDo : SeverOutcome.Failed);
+        return new RemoteSever(severed, ClassifyAttempts(severed, denied, failed), severedAddresses);
     }
 
-    private static async Task<(int, SeverOutcome)> SeverRemoteLinuxAsync(IReadOnlyCollection<string> addresses)
+    private static async Task<RemoteSever> SeverRemoteLinuxAsync(IReadOnlyCollection<string> addresses)
     {
         // `ss -K` alone destroys every matching socket on the machine, so it is aimed at
         // VRChat's sockets only, resolved through procfs (readable as the owning user, and as
         // root in the elevated helper).
         var sockets = NetworkConnections.ListVrChatSocketsLinux();
+        var severedAddresses = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var severed = 0;
         var denied = false;
+        var failed = false;
 
         foreach (var address in addresses)
         {
@@ -421,29 +453,29 @@ public static class ConnectionSevering
 
             foreach (var socket in sockets.Where(s => SameAddress(s.RemoteAddress, address)))
             {
-                var outcome = await RunSsKillAsync(BuildSsKillArgs(socket.RemoteAddress, socket.LocalPort, socket.RemotePort), address);
+                var args = BuildSsKillArgs(socket.LocalAddress, socket.LocalPort, socket.RemoteAddress, socket.RemotePort);
+                var outcome = await RunSsKillAsync(args, address);
 
                 switch (outcome)
                 {
                     case SeverOutcome.Severed:
                         severed++;
+                        severedAddresses.Add(address);
                         break;
                     case SeverOutcome.NotPermitted:
                         denied = true;
                         break;
+                    case SeverOutcome.Failed:
+                        failed = true;
+                        break;
                     case SeverOutcome.Unsupported:
                         // ss is not installed; no point trying the remaining sockets.
-                        return (severed, severed > 0 ? SeverOutcome.Severed : SeverOutcome.Unsupported);
+                        return new RemoteSever(severed, severed > 0 ? SeverOutcome.Severed : SeverOutcome.Unsupported, severedAddresses);
                 }
             }
         }
 
-        if (severed > 0)
-            return (severed, SeverOutcome.Severed);
-        if (denied)
-            return (0, SeverOutcome.NotPermitted);
-
-        return (0, SeverOutcome.NothingToDo);
+        return new RemoteSever(severed, ClassifyAttempts(severed, denied, failed), severedAddresses);
     }
 
     /// <summary>Compares addresses as addresses, so an IPv4-mapped IPv6 form equals its IPv4 form.</summary>
@@ -465,17 +497,23 @@ public static class ConnectionSevering
     /// a host:port separator, so `dst 2001:db8::1` is rejected with
     /// "an inet prefix is expected rather than 2001:db8:" and nothing is closed. Brackets
     /// disambiguate it, and IPv4 is unaffected either way — so this is the whole of IPv6
-    /// support on Linux.
+    /// support on Linux. Applies equally to `src` and `dst`.
     /// </summary>
-    internal static string FormatSsDestination(string address) =>
+    internal static string FormatSsAddress(string address) =>
         IsIpV6(address) ? $"[{address}]" : address;
 
     /// <summary>
-    /// The `ss` arguments that destroy exactly one socket: the remote address plus both ports
-    /// pin it to a single VRChat connection.
+    /// The `ss` arguments that destroy exactly one socket: both endpoints — local and remote
+    /// address plus both ports — pin it to a single VRChat connection.
     /// </summary>
-    internal static string[] BuildSsKillArgs(string remoteAddress, int localPort, int remotePort) =>
-        ["-t", "-K", "dst", FormatSsDestination(remoteAddress), "sport", "=", $":{localPort}", "dport", "=", $":{remotePort}"];
+    internal static string[] BuildSsKillArgs(string localAddress, int localPort, string remoteAddress, int remotePort) =>
+    [
+        "-t", "-K",
+        "src", FormatSsAddress(localAddress),
+        "dst", FormatSsAddress(remoteAddress),
+        "sport", "=", $":{localPort}",
+        "dport", "=", $":{remotePort}"
+    ];
 
     /// <summary>
     /// Runs `ss -K` with <paramref name="args"/> and works out what really happened.

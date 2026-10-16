@@ -60,6 +60,23 @@ internal sealed class Program
              (processName.Length == 15 && name.Length > 15 &&
               name.StartsWith(processName, StringComparison.OrdinalIgnoreCase))));
 
+    /// <summary>
+    /// Whether a process from a scan is another running instance of this app. Reading a
+    /// process's properties throws once it has exited, and processes exit mid-scan all the
+    /// time; such a process is not an instance to kill, and must not abort the scan.
+    /// </summary>
+    internal static bool IsOtherInstance(Process process, IEnumerable<string> imageNames)
+    {
+        try
+        {
+            return process.Id != Environment.ProcessId && MatchesImageName(process.ProcessName, imageNames);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or NotSupportedException)
+        {
+            return false;
+        }
+    }
+
     private static readonly CancellationTokenSource ShutdownCts = new();
 
     /// <summary>
@@ -148,13 +165,11 @@ internal sealed class Program
                 };
                 foreach (var process in Process.GetProcesses())
                 {
-                    if (process.Id == Environment.ProcessId || !MatchesImageName(process.ProcessName, imageNames))
-                    {
-                        process.Dispose();
-                        continue;
-                    }
                     try
                     {
+                        if (!IsOtherInstance(process, imageNames))
+                            continue;
+
                         process.Kill();
                         process.WaitForExit(5000);
                         Logger.Information("Killed existing instance with PID {Pid} due to kill existing instance argument.", process.Id);
@@ -163,7 +178,10 @@ internal sealed class Program
                     {
                         Logger.Warning(ex, "Failed to kill existing instance with PID {Pid}.", process.Id);
                     }
-                    process.Dispose();
+                    finally
+                    {
+                        process.Dispose();
+                    }
                 }
                 // Re-acquire after the holder has fully exited and released its mutex handle.
                 _singleInstanceMutex?.Dispose();
@@ -396,10 +414,11 @@ internal sealed class Program
             var lines = await File.ReadAllLinesAsync(YtdlManager.CookiesPath);
             foreach (var line in lines)
             {
-                if (string.IsNullOrWhiteSpace(line) || line.StartsWith('#'))
+                var row = CookieFile.AsCookieRow(line);
+                if (row == null)
                     continue;
 
-                var parts = line.Split('\t');
+                var parts = row.Split('\t');
                 if (parts.Length < 7)
                     continue;
 

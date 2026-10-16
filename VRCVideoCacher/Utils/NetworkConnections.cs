@@ -31,14 +31,22 @@ public static class NetworkConnections
     private static DateTime _pidsCachedAt = DateTime.MinValue;
 
     /// <summary>
-    /// VRChat's PIDs mapped to process names. Cached for a few seconds.
+    /// VRChat's PIDs mapped to process names. Cached for a few seconds for the UI refresh.
     /// </summary>
-    public static Dictionary<int, string> GetVrChatProcesses()
+    /// <param name="bypassCache">
+    /// Enumerate now rather than trust the cache. Severing must: within the cache lifetime a
+    /// restarted VRChat would be missed, and a PID reused by another process would be
+    /// targeted. The fresh result replaces the cache.
+    /// </param>
+    public static Dictionary<int, string> GetVrChatProcesses(bool bypassCache = false)
     {
-        lock (PidCacheLock)
+        if (!bypassCache)
         {
-            if (DateTime.UtcNow - _pidsCachedAt < PidCacheLifetime)
-                return _cachedPids;
+            lock (PidCacheLock)
+            {
+                if (DateTime.UtcNow - _pidsCachedAt < PidCacheLifetime)
+                    return _cachedPids;
+            }
         }
 
         var found = new Dictionary<int, string>();
@@ -198,14 +206,16 @@ public static class NetworkConnections
     /// <summary>
     /// Every TCP socket owned by VRChat regardless of port, un-annotated. Severing works from
     /// this rather than <see cref="List"/> so a CDN on a non-standard port is still found, and
-    /// so `ss` can be pointed at exactly VRChat's sockets and nobody else's.
+    /// so `ss` can be pointed at exactly VRChat's sockets and nobody else's. The PIDs are
+    /// looked up fresh for the same reason they are on Windows.
     /// </summary>
-    internal static List<ActiveConnectionInfo> ListVrChatSocketsLinux() => ListLinux(onlyInterestingPorts: false);
+    internal static List<ActiveConnectionInfo> ListVrChatSocketsLinux() =>
+        ListLinux(onlyInterestingPorts: false, freshPids: true);
 
-    private static List<ActiveConnectionInfo> ListLinux(bool onlyInterestingPorts = true)
+    private static List<ActiveConnectionInfo> ListLinux(bool onlyInterestingPorts = true, bool freshPids = false)
     {
         var list = new List<ActiveConnectionInfo>();
-        var processes = GetVrChatProcesses();
+        var processes = GetVrChatProcesses(bypassCache: freshPids);
         if (processes.Count == 0)
             return list;
 

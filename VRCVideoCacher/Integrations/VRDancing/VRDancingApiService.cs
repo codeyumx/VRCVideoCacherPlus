@@ -20,7 +20,7 @@ public class VRDancingApiService
 
     private static async Task<VRDSongInfo?> GetVideoInfo(string code)
     {
-        var req = await HttpClient.GetAsync($"/api/v1/public/getsong?code={code}");
+        var req = await HttpClient.GetAsync($"/api/v1/public/getsong?code={Uri.EscapeDataString(code)}");
         var str = await req.Content.ReadAsStringAsync();
         // API sometimes returns a non-JSON error page (e.g. "error...") instead of a 4xx
         if (!req.IsSuccessStatusCode || !str.TrimStart().StartsWith('{'))

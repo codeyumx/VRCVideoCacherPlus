@@ -131,6 +131,11 @@ public partial class App : Application
 
     private bool _isExiting;
     private IClassicDesktopStyleApplicationLifetime? _desktop;
+
+    // Held for the app's lifetime: PosixSignalRegistration unregisters in its finalizer, so a
+    // discarded registration silently stops intercepting SIGTERM after the next GC.
+    private PosixSignalRegistration? _sigtermRegistration;
+
     private NativeMenuItem? _showItem;
     private NativeMenuItem? _videoPlayersItem;
     private NativeMenuItem? _openCacheItem;
@@ -184,7 +189,7 @@ public partial class App : Application
         // Avalonia state is cleaned up properly before the process exits.
         if (OperatingSystem.IsLinux())
         {
-            PosixSignalRegistration.Create(PosixSignal.SIGTERM, ctx =>
+            _sigtermRegistration = PosixSignalRegistration.Create(PosixSignal.SIGTERM, ctx =>
             {
                 ctx.Cancel = true; // suppress default immediate-kill behaviour
                 Dispatcher.UIThread.Post(() =>
@@ -195,6 +200,11 @@ public partial class App : Application
                     _desktop?.Shutdown();
                 });
             });
+            desktop.Exit += (_, _) =>
+            {
+                _sigtermRegistration?.Dispose();
+                _sigtermRegistration = null;
+            };
 
             //Pressing X on window does not remove the tray nor stop the console process
             MainWindow!.Closing += (_, _) =>

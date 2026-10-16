@@ -127,4 +127,42 @@ public class BulkPreCacheTests
 
         Assert.Empty(downloaded);
     }
+
+    // Manifest names are untrusted and the publish step overwrites, so only the cache's own
+    // "<videoId>.mp4|webm" form may get through — not traversal, and not other files that
+    // live in the cache folder such as index.html.
+    [Theory]
+    [InlineData("--QOnlGckhs.mp4")]
+    [InlineData("dQw4w9WgXcQ.webm")]
+    [InlineData("abc_DEF-123.MP4")]
+    [InlineData("4fGh7Jk9LmNoPqRsTuVwXyZ0aBcDeFgHiJkLmNoPq.mp4")]
+    public void AcceptsVideoCacheFileNames(string fileName)
+    {
+        Assert.True(BulkPreCache.IsSafeCacheFileName(fileName));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("index.html")]
+    [InlineData("video")]
+    [InlineData(".mp4")]
+    [InlineData("../evil.mp4")]
+    [InlineData("..\\evil.mp4")]
+    [InlineData("C:evil.mp4")]
+    [InlineData("/etc/evil.mp4")]
+    [InlineData("_tempVideo.abc.mp4")]
+    [InlineData("abc.mp4.exe")]
+    [InlineData("a b.mp4")]
+    [InlineData("abc.mp4 ")]
+    public void RejectsOtherFileNames(string? fileName)
+    {
+        Assert.False(BulkPreCache.IsSafeCacheFileName(fileName));
+    }
+
+    [Fact]
+    public void RejectsOverlongFileName()
+    {
+        Assert.False(BulkPreCache.IsSafeCacheFileName(new string('a', 200) + ".mp4"));
+    }
 }

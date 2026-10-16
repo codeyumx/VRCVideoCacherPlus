@@ -6,11 +6,13 @@ mkdir Build
 
 echo Building for Github Linux x64...
 dotnet publish VRCVideoCacher/VRCVideoCacher.csproj -c Release -r linux-x64 -o ./Build/linux-x64
+if errorlevel 1 exit /b 1
 
 echo Done!
 goto :eof
 ::BATCH
 # Linux/macOS -- run with: bash buildLinux.bat
+set -e
 rm -rf Build/linux-x64
 mkdir -p Build
 

@@ -12,18 +12,18 @@ public class ConnectionSeveringTests
     [InlineData("2001:db8::1", "[2001:db8::1]")]
     [InlineData("::1", "[::1]")]
     [InlineData("fe80::1ff:fe23:4567:890a", "[fe80::1ff:fe23:4567:890a]")]
-    public void BracketsIpV6Destinations(string address, string expected)
+    public void BracketsIpV6Addresses(string address, string expected)
     {
-        Assert.Equal(expected, ConnectionSevering.FormatSsDestination(address));
+        Assert.Equal(expected, ConnectionSevering.FormatSsAddress(address));
     }
 
     [Theory]
     [InlineData("1.2.3.4")]
     [InlineData("127.0.0.1")]
     [InlineData("172.217.16.142")]
-    public void LeavesIpV4DestinationsAlone(string address)
+    public void LeavesIpV4AddressesAlone(string address)
     {
-        Assert.Equal(address, ConnectionSevering.FormatSsDestination(address));
+        Assert.Equal(address, ConnectionSevering.FormatSsAddress(address));
     }
 
     [Fact]
@@ -31,7 +31,7 @@ public class ConnectionSeveringTests
     {
         // Never reaches ss — the elevated helper drops anything that is not an IP — but the
         // formatter must not invent brackets around whatever it is handed.
-        Assert.Equal("not-an-address", ConnectionSevering.FormatSsDestination("not-an-address"));
+        Assert.Equal("not-an-address", ConnectionSevering.FormatSsAddress("not-an-address"));
     }
 
     [Fact]
@@ -75,13 +75,26 @@ public class ConnectionSeveringTests
     public void SsKillIsScopedToOneSocket()
     {
         // `ss -K dst <ip>` alone would destroy that host's sockets for every process on the
-        // machine; the ports pin it to the one VRChat owns.
+        // machine; both endpoints — local address and port, remote address and port — pin it
+        // to the one VRChat owns.
         Assert.Equal(
-            ["-t", "-K", "dst", "1.2.3.4", "sport", "=", ":40000", "dport", "=", ":443"],
-            ConnectionSevering.BuildSsKillArgs("1.2.3.4", 40000, 443));
+            ["-t", "-K", "src", "192.168.1.10", "dst", "1.2.3.4", "sport", "=", ":40000", "dport", "=", ":443"],
+            ConnectionSevering.BuildSsKillArgs("192.168.1.10", 40000, "1.2.3.4", 443));
         Assert.Equal(
-            ["-t", "-K", "dst", "[2001:db8::1]", "sport", "=", ":50000", "dport", "=", ":80"],
-            ConnectionSevering.BuildSsKillArgs("2001:db8::1", 50000, 80));
+            ["-t", "-K", "src", "[2001:db8::10]", "dst", "[2001:db8::1]", "sport", "=", ":50000", "dport", "=", ":80"],
+            ConnectionSevering.BuildSsKillArgs("2001:db8::10", 50000, "2001:db8::1", 80));
+    }
+
+    // A socket that matched and failed to close for a reason other than permissions used to
+    // fall through to "nothing to do", telling the user there was nothing to cut.
+    [Theory]
+    [InlineData(1, true, true, SeverOutcome.Severed)]
+    [InlineData(0, true, true, SeverOutcome.NotPermitted)]
+    [InlineData(0, false, true, SeverOutcome.Failed)]
+    [InlineData(0, false, false, SeverOutcome.NothingToDo)]
+    public void ClassifiesSeverAttempts(int severed, bool denied, bool failed, SeverOutcome expected)
+    {
+        Assert.Equal(expected, ConnectionSevering.ClassifyAttempts(severed, denied, failed));
     }
 
     [Theory]

@@ -119,4 +119,38 @@ public class HlsManifestTests
     [InlineData("https://cdn.example.com/v/clip.mp4", false)]
     public void CanHandle_FastPathsOnTheM3u8Extension(string url, bool expected) =>
         Assert.Equal(expected, new HlsIntegration().CanHandle(new Uri(url)));
+
+    // ProbeKey is both the probe-cache key and the video id source: a query that selects
+    // content must split it, while rotating signatures must not.
+    [Fact]
+    public void ProbeKey_KeepsContentSelectingQueryParams() =>
+        Assert.NotEqual(
+            HlsIntegration.ProbeKey("https://cdn.example.com/manifest.m3u8?id=movie1"),
+            HlsIntegration.ProbeKey("https://cdn.example.com/manifest.m3u8?id=movie2"));
+
+    [Fact]
+    public void ProbeKey_IgnoresRotatingSigningParams() =>
+        Assert.Equal(
+            HlsIntegration.ProbeKey("https://cdn.example.com/manifest.m3u8?id=movie1&token=aaa&Expires=100&Signature=x&Key-Pair-Id=k"),
+            HlsIntegration.ProbeKey("https://cdn.example.com/manifest.m3u8?Expires=200&id=movie1&token=bbb&Signature=y&Key-Pair-Id=k"));
+
+    [Fact]
+    public void ProbeKey_IgnoresAwsSigV4Params() =>
+        Assert.Equal(
+            "https://bucket.s3.amazonaws.com/v/clip.m3u8",
+            HlsIntegration.ProbeKey("https://bucket.s3.amazonaws.com/v/clip.m3u8?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20260101T000000Z&x-amz-signature=abc"));
+
+    [Fact]
+    public void ProbeKey_IsIndependentOfParamOrder() =>
+        Assert.Equal(
+            HlsIntegration.ProbeKey("https://cdn.example.com/live.m3u8?b=2&a=1"),
+            HlsIntegration.ProbeKey("https://cdn.example.com/live.m3u8?a=1&b=2"));
+
+    [Theory]
+    [InlineData("https://cdn.example.com/v/clip.m3u8")]
+    [InlineData("https://cdn.example.com/v/clip.m3u8?")]
+    [InlineData("https://cdn.example.com/v/clip.m3u8?hdnts=exp%3D1~hmac%3Dab&st=1&e=2")]
+    [InlineData("https://cdn.example.com/v/clip.m3u8#frag")]
+    public void ProbeKey_IsThePathWhenNoContentParamsRemain(string url) =>
+        Assert.Equal("https://cdn.example.com/v/clip.m3u8", HlsIntegration.ProbeKey(url));
 }

@@ -95,18 +95,33 @@ public class VideoDownloader
 
     // On startup, wipe any leftover _tempVideo.* (including .part) from a prior crash.
     // Resume across process restarts isn't worth the risk of cross-video glue-ups.
+    // Bulk pre-cache scratch files (_tempBulk.*) are also cleaned, but the bulk pass is
+    // started before this type initialises and may be writing one right now, so only those
+    // last written before this process started are touched.
     private static void SweepStaleTempFiles()
     {
         try
         {
             if (!Directory.Exists(CacheManager.CachePath)) return;
             foreach (var path in Directory.EnumerateFiles(CacheManager.CachePath, $"{TempPrefix}*"))
+                TryDeleteStaleTemp(path);
+
+            DateTime processStartUtc;
+            using (var self = Process.GetCurrentProcess())
+                processStartUtc = self.StartTime.ToUniversalTime();
+            foreach (var path in Directory.EnumerateFiles(CacheManager.CachePath, $"{Utils.BulkPreCache.TempPrefix}*"))
             {
-                try { File.Delete(path); }
-                catch (Exception ex) { Log.Warning("Failed to remove stale temp {Path}: {Err}", path, ex.Message); }
+                if (File.GetLastWriteTimeUtc(path) < processStartUtc)
+                    TryDeleteStaleTemp(path);
             }
         }
         catch (Exception ex) { Log.Warning("Stale temp sweep failed: {Err}", ex.Message); }
+    }
+
+    private static void TryDeleteStaleTemp(string path)
+    {
+        try { File.Delete(path); }
+        catch (Exception ex) { Log.Warning("Failed to remove stale temp {Path}: {Err}", path, ex.Message); }
     }
 
     private static void OnStreamingActivity()

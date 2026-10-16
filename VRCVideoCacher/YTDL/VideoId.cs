@@ -62,28 +62,45 @@ public class VideoId
         return markers.Any(marker => error.Contains(marker, StringComparison.OrdinalIgnoreCase));
     }
 
-    private static async Task<(string Output, string Error, int ExitCode)> RunYtdlpAsync(List<string> args, string url, bool includeCookies = true)
+    private static async Task<(string Output, string Error, int ExitCode)> RunYtdlpAsync(List<string> args, string url, bool includeCookies = true, CancellationToken ct = default)
     {
+        // GenerateYtdlArgs appends to the list it is given, so build on a copy: callers
+        // retry with the same args, and reusing the list stacked a second "-- url" (and
+        // every flag after it) onto the retry.
         // "--" so a URL that happens to start with a dash is never taken for a flag.
         // Metadata runs have no use for progress output.
-        args.Add("--no-progress");
-        var arguments = YtdlManager.GenerateYtdlArgs(args, ["--", url], includeCookies);
+        var arguments = YtdlManager.GenerateYtdlArgs([.. args, "--no-progress"], ["--", url], includeCookies);
         Log.Information("Starting yt-dlp with args: {args:l}", string.Join(' ', arguments));
-        var (output, error, exitCode) = await ProcessRunner.RunAsync(YtdlManager.YtdlPath, arguments);
+        var (output, error, exitCode) = await ProcessRunner.RunAsync(YtdlManager.YtdlPath, arguments, ct);
         Log.Information("Finished yt-dlp");
         return (output, error, exitCode);
     }
 
-    public static async Task<VideoInfo?> GetVideoId(string url, bool avPro)
+    public static Task<VideoInfo?> GetVideoId(string url, bool avPro) =>
+        GetVideoId(Services.RuleEngine.EvaluateUrl(url), avPro);
+
+    /// <summary>
+    /// Resolves the URL a rule evaluation settled on. Callers that act on the evaluation
+    /// themselves (ApiController handles Block/Direct/Redirect) pass it in rather than the
+    /// URL, so the rules — Rewrites in particular — are not applied a second time to their
+    /// own output.
+    /// </summary>
+    public static async Task<VideoInfo?> GetVideoId(Services.RuleEvaluationResult evaluation, bool avPro)
     {
-        url = url.Trim();
-        // A rule that forces an integration is matched against the URL as given. Rewriting
-        // first (redirect-walking in particular) would move the URL off the rule's pattern.
-        var matchedRule = Services.RuleEngine.EvaluateUrl(url).MatchedRule;
+        // FinalUrl carries the output of Rewrite and Redirect rules; resolving the URL as
+        // given ignored them for every caller but ApiController.
+        var url = evaluation.FinalUrl.Trim();
+        // A rule that forces an integration is matched before the integration rewriters
+        // run: redirect-walking in particular would move the URL off the rule's pattern.
+        var matchedRule = evaluation.MatchedRule;
         if (string.IsNullOrEmpty(matchedRule.Integration))
         {
-            url = await IntegrationRegistry.ApplyRewrites(url);
-            matchedRule = Services.RuleEngine.EvaluateUrl(url).MatchedRule;
+            var rewritten = await IntegrationRegistry.ApplyRewrites(url);
+            if (rewritten != url)
+            {
+                url = rewritten;
+                matchedRule = Services.RuleEngine.EvaluateUrl(url).MatchedRule;
+            }
         }
 
         var uri = ToUri(url);
@@ -99,8 +116,13 @@ public class VideoId
     /// This is called in the streaming path so that ActiveStreamTracker knows how long
     /// to defer cache downloads.
     /// </summary>
-    public static async Task<double?> FetchAndCacheYouTubeMetadataAsync(string videoId)
+    public static async Task<double?> FetchAndCacheYouTubeMetadataAsync(string videoId, CancellationToken ct = default)
     {
+        // A channel's /live page has no video id of its own: "live" would be fetched as
+        // watch?v=live and cached under a key every live channel shares.
+        if (videoId == Integrations.YouTube.YouTubeIntegration.LiveVideoId)
+            return null;
+
         // Check if we already have duration cached
         var existing = DatabaseManager.GetVideoInfoCache(videoId);
         if (existing?.Duration is > 0)
@@ -123,13 +145,13 @@ public class VideoId
                 "--extractor-args", "youtube:player_client=web"
             };
 
-            var (rawData, error, exitCode) = await RunYtdlpAsync(args, url, includeCookies: true);
+            var (rawData, error, exitCode) = await RunYtdlpAsync(args, url, includeCookies: true, ct);
             if ((exitCode != 0 || string.IsNullOrEmpty(rawData)) && !IsTerminalFailure(error))
             {
                 // Worth one retry: expired or rejected cookies make yt-dlp fail in a way a
                 // cookie-less request often survives. Pointless for a deleted video.
                 Log.Warning("Metadata fetch with cookies failed for {VideoId} ({Error}). Retrying without cookies...", videoId, error.Trim());
-                (rawData, error, exitCode) = await RunYtdlpAsync(args, url, includeCookies: false);
+                (rawData, error, exitCode) = await RunYtdlpAsync(args, url, includeCookies: false, ct);
             }
 
             if (exitCode != 0 || string.IsNullOrEmpty(rawData))
@@ -153,6 +175,11 @@ public class VideoId
 
             Log.Information("Cached metadata for {VideoId}: duration={Duration}s", videoId, data.Duration);
             return data.Duration;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // The caller's timeout; yt-dlp has already been killed. Let the caller report it.
+            throw;
         }
         catch (Exception ex)
         {

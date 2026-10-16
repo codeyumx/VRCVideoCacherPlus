@@ -58,10 +58,15 @@ public class ConfigManager
         // Repairs and seeds the rule list. Called with the instance rather than reaching
         // for ConfigManager.Config: PlusConfigManager has no static state of its own, so
         // there is no initialiser to re-enter here.
-        PlusConfigManager.Initialize(Config);
+        var plusConfigCarriedOver = PlusConfigManager.Initialize(Config);
 
         Log.Information("Loaded config.");
         TrySaveConfig();
+
+        // Only once the carried-over values are safely in Config.json: TrySaveConfig throws
+        // if the write fails, which leaves PlusConfig.json in place to be read again next launch.
+        if (plusConfigCarriedOver)
+            PlusConfigManager.RetirePlusConfigFile();
     }
 
     public static void TrySaveConfig()

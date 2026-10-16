@@ -194,6 +194,13 @@ public class YtdlManager
     /// entries, honouring double and single quotes the way a shell would. The setting is a
     /// single config string, but ArgumentList needs one token per element — appending it
     /// whole would pass e.g. `--retries 3` as one argument named "--retries 3".
+    ///
+    /// Backslashes follow the Windows CommandLineToArgvW rules, so a quote can be embedded
+    /// (`"title=\"My Video\""`) without breaking Windows paths: a run of backslashes is
+    /// literal unless it ends at a double quote, where 2n backslashes give n and leave the
+    /// quote as a delimiter, and 2n+1 give n plus a literal quote. A quoted path ending in
+    /// a backslash therefore needs it doubled: `"C:\dir\\"`. Inside single quotes nothing
+    /// is special but the closing quote, as in POSIX shells.
     /// </summary>
     internal static List<string> SplitArguments(string? value)
     {
@@ -205,8 +212,40 @@ public class YtdlManager
         var quote = '\0';
         var hasToken = false;
 
-        foreach (var c in value)
+        var i = 0;
+        while (i < value.Length)
         {
+            var c = value[i];
+
+            if (c == '\\' && quote != '\'')
+            {
+                var run = 0;
+                while (i < value.Length && value[i] == '\\')
+                {
+                    run++;
+                    i++;
+                }
+
+                hasToken = true;
+                if (i < value.Length && value[i] == '"')
+                {
+                    current.Append('\\', run / 2);
+                    if (run % 2 == 1)
+                    {
+                        current.Append('"');
+                        i++;
+                    }
+                    // Even run: the quote is still unconsumed and acts as a delimiter.
+                }
+                else
+                {
+                    current.Append('\\', run);
+                }
+                continue;
+            }
+
+            i++;
+
             if (quote != '\0')
             {
                 if (c == quote)

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Xunit;
 
 namespace VRCVideoCacher.Tests;
@@ -28,4 +29,20 @@ public class KillExistingInstanceTests
     [Fact]
     public void MatchesImageName_IgnoresEmptyImageName() =>
         Assert.False(Program.MatchesImageName("", [""]));
+
+    // A process that has exited (or was never associated) throws from Id/ProcessName; the scan
+    // used to read those outside any try, so one process exiting mid-scan aborted the whole kill.
+    [Fact]
+    public void IsOtherInstance_ProcessWhosePropertiesThrowIsNotATarget()
+    {
+        using var process = new Process();
+        Assert.False(Program.IsOtherInstance(process, Names));
+    }
+
+    [Fact]
+    public void IsOtherInstance_NeverTargetsTheCurrentProcess()
+    {
+        using var current = Process.GetCurrentProcess();
+        Assert.False(Program.IsOtherInstance(current, [current.ProcessName]));
+    }
 }

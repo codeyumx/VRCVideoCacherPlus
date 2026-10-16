@@ -34,4 +34,34 @@ public class ActiveStreamSessionStatusTests
 
         ActiveStreamTracker.ClearAllSessions();
     }
+
+    // The log monitor resolves a direct stream's address on a detached task. It used to write
+    // the result back with AddOrUpdateSession, which re-inserted a session that an AVPro
+    // shutdown had cleared in the meantime.
+    [Fact]
+    public void ALateAddressLookupDoesNotResurrectAClearedSession()
+    {
+        const string url = "https://cdn.example.test/cleared.mp4";
+        ActiveStreamTracker.ClearAllSessions();
+        ActiveStreamTracker.AddOrUpdateSession(Loading(url));
+        ActiveStreamTracker.ClearAllSessions();
+
+        Assert.False(ActiveStreamTracker.TryUpdateSessionRemoteIp(url, "1.2.3.4"));
+        Assert.Empty(ActiveStreamTracker.GetActiveSessions());
+    }
+
+    [Fact]
+    public void AnAddressLookupUpdatesAStillTrackedSession()
+    {
+        const string url = "https://cdn.example.test/tracked.mp4";
+        ActiveStreamTracker.ClearAllSessions();
+        ActiveStreamTracker.AddOrUpdateSession(Loading(url));
+
+        Assert.True(ActiveStreamTracker.TryUpdateSessionRemoteIp(url, "1.2.3.4"));
+        var session = Assert.Single(ActiveStreamTracker.GetActiveSessions());
+        Assert.Equal("1.2.3.4", session.RemoteIp);
+        Assert.Equal("Loading", session.Status);
+
+        ActiveStreamTracker.ClearAllSessions();
+    }
 }

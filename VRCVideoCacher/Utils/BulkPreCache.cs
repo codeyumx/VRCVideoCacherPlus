@@ -19,23 +19,41 @@ public class BulkPreCache
 
     /// <summary>
     /// Manifest-supplied names are untrusted. Joining one straight onto the cache directory
-    /// let an entry like "../../Startup/evil.exe" write anywhere the process can reach.
-    /// Every legitimate entry is a bare "&lt;videoId&gt;.mp4", so require exactly that.
+    /// let an entry like "../../Startup/evil.exe" write anywhere the process can reach, and
+    /// even a bare name like "index.html" overwrote non-video files in the cache folder.
+    /// Every legitimate entry is "&lt;videoId&gt;.mp4" or "&lt;videoId&gt;.webm" with an id made of
+    /// [A-Za-z0-9_-] (YouTube ids, URL hashes, numeric track ids), so require exactly that.
     /// </summary>
     internal static bool IsSafeCacheFileName(string? fileName)
     {
-        if (string.IsNullOrWhiteSpace(fileName))
+        if (string.IsNullOrEmpty(fileName) || fileName.Length > MaxCacheFileNameLength)
             return false;
 
-        // Rejects any directory component, absolute paths, and drive-relative forms.
-        if (fileName != Path.GetFileName(fileName))
+        var dot = fileName.LastIndexOf('.');
+        if (dot <= 0)
             return false;
 
-        if (fileName is "." or "..")
+        var extension = fileName[dot..];
+        if (!extension.Equals(".mp4", StringComparison.OrdinalIgnoreCase) &&
+            !extension.Equals(".webm", StringComparison.OrdinalIgnoreCase))
             return false;
 
-        return fileName.IndexOfAny(Path.GetInvalidFileNameChars()) < 0;
+        foreach (var c in fileName.AsSpan(0, dot))
+        {
+            if (!char.IsAsciiLetterOrDigit(c) && c != '_' && c != '-')
+                return false;
+        }
+
+        return true;
     }
+
+    private const int MaxCacheFileNameLength = 128;
+
+    // Distinct from the queue downloader's "_tempVideo." scratch names: bulk downloads start
+    // before VideoDownloader exists, and sharing that prefix let its startup sweep unlink an
+    // open bulk file and let the two writers collide on the same id. VideoDownloader sweeps
+    // stale bulk temps only when they predate this process.
+    internal const string TempPrefix = "_tempBulk.";
 
     // FileName and Url are required
     // LastModified and Size are optional
@@ -168,11 +186,12 @@ public class BulkPreCache
             return;
         }
 
-        // Stage under the _tempVideo. prefix that BuildCache skips and SweepStaleTempFiles
-        // cleans up, then validate before publishing. Writing straight to the final name
-        // meant a mirror answering 200 with an HTML error page put that page into the cache
-        // under a .mp4 name, to be served to VRChat until someone noticed.
-        var tempPath = Path.Join(CacheManager.CachePath, $"_tempVideo.{fileInfo.FileName}");
+        // Stage under a unique _tempBulk. name, then validate before publishing. Writing
+        // straight to the final name meant a mirror answering 200 with an HTML error page put
+        // that page into the cache under a .mp4 name, to be served to VRChat until someone
+        // noticed. The trailing GUID keeps the name off the .mp4/.webm extensions BuildCache
+        // indexes and stops two writers for the same file sharing a scratch file.
+        var tempPath = Path.Join(CacheManager.CachePath, $"{TempPrefix}{fileInfo.FileName}.{Guid.NewGuid():N}");
         try
         {
             await using (var fileStream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None))

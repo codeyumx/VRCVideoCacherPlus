@@ -77,9 +77,35 @@ jobs:
       - name: Run the test suite
         run: dotnet test VRCVideoCacher.Tests/VRCVideoCacher.Tests.csproj -c Release --nologo
 
+  # The app embeds VRCVideoCacher/yt-dlp-stub.exe. The checked-in copy is only for local builds;
+  # a release rebuilds it from this tag's yt-dlp-stub/ source so it cannot ship a stale stub.
+  # Native AOT cannot cross-compile to Windows from Linux, so this builds on Windows, the same
+  # way yt-dlp-stub/publish.bat does.
+  stub:
+    name: yt-dlp-stub
+    needs: version
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Publish yt-dlp-stub
+        run: dotnet publish yt-dlp-stub/yt-dlp-stub.csproj -c Release -r win-x64 --self-contained true -o out/yt-dlp-stub
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: yt-dlp-stub
+          path: out/yt-dlp-stub/yt-dlp-stub.exe
+          if-no-files-found: error
+
   build:
     name: ${{ matrix.rid }}
-    needs: test
+    needs: [test, stub]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -108,6 +134,12 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+
+      # Overwrites the checked-in stub with the one the stub job built from this tag.
+      - uses: actions/download-artifact@v4
+        with:
+          name: yt-dlp-stub
+          path: VRCVideoCacher
 
       # The tag is the version the binary reports (-p:Version overrides <Version>), so a
       # `-rc1` build is a SemVer pre-release that ranks below the final it leads up to.
@@ -141,7 +173,7 @@ jobs:
 
   release:
     name: publish
-    needs: [version, test, build]
+    needs: [version, test, stub, build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -149,8 +181,10 @@ jobs:
           ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 0
 
+      # Only the app binaries; the stub artifact is already embedded in them.
       - uses: actions/download-artifact@v4
         with:
+          pattern: VRCVideoCacherPlus*
           path: assets
 
       - name: Write the release notes

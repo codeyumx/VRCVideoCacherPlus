@@ -81,6 +81,11 @@ public static class VrcLogMonitor
         CancellationTokenSource? tailCts = null;
         Task? tailTask = null;
 
+        // Only the log already open when monitoring starts is joined at its end — its history
+        // belongs to sessions we never saw. A file selected later is a rollover that VRChat may
+        // have been writing to for up to a poll interval already, so it is read from the start.
+        var initialPoll = true;
+
         while (!ct.IsCancellationRequested)
         {
             try
@@ -107,7 +112,8 @@ public static class VrcLogMonitor
                     {
                         Log.Information("Now monitoring VRChat log file: {File}", Path.GetFileName(currentFile));
                         tailCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                        tailTask = Task.Run(() => TailFileAsync(currentFile, tailCts.Token));
+                        var seekToEnd = initialPoll;
+                        tailTask = Task.Run(() => TailFileAsync(currentFile, seekToEnd, tailCts.Token));
                     }
                 }
             }
@@ -115,6 +121,8 @@ public static class VrcLogMonitor
             {
                 Log.Error(ex, "Error in log monitor directory polling loop.");
             }
+
+            initialPoll = false;
 
             // Check for log file rollover every 5 seconds
             try
@@ -168,15 +176,15 @@ public static class VrcLogMonitor
         }
     }
 
-    private static async Task TailFileAsync(string filePath, CancellationToken ct)
+    private static async Task TailFileAsync(string filePath, bool seekToEnd, CancellationToken ct)
     {
         try
         {
             using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
             using var sr = new StreamReader(fs, Encoding.UTF8);
 
-            // Seek to the end of the file so we only tail new output log entries in the current session
-            fs.Seek(0, SeekOrigin.End);
+            if (seekToEnd)
+                fs.Seek(0, SeekOrigin.End);
 
             while (!ct.IsCancellationRequested)
             {
@@ -251,8 +259,15 @@ public static class VrcLogMonitor
                     session.OriginalUrl = url;
                 }
 
-                // Resolve IP address in background
-                if (Uri.TryCreate(url, UriKind.Absolute, out var uri) && !url.Contains("localhost") && !url.Contains("127.0.0.1"))
+                var isLocal = Uri.TryCreate(url, UriKind.Absolute, out var uri) && IsLocalServerUrl(uri, url);
+                session.IsLocalStream = isLocal;
+
+                ActiveStreamTracker.AddOrUpdateSession(session);
+
+                // Resolve the IP address in the background, after the session is tracked so the
+                // update below has something to land on. Update-only: an AVPro shutdown or world
+                // change may clear the session before the lookup returns, and it must stay gone.
+                if (uri != null && !isLocal)
                 {
                     Task.Run(async () =>
                     {
@@ -260,16 +275,12 @@ public static class VrcLogMonitor
                         {
                             var addresses = await System.Net.Dns.GetHostAddressesAsync(uri.Host);
                             if (addresses.Length > 0)
-                            {
-                                session.RemoteIp = addresses[0].ToString();
-                                ActiveStreamTracker.AddOrUpdateSession(session);
-                            }
+                                ActiveStreamTracker.TryUpdateSessionRemoteIp(url, addresses[0].ToString());
                         }
                         catch { }
                     });
                 }
 
-                ActiveStreamTracker.AddOrUpdateSession(session);
                 return;
             }
 
@@ -304,4 +315,14 @@ public static class VrcLogMonitor
             Log.Debug(ex, "Error parsing log line: {Line}", line);
         }
     }
+
+    /// <summary>
+    /// Whether VRChat is fetching <paramref name="url"/> from this application's own web server
+    /// — a cached video — rather than from a remote host. The server always listens on
+    /// localhost and 127.0.0.1, plus the configured URL (which the hosts-file mode points at a
+    /// non-loopback name).
+    /// </summary>
+    private static bool IsLocalServerUrl(Uri uri, string url) =>
+        uri.IsLoopback ||
+        url.StartsWith(ConfigManager.Config.YtdlpWebServerUrl + "/", StringComparison.OrdinalIgnoreCase);
 }

@@ -27,6 +27,44 @@ bottom as tags only. The fork's own releases start at `2026.6.17`.
 
 ## Unreleased
 
+### Fixed
+
+- **YouTube URLs:** channel live pages (`/@handle/live`) no longer become `watch?v=live` and fail
+  with a 500. Shorts links with a trailing slash and `youtube-nocookie.com` embeds now resolve.
+- **HLS:** manifests that differ only by a content query (`?id=a` vs `?id=b`) no longer share
+  a cache file. The probe has a 10 s overall timeout, so a server that stalls mid-body can no
+  longer hang `/getvideo`.
+- **Rules:** Rewrite/Redirect rules now apply to start-up pre-cache, History and the manual queue,
+  not only to in-game requests.
+- A timed-out metadata lookup now kills its yt-dlp process instead of leaving it running. The
+  no-cookies retry no longer passes the URL twice.
+- Additional yt-dlp arguments keep escaped quotes (`\"`) inside quoted values.
+- VRDancing metadata lookups no longer include the URL's query in the song code. A timeout in the
+  third-party YouTube redirect check now falls back to the original URL.
+- **Cache:** removing old files to stay under the size limit can no longer delete a file a
+  download has just pinned and published.
+- `PlusConfig.json` is renamed to `.bak` only after the migrated `Config.json` has been saved.
+- SIGTERM on Linux goes through the normal shutdown every time. Before, the signal handler
+  could be garbage-collected and then stop working.
+- `--kill-existing-instance` no longer gives up when a process exits during the scan.
+- **Severing:** the Now Playing button closes only the selected cached stream, not all of them.
+  Only addresses that were actually severed stop being tracked. Linux `ss -K` failures are
+  reported, and its filter now includes the local address. VRChat's process ID is looked up
+  fresh before severing.
+- **Log monitor:** a new VRChat log is read from the start, so its first lines are not missed.
+  A slow address lookup can no longer bring back a session that was already cleared.
+- **Bulk pre-cache:** temp files get their own unique names, so the downloader's start-up cleanup
+  no longer deletes them. Manifest entries must be `<id>.mp4`/`.webm`, so a manifest can't
+  overwrite other files in the cache folder.
+- `#HttpOnly_` cookie rows are read, so `LOGIN_INFO` expiry and cookie validation now see them.
+- The hosts entry counts as installed only if the whole managed block is present. A damaged
+  block is repaired.
+- Saving an unrelated setting no longer undoes unsaved edits to the "Block all Videos" rule.
+- Releases build `yt-dlp-stub.exe` from source instead of shipping the checked-in copy.
+  `publish.sh` points at `net10.0`. The build scripts stop at the first failed publish.
+- The browser extension matches YouTube by hostname, so `notyoutube.com` no longer triggers a
+  cookie upload.
+
 ## [2026.9.30] — 2026-09-30
 
 Everything from [PR #1](https://github.com/codeyumx/VRCVideoCacherPlus/pull/1)

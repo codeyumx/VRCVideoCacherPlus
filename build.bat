@@ -8,20 +8,25 @@ mkdir Build
 
 echo Building for Github Windows x64...
 dotnet publish VRCVideoCacher/VRCVideoCacher.csproj -c Release -r win-x64 -o ./Build/win-x64
+if errorlevel 1 exit /b 1
 
 echo Building for Github Linux x64...
 dotnet publish VRCVideoCacher/VRCVideoCacher.csproj -c Release -r linux-x64 -o ./Build/linux-x64
+if errorlevel 1 exit /b 1
 
 echo Building for Steam Windows x64...
 dotnet publish VRCVideoCacher/VRCVideoCacher.csproj -c SteamRelease -r win-x64 -o ./Build/Steam/win-x64
+if errorlevel 1 exit /b 1
 
 echo Building for Steam Linux x64...
 dotnet publish VRCVideoCacher/VRCVideoCacher.csproj -c SteamRelease -r linux-x64 -o ./Build/Steam/linux-x64
+if errorlevel 1 exit /b 1
 
 echo Done!
 goto :eof
 ::BATCH
 # Linux/macOS -- run with: bash build.bat
+set -e
 rm -rf Build VRCVideoCacher/bin VRCVideoCacher/obj
 mkdir -p Build
 

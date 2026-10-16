@@ -240,6 +240,7 @@ public static class ActiveStreamTracker
                 existing.OriginalUrl = session.OriginalUrl;
                 existing.ResolvedUrl = session.ResolvedUrl;
                 existing.RemoteIp = session.RemoteIp;
+                existing.IsLocalStream = session.IsLocalStream;
                 existing.Status = session.Status;
                 existing.StartTime = session.StartTime;
                 existing.PlaybackStartedTime = session.PlaybackStartedTime;
@@ -251,6 +252,26 @@ public static class ActiveStreamTracker
             }
         }
         OnSessionsChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// Records the address a session's URL resolved to, but only if that session is still
+    /// tracked. The lookup runs detached, and inserting here would resurrect a session that an
+    /// AVPro shutdown or world change cleared while it was in flight.
+    /// </summary>
+    /// <returns>Whether a tracked session was updated.</returns>
+    public static bool TryUpdateSessionRemoteIp(string url, string remoteIp)
+    {
+        lock (SessionsLock)
+        {
+            var existing = _activeSessions.FirstOrDefault(s => s.ResolvedUrl == url || s.OriginalUrl == url);
+            if (existing == null)
+                return false;
+
+            existing.RemoteIp = remoteIp;
+        }
+        OnSessionsChanged?.Invoke();
+        return true;
     }
 
     public static void UpdateSessionStatus(string url, string status, DateTime? playbackStartedTime = null)
@@ -325,6 +346,13 @@ public class ActiveVideoSession
     public string OriginalUrl { get; set; } = string.Empty;
     public string ResolvedUrl { get; set; } = string.Empty;
     public string? RemoteIp { get; set; }
+
+    /// <summary>
+    /// Served by this application's own web server from the cache, rather than fetched by
+    /// VRChat from a remote host. Stopping it means closing our response, not a socket of
+    /// VRChat's — and it never has a <see cref="RemoteIp"/>.
+    /// </summary>
+    public bool IsLocalStream { get; set; }
     public string Status { get; set; } = string.Empty; // "Loading", "Playing", "Failed"
     public DateTime StartTime { get; set; }
     public DateTime? PlaybackStartedTime { get; set; }

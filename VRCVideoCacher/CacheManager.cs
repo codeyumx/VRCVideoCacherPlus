@@ -124,8 +124,6 @@ public class CacheManager
         TryFlushCache();
     }
 
-    private static readonly ConcurrentDictionary<string, int> PinnedFiles = new();
-
     /// <summary>
     /// Protects a cache file from eviction while it is being written or published. Dispose
     /// the returned handle when done.
@@ -135,35 +133,7 @@ public class CacheManager
     /// years old — so it arrives as the least-recently-used thing in the cache and
     /// AddToCache's own flush would delete what was just downloaded.
     /// </summary>
-    public static IDisposable PinFile(string fileName)
-    {
-        PinnedFiles.AddOrUpdate(fileName, 1, static (_, count) => count + 1);
-        return new Pin(fileName);
-    }
-
-    private sealed class Pin(string fileName) : IDisposable
-    {
-        private int _disposed;
-
-        public void Dispose()
-        {
-            if (Interlocked.Exchange(ref _disposed, 1) == 1)
-                return;
-
-            while (PinnedFiles.TryGetValue(fileName, out var count))
-            {
-                if (count <= 1)
-                {
-                    if (PinnedFiles.TryRemove(new KeyValuePair<string, int>(fileName, count)))
-                        return;
-                }
-                else if (PinnedFiles.TryUpdate(fileName, count - 1, count))
-                {
-                    return;
-                }
-            }
-        }
-    }
+    public static IDisposable PinFile(string fileName) => CacheFilePins.Acquire(fileName);
 
     public static void TryFlushCache()
     {
@@ -177,56 +147,80 @@ public class CacheManager
 
         var recentPlayHistory = DatabaseManager.GetPlayHistory();
 
-        // LRU eviction — LastModified is updated on every cache hit, so it acts as "last accessed"
+        // LRU eviction — LastModified is updated on every cache hit, so it acts as "last accessed".
+        // The timestamp is captured with the snapshot so an entry refreshed after it was taken
+        // (republished by a downloader, or hit) is recognised and kept.
         var lru = CachedAssets
-            .OrderBy(kvp => kvp.Value.LastModified)
+            .Select(kvp => (Entry: kvp, LastModified: kvp.Value.LastModified))
+            .OrderBy(candidate => candidate.LastModified)
             .ToList();
 
-        foreach (var kvp in lru)
+        foreach (var (kvp, snapshotLastModified) in lru)
         {
             if (cacheSize < maxCacheSize)
                 break;
 
-            if (PinnedFiles.ContainsKey(kvp.Value.FileName))
-            {
-                Log.Debug("Not evicting {FileName}: currently in use.", kvp.Value.FileName);
-                continue;
-            }
+            var deleted = false;
 
-            var videoId = Path.GetFileNameWithoutExtension(kvp.Value.FileName);
-            var filePath = Path.Join(CachePath, kvp.Value.FileName);
-            if (File.Exists(filePath))
+            // The pin check, the delete and the index removal happen under the pin lock: a
+            // downloader pins before it moves a file into place, so it either pins first and
+            // the file is skipped here, or waits until this entry is gone and then publishes
+            // and indexes its file afresh. Checking without the lock let a pin and publish
+            // land between the check and the delete, which then removed the new file.
+            lock (CacheFilePins.SyncRoot)
             {
-                // A cache file can be open for serving or being written by the downloader.
-                // ClearCache already tolerated that; eviction did not, and the exception
-                // propagated out through AddToCache into the download-completion path.
-                try
+                if (CacheFilePins.IsPinned(kvp.Value.FileName))
                 {
-                    File.Delete(filePath);
-                    cacheSize -= kvp.Value.Size;
-                }
-                catch (Exception ex)
-                {
-                    Log.Warning("Could not evict {FileName}: {Error}", kvp.Value.FileName, ex.Message);
+                    Log.Debug("Not evicting {FileName}: currently in use.", kvp.Value.FileName);
                     continue;
                 }
 
-                // delete thumbnail if not in recent history
-                if (recentPlayHistory.All(h => h.Id != videoId))
+                // Removed and re-added (a fresh object), or refreshed in place, since the
+                // snapshot: either way the file on disk is not the one that was ranked.
+                if (!CachedAssets.TryGetValue(kvp.Key, out var current) ||
+                    !ReferenceEquals(current, kvp.Value) ||
+                    current.LastModified != snapshotLastModified)
                 {
-                    var thumbnailPath = ThumbnailManager.GetThumbnailPath(videoId);
+                    Log.Debug("Not evicting {FileName}: changed since the eviction pass began.", kvp.Value.FileName);
+                    continue;
+                }
+
+                var filePath = Path.Join(CachePath, kvp.Value.FileName);
+                if (File.Exists(filePath))
+                {
+                    // A cache file can be open for serving or being written by the downloader.
+                    // ClearCache already tolerated that; eviction did not, and the exception
+                    // propagated out through AddToCache into the download-completion path.
                     try
                     {
-                        if (File.Exists(thumbnailPath))
-                            File.Delete(thumbnailPath);
+                        File.Delete(filePath);
+                        cacheSize -= kvp.Value.Size;
+                        deleted = true;
                     }
                     catch (Exception ex)
                     {
-                        Log.Debug("Could not delete thumbnail {Path}: {Error}", thumbnailPath, ex.Message);
+                        Log.Warning("Could not evict {FileName}: {Error}", kvp.Value.FileName, ex.Message);
+                        continue;
                     }
                 }
+                CachedAssets.TryRemove(kvp.Key, out _);
             }
-            CachedAssets.TryRemove(kvp.Key, out _);
+
+            // delete thumbnail if not in recent history
+            var videoId = Path.GetFileNameWithoutExtension(kvp.Value.FileName);
+            if (deleted && recentPlayHistory.All(h => h.Id != videoId))
+            {
+                var thumbnailPath = ThumbnailManager.GetThumbnailPath(videoId);
+                try
+                {
+                    if (File.Exists(thumbnailPath))
+                        File.Delete(thumbnailPath);
+                }
+                catch (Exception ex)
+                {
+                    Log.Debug("Could not delete thumbnail {Path}: {Error}", thumbnailPath, ex.Message);
+                }
+            }
         }
     }
 
@@ -337,5 +331,64 @@ public class CacheManager
         CachedAssets.Clear();
         OnCacheChanged?.Invoke(string.Empty, CacheChangeType.Cleared);
         Log.Information("Cache cleared");
+    }
+}
+
+/// <summary>
+/// The pin counts behind <see cref="CacheManager.PinFile"/>. Kept out of CacheManager so it
+/// carries no dependency on that type's initialiser (config, cache directory, database).
+///
+/// Pinning, unpinning and eviction's pin-check-and-delete all run under <see cref="SyncRoot"/>,
+/// which makes "not pinned, so delete it" atomic with respect to a downloader pinning the file.
+/// </summary>
+internal static class CacheFilePins
+{
+    /// <summary>Held by eviction across its pin check and delete; taken by every pin and unpin.</summary>
+    internal static readonly object SyncRoot = new();
+
+    private static readonly Dictionary<string, int> PinCounts = new();
+
+    internal static IDisposable Acquire(string fileName)
+    {
+        lock (SyncRoot)
+        {
+            PinCounts[fileName] = PinCounts.TryGetValue(fileName, out var count) ? count + 1 : 1;
+        }
+        return new Pin(fileName);
+    }
+
+    internal static bool IsPinned(string fileName)
+    {
+        lock (SyncRoot)
+        {
+            return PinCounts.ContainsKey(fileName);
+        }
+    }
+
+    private static void Release(string fileName)
+    {
+        lock (SyncRoot)
+        {
+            if (!PinCounts.TryGetValue(fileName, out var count))
+                return;
+
+            if (count <= 1)
+                PinCounts.Remove(fileName);
+            else
+                PinCounts[fileName] = count - 1;
+        }
+    }
+
+    private sealed class Pin(string fileName) : IDisposable
+    {
+        private int _disposed;
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) == 1)
+                return;
+
+            Release(fileName);
+        }
     }
 }

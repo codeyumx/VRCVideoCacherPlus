@@ -81,6 +81,13 @@ public class ThirdPartyYouTubeRewriter : UrlRewriter
             Log.Warning(ex, "Failed to follow redirects for {URL}, returning original", url);
             return url;
         }
+        // HttpClient.Timeout surfaces as TaskCanceledException; RewriteAsync takes no caller
+        // token, so any cancellation here is that timeout and the original URL still stands.
+        catch (TaskCanceledException ex)
+        {
+            Log.Warning(ex, "Timed out following redirects for {URL}, returning original", url);
+            return url;
+        }
 
         if (current != url)
         {

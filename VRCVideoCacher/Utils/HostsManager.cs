@@ -54,10 +54,16 @@ public class HostsManager
     {
         CreateHostsIfNotExists();
         var hostsFile = File.ReadAllText(HostsPath);
-        if (hostsFile.Contains(HeaderMarker, StringComparison.Ordinal))
+        var updated = WithManagedBlock(hostsFile);
+        if (updated == hostsFile)
             return;
 
-        File.AppendAllText(HostsPath, $"{Header}{ManagedHostLine}{Footer}");
+        // Appending leaves the user's existing bytes untouched; only a repair that inserts
+        // inside an existing block needs the whole file rewritten.
+        if (updated.StartsWith(hostsFile, StringComparison.Ordinal))
+            File.AppendAllText(HostsPath, updated[hostsFile.Length..]);
+        else
+            File.WriteAllText(HostsPath, updated);
     }
 
     private static void Remove()
@@ -101,9 +107,82 @@ public class HostsManager
         if (!File.Exists(HostsPath))
             return false;
 
-        var hostsFile = File.ReadAllText(HostsPath);
-        return hostsFile.Contains(HeaderMarker, StringComparison.Ordinal);
+        return HasManagedBlock(File.ReadAllText(HostsPath));
     }
+
+    // The begin marker alone used to count as "added", so a block that had lost its mapping
+    // line or end marker was reported as working and Add() refused to repair it. A block only
+    // counts when the begin marker, the mapping line and the end marker are all present.
+    internal static bool HasManagedBlock(string hostsFile)
+    {
+        var (_, footer, hasMapping) = LocateBlock(hostsFile.Split('\n'));
+        return footer >= 0 && hasMapping;
+    }
+
+    /// <summary>
+    /// Returns the hosts content with a complete managed block. A missing block is appended;
+    /// a malformed one is repaired by inserting only what is missing directly after our own
+    /// begin marker, so no line outside our markers is changed or pulled inside them.
+    /// </summary>
+    internal static string WithManagedBlock(string hostsFile)
+    {
+        var (header, footer, hasMapping) = LocateBlock(hostsFile.Split('\n'));
+        if (header < 0)
+            return hostsFile + $"{Header}{ManagedHostLine}{Footer}";
+        if (footer >= 0 && hasMapping)
+            return hostsFile;
+
+        // Keep the file's own line endings, and make sure the header line is terminated so
+        // insertions after it never land on the same line.
+        var crlf = hostsFile.Contains("\r\n", StringComparison.Ordinal);
+        if (!hostsFile.EndsWith('\n'))
+            hostsFile += crlf ? "\r\n" : "\n";
+
+        var lineSuffix = crlf ? "\r" : "";
+        var lines = hostsFile.Split('\n').ToList();
+        var insertAt = header + 1;
+        if (footer >= 0)
+        {
+            // Markers intact, mapping gone: put it back just inside the begin marker.
+            lines.Insert(insertAt, ManagedHostLine + lineSuffix);
+        }
+        else
+        {
+            // No end marker, so the block's extent is unknown and everything after the begin
+            // marker may be the user's. Close the block straight after the begin marker
+            // (keeping a mapping line already sitting directly beneath it).
+            if (!IsManagedHostLine(lines[insertAt]))
+                lines.Insert(insertAt, ManagedHostLine + lineSuffix);
+            lines.Insert(insertAt + 1, FooterMarker + lineSuffix);
+        }
+
+        return string.Join('\n', lines);
+    }
+
+    // Finds the first begin marker line, the first end marker line after it (-1 if none),
+    // and whether the mapping line sits between them. Lines are compared trimmed so CRLF/LF
+    // and stray indentation don't matter.
+    private static (int Header, int Footer, bool HasMapping) LocateBlock(string[] lines)
+    {
+        var header = Array.FindIndex(lines, line => line.Trim() == HeaderMarker);
+        if (header < 0)
+            return (-1, -1, false);
+
+        var hasMapping = false;
+        for (var i = header + 1; i < lines.Length; i++)
+        {
+            if (lines[i].Trim() == FooterMarker)
+                return (header, i, hasMapping);
+            if (IsManagedHostLine(lines[i]))
+                hasMapping = true;
+        }
+
+        return (header, -1, hasMapping);
+    }
+
+    // Tolerates tabs or repeated spaces between address and name.
+    private static bool IsManagedHostLine(string line) =>
+        string.Join(' ', line.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)) == ManagedHostLine;
 
     private static void CreateHostsIfNotExists()
     {

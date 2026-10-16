@@ -59,13 +59,55 @@ public class HlsIntegration : Integration
     // Negative results (probe failed or returned non-HLS) are cached briefly so that a
     // transient CDN error doesn't permanently mask a real HLS URL within ProbeTtl.
     private static readonly TimeSpan NegativeProbeTtl = TimeSpan.FromSeconds(30);
+    // HttpClient.Timeout stops covering the request once headers arrive (ResponseHeadersRead),
+    // so the body read needs its own bound — a server that stalls mid-body would otherwise
+    // hold /getvideo and every caller sharing the in-flight probe indefinitely. One budget
+    // spans the whole probe, master-playlist recursion included.
+    private static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(10);
 
-    // Signed CDN URLs often rotate query tokens per request — key on scheme+host+path
-    // so the 5-min TTL actually holds across plays of the same manifest.
-    private static string ProbeKey(string url)
+    // Query parameters that sign or expire a URL rather than select its content. Signed CDN
+    // URLs rotate these per request, so they are dropped from the key to let the 5-min TTL
+    // (and the cached MP4) hold across plays of the same manifest.
+    private static readonly HashSet<string> VolatileQueryParams = new(StringComparer.OrdinalIgnoreCase)
     {
-        try { var u = new Uri(url); return u.GetLeftPart(UriPartial.Path); }
+        "token", "__token__", "hdnts", "hdnea", "auth", "acl", "wmsAuthSign",
+        "expires", "expire", "expiry", "exp", "e", "se", "st", "ttl",
+        "signature", "sig", "sign", "signed", "policy", "key-pair-id",
+        "md5", "hash", "hmac", "nonce",
+    };
+
+    private static readonly string[] VolatileQueryParamPrefixes = ["X-Amz-", "X-Goog-"];
+
+    private static bool IsVolatileQueryParam(string name) =>
+        VolatileQueryParams.Contains(name) ||
+        VolatileQueryParamPrefixes.Any(p => name.StartsWith(p, StringComparison.OrdinalIgnoreCase));
+
+    // Scheme+host+path plus the query parameters that identify content (?id=movie1 vs
+    // ?id=movie2 are different videos), sorted so parameter order doesn't split the key.
+    // Signing/expiry parameters are dropped. Doubles as the video id source.
+    internal static string ProbeKey(string url)
+    {
+        Uri u;
+        try { u = new Uri(url); }
         catch { return url; }
+
+        var path = u.GetLeftPart(UriPartial.Path);
+        var query = u.Query;
+        if (query.Length <= 1)
+            return path;
+
+        var kept = query[1..]
+            .Split('&', StringSplitOptions.RemoveEmptyEntries)
+            .Where(pair =>
+            {
+                var eq = pair.IndexOf('=');
+                var name = Uri.UnescapeDataString(eq < 0 ? pair : pair[..eq]);
+                return !IsVolatileQueryParam(name);
+            })
+            .Order(StringComparer.Ordinal)
+            .ToList();
+
+        return kept.Count == 0 ? path : $"{path}?{string.Join('&', kept)}";
     }
 
     public override bool CanHandle(Uri uri)
@@ -119,8 +161,9 @@ public class HlsIntegration : Integration
 
     public override async Task<VideoInfo?> GetVideoInfo(string url, Uri uri, bool avPro)
     {
-        // Hash the path-only form so signed CDN URLs (rotating query tokens per play)
-        // resolve to a stable videoId — otherwise the cached MP4 is never re-served.
+        // Hash the probe key (path + content-identifying query) so signed CDN URLs
+        // (rotating query tokens per play) resolve to a stable videoId — otherwise the
+        // cached MP4 is never re-served.
         var videoId = VideoId.HashUrl(ProbeKey(url));
         var videoInfo = new VideoInfo
         {
@@ -200,7 +243,7 @@ public class HlsIntegration : Integration
             return entry.Result;
 
         // Dedupe in-flight probes so concurrent plays of the same URL share a single GET.
-        var lazy = InFlightProbes.GetOrAdd(key, _ => new Lazy<Task<ProbeResult>>(() => Probe(url, depth: 0)));
+        var lazy = InFlightProbes.GetOrAdd(key, _ => new Lazy<Task<ProbeResult>>(() => ProbeWithTimeout(url)));
         try
         {
             var result = await lazy.Value;
@@ -233,7 +276,13 @@ public class HlsIntegration : Integration
     private const int ProbeMaxDepth = 3;
     private const int ProbeBodyCap = 64 * 1024;
 
-    private static async Task<ProbeResult> Probe(string url, int depth)
+    private static async Task<ProbeResult> ProbeWithTimeout(string url)
+    {
+        using var cts = new CancellationTokenSource(ProbeTimeout);
+        return await Probe(url, depth: 0, cts.Token);
+    }
+
+    private static async Task<ProbeResult> Probe(string url, int depth, CancellationToken cancellationToken)
     {
         if (depth >= ProbeMaxDepth)
         {
@@ -250,7 +299,7 @@ public class HlsIntegration : Integration
         try
         {
             using var req = new HttpRequestMessage(HttpMethod.Get, url);
-            using var res = await HttpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead);
+            using var res = await HttpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             if (!res.IsSuccessStatusCode)
                 return new ProbeResult(false, null, false, null);
 
@@ -275,8 +324,8 @@ public class HlsIntegration : Integration
 
             // Read at most 64 KiB — cheap for a non-HLS false positive and enough for
             // most manifests. Longer media playlists are handled via the truncation flag.
-            await using var stream = await res.Content.ReadAsStreamAsync();
-            var (bytes, truncated) = await ReadBoundedBytesAsync(stream, ProbeBodyCap);
+            await using var stream = await res.Content.ReadAsStreamAsync(cancellationToken);
+            var (bytes, truncated) = await ReadBoundedBytesAsync(stream, ProbeBodyCap, cancellationToken);
 
             // MPEG-TS magic: 0x47 sync byte every 188 bytes. Check the first three packets
             // so we don't false-positive on a random file that happens to start with 'G'.
@@ -307,7 +356,10 @@ public class HlsIntegration : Integration
                 var variant = ResolveFirstVariant(body, url);
                 if (variant != null)
                 {
-                    var inner = await Probe(variant, depth + 1);
+                    var inner = await Probe(variant, depth + 1, cancellationToken);
+                    // The variant probe swallows its own failures; a timeout there means the
+                    // whole probe ran out of budget, which is a failure, not "HLS, unknown length".
+                    cancellationToken.ThrowIfCancellationRequested();
                     return new ProbeResult(true, inner.Duration, inner.IsComplete, sessionTitle ?? inner.Title);
                 }
                 return new ProbeResult(true, null, false, sessionTitle);
@@ -323,6 +375,11 @@ public class HlsIntegration : Integration
             }
             return new ProbeResult(true, duration, complete, sessionTitle);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            Log.Debug("HLS probe timed out for {URL}", url);
+            return new ProbeResult(false, null, false, null);
+        }
         catch (Exception ex)
         {
             Log.Debug("HLS probe failed for {URL}: {Error}", url, ex.Message);
@@ -330,12 +387,12 @@ public class HlsIntegration : Integration
         }
     }
 
-    private static async Task<(byte[] Bytes, bool Truncated)> ReadBoundedBytesAsync(Stream stream, int maxBytes)
+    private static async Task<(byte[] Bytes, bool Truncated)> ReadBoundedBytesAsync(Stream stream, int maxBytes, CancellationToken cancellationToken)
     {
         var buffer = new byte[Math.Min(8192, maxBytes)];
         using var ms = new MemoryStream();
         int read;
-        while (ms.Length < maxBytes && (read = await stream.ReadAsync(buffer.AsMemory(0, (int)Math.Min(buffer.Length, maxBytes - ms.Length)))) > 0)
+        while (ms.Length < maxBytes && (read = await stream.ReadAsync(buffer.AsMemory(0, (int)Math.Min(buffer.Length, maxBytes - ms.Length)), cancellationToken)) > 0)
             ms.Write(buffer, 0, read);
 
         // Peek one more byte to distinguish "exactly maxBytes" from "truncated".
@@ -343,8 +400,8 @@ public class HlsIntegration : Integration
         if (ms.Length >= maxBytes)
         {
             var probe = new byte[1];
-            try { truncated = await stream.ReadAsync(probe.AsMemory(0, 1)) > 0; }
-            catch { /* stream may be closed — assume not truncated */ }
+            try { truncated = await stream.ReadAsync(probe.AsMemory(0, 1), cancellationToken) > 0; }
+            catch when (!cancellationToken.IsCancellationRequested) { /* stream may be closed — assume not truncated */ }
         }
         return (ms.ToArray(), truncated);
     }

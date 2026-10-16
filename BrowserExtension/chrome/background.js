@@ -3,10 +3,23 @@ importScripts("cookies.js");
 // AUTOMATIC mode (opt-in): push cookies on every YouTube page load. This is the only
 // behaviour gated by the "Share cookies automatically" toggle.
 ext.tabs.onUpdated.addListener(async (_id, info, tab) => {
-  if (info.status !== "complete" || !tab.url || !tab.url.includes("youtube.com")) return;
+  if (info.status !== "complete" || !isYouTubeUrl(tab.url)) return;
   const { autoShare } = await ext.storage.local.get("autoShare");
   if (autoShare) sendCookies();
 });
+
+// Matches youtube.com and its subdomains by hostname, so lookalike hosts (notyoutube.com) and
+// URLs that merely mention it (?next=youtube.com) don't trigger an upload.
+function isYouTubeUrl(url) {
+  if (!url) return false;
+  let host;
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    return false;
+  }
+  return host === "youtube.com" || host.endsWith(".youtube.com");
+}
 
 // MANUAL (app-triggered) refresh via long-poll: hold a request open so the app can wake it
 // the instant the user clicks "Request fresh cookies" — they never need to open this popup

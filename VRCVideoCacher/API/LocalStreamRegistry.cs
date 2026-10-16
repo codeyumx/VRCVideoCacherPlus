@@ -57,6 +57,33 @@ public static class LocalStreamRegistry
         return closed;
     }
 
+    /// <summary>
+    /// Closes only the streams serving <paramref name="url"/> — one cached video — and returns
+    /// how many were actually closed. Matched on the request path, which is what
+    /// <see cref="Register"/> records, so the host VRChat used (localhost, 127.0.0.1 or the
+    /// configured server URL) does not matter. Ordinal: cached file names are video IDs, which
+    /// are case-sensitive.
+    /// </summary>
+    public static int CloseForUrl(string url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            return 0;
+
+        var path = uri.AbsolutePath;
+        var closed = 0;
+
+        foreach (var pair in Streams)
+        {
+            if (!string.Equals(pair.Value.Path, path, StringComparison.Ordinal))
+                continue;
+
+            if (Streams.TryRemove(pair.Key, out var entry) && Close(entry))
+                closed++;
+        }
+
+        return closed;
+    }
+
     private static bool Close(Entry entry)
     {
         try

@@ -24,45 +24,67 @@ public static class PlusConfigManager
 
     /// <summary>
     /// Runs once from ConfigManager's initialiser, after the file is loaded and before it
-    /// is saved back.
+    /// is saved back. Returns true when PlusConfig.json was carried over and must be set aside
+    /// with <see cref="RetirePlusConfigFile()"/> once Config.json has been saved.
     /// </summary>
-    internal static void Initialize(ConfigModel config)
+    internal static bool Initialize(ConfigModel config)
     {
         // TODO: Remove later - one-time move of the settings builds up to 2026.8.14 kept in PlusConfig.json.
-        MigratePlusConfigFile(config);
+        var plusConfigCarriedOver = MigratePlusConfigFile(config,
+            Path.Join(Program.DataPath, "PlusConfig.json"),
+            Path.Join(Program.DataPath, "Config.json"));
         // TODO: Remove later - one-time migration of the settings the rule engine replaced.
         MigrateLegacyRuleSettings(config);
         // TODO: Remove later - Migrating/repairing broken Dropbox rule pattern for existing users
         MigrateBrokenDefaultRules(config);
         EnsureDefaultRules(config);
+        return plusConfigCarriedOver;
     }
 
     /// <summary>
     /// Builds up to 2026.8.14 kept the three Plus settings in their own PlusConfig.json. They now
-    /// live in Config.json, so the file is read once and renamed to PlusConfig.json.bak: left
-    /// under its own name it would be re-read every launch and overwrite later changes. A
-    /// Config.json that already carries the keys was written by a build that owns them, so the
-    /// file is stale and is only set aside.
+    /// live in Config.json, so the file is read once here and, after Config.json has been saved,
+    /// renamed to PlusConfig.json.bak by <see cref="RetirePlusConfigFile()"/>: left under its own
+    /// name it would be re-read every launch and overwrite later changes. Renaming it before the
+    /// save would lose the settings if the save failed. A Config.json that already carries the
+    /// keys was written by a build that owns them, so the file is stale and is only set aside.
+    /// Returns true when the file should be retired.
     /// </summary>
-    private static void MigratePlusConfigFile(ConfigModel config)
+    internal static bool MigratePlusConfigFile(ConfigModel config, string plusConfigPath, string configPath)
     {
-        var path = Path.Join(Program.DataPath, "PlusConfig.json");
-        if (!File.Exists(path))
-            return;
+        if (!File.Exists(plusConfigPath))
+            return false;
 
         try
         {
-            var configPath = Path.Join(Program.DataPath, "Config.json");
             var configOwnsTheKeys = File.Exists(configPath) &&
                                     File.ReadAllText(configPath).Contains("\"CacheDownloadRateLimitMBs\"");
             if (!configOwnsTheKeys)
-                ApplyPlusConfigFile(File.ReadAllText(path), config);
+                ApplyPlusConfigFile(File.ReadAllText(plusConfigPath), config);
 
-            File.Move(path, path + ".bak", overwrite: true);
+            return true;
         }
         catch (Exception ex)
         {
             Log.Warning(ex, "Could not carry the settings in PlusConfig.json over to Config.json.");
+            return false;
+        }
+    }
+
+    /// <summary>Sets PlusConfig.json aside. Call only after Config.json has been saved.</summary>
+    internal static void RetirePlusConfigFile() =>
+        RetirePlusConfigFile(Path.Join(Program.DataPath, "PlusConfig.json"));
+
+    internal static void RetirePlusConfigFile(string plusConfigPath)
+    {
+        try
+        {
+            if (File.Exists(plusConfigPath))
+                File.Move(plusConfigPath, plusConfigPath + ".bak", overwrite: true);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Could not rename PlusConfig.json to PlusConfig.json.bak.");
         }
     }
 

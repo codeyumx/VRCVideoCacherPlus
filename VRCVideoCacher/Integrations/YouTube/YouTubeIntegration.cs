@@ -8,9 +8,20 @@ public class YouTubeIntegration : Integration
 {
     private static readonly ILogger Log = Program.Logger.ForContext<YouTubeIntegration>();
 
-    private static readonly string[] Hosts = ["youtube.com", "youtu.be", "www.youtube.com", "m.youtube.com", "music.youtube.com"];
-    private static readonly Regex IdRegex = new(@"(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|live\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})");
+    /// <summary>
+    /// VideoId given to a channel's /live URL. It names no particular video — the channel
+    /// decides what is live — so it must never be cached, nor used as a metadata key.
+    /// </summary>
+    public const string LiveVideoId = "live";
+
+    private static readonly string[] Hosts =
+    [
+        "youtube.com", "youtu.be", "www.youtube.com", "m.youtube.com", "music.youtube.com",
+        "youtube-nocookie.com", "www.youtube-nocookie.com"
+    ];
+    private static readonly Regex IdRegex = new(@"(?:youtube(?:-nocookie)?\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|live\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})");
     private static readonly Regex BareIdRegex = new(@"^\/(?=[a-zA-Z0-9_-]*[\d_A-Z-])[a-zA-Z0-9_-]{11}$");
+    private static readonly Regex VideoIdRegex = new(@"^[a-zA-Z0-9_-]{11}$");
 
     private const string AVProFormat = "(mp4/best)[height<=?1080][height>=?64][width>=?64]";
     private const string UnityPlayerFormat = "(mp4/best)[vcodec!=av01][vcodec!=vp9.2][height<=?1080][height>=?64][width>=?64][protocol^=http]";
@@ -22,14 +33,23 @@ public class YouTubeIntegration : Integration
     public override Task<VideoInfo?> GetVideoInfo(string url, Uri uri, bool avPro)
     {
         string? videoId = null;
+        // Persist a canonical single-video URL so history/buttons never link to a playlist.
+        string? canonicalUrl = null;
+        var segments = uri.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
 
         var match = IdRegex.Match(url);
         if (match.Success)
             videoId = match.Groups[1].Value;
-        else if (uri.AbsolutePath.StartsWith("/shorts/"))
-            videoId = uri.AbsolutePath.Split('/')[^1];
-        else if (uri.AbsolutePath.TrimEnd('/').EndsWith("/live"))
-            videoId = "live";
+        else if (segments is ["shorts", var shortId, ..])
+            videoId = VideoIdRegex.IsMatch(shortId) ? shortId : null;
+        else if (segments is [_, .., "live"])
+        {
+            // A channel's live page (/@handle/live, /channel/UC…/live, …). There is no
+            // video id to canonicalise to; yt-dlp resolves the channel URL to whatever is
+            // currently live, so keep that URL, minus query and fragment.
+            videoId = LiveVideoId;
+            canonicalUrl = $"https://www.youtube.com/{string.Join('/', segments)}";
+        }
         else if (BareIdRegex.IsMatch(uri.AbsolutePath))
             videoId = uri.AbsolutePath.TrimStart('/');
 
@@ -39,14 +59,9 @@ public class YouTubeIntegration : Integration
             return Task.FromResult<VideoInfo?>(null);
         }
 
-        videoId = videoId.Length > 11 ? videoId[..11] : videoId;
-
-        // Persist a canonical single-video URL so history/buttons never link to a playlist.
-        var canonicalUrl = $"https://www.youtube.com/watch?v={videoId}";
-
         return Task.FromResult<VideoInfo?>(new VideoInfo
         {
-            VideoUrl = canonicalUrl,
+            VideoUrl = canonicalUrl ?? $"https://www.youtube.com/watch?v={videoId}",
             VideoId = videoId,
             UrlType = UrlType.YouTube,
             DownloadFormat = avPro ? DownloadFormat.Webm : DownloadFormat.MP4

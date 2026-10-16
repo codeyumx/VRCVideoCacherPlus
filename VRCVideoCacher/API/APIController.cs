@@ -8,6 +8,7 @@ using VRCVideoCacher.Services;
 using VRCVideoCacher.YTDL;
 using VRCVideoCacher.Integrations;
 using VRCVideoCacher.Integrations.Hls;
+using VRCVideoCacher.Integrations.YouTube;
 
 namespace VRCVideoCacher.API;
 
@@ -294,7 +295,9 @@ public class ApiController : WebApiController
             }
         }
 
-        var videoInfo = await VideoId.GetVideoId(requestUrl, avPro);
+        // Hand over the evaluation itself: GetVideoId would otherwise run the rules again
+        // on their own output, applying Rewrite rules twice.
+        var videoInfo = await VideoId.GetVideoId(evalResult, avPro);
         if (videoInfo == null)
         {
             Log.Information("Failed to get Video Info for URL: {URL}", requestUrl);
@@ -393,7 +396,7 @@ public class ApiController : WebApiController
         await HttpContext.SendStringAsync(response, "text/plain", Encoding.UTF8);
 
         // Don't attempt to cache if its a livestream
-        if (videoInfo.VideoId.Equals("live"))
+        if (videoInfo.VideoId == YouTubeIntegration.LiveVideoId)
             return;
 
         // Record activity immediately with whatever duration we already have cached,
@@ -407,9 +410,10 @@ public class ApiController : WebApiController
             {
                 try
                 {
+                    // The token, not just a WaitAsync, so timing out also kills yt-dlp
+                    // instead of leaving it running in the background.
                     using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-                    var duration = await VideoId.FetchAndCacheYouTubeMetadataAsync(videoInfo.VideoId)
-                        .WaitAsync(cts.Token);
+                    var duration = await VideoId.FetchAndCacheYouTubeMetadataAsync(videoInfo.VideoId, cts.Token);
                     if (duration is > 0)
                         ActiveStreamTracker.RecordActivity(videoInfo.VideoId, duration);
                 }

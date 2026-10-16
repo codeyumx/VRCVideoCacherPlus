@@ -131,6 +131,10 @@ public partial class RulesViewModel : ViewModelBase
 
     private bool _isLoading;
 
+    // Last VideoPlayersEnabled value this editor has seen, so a config save can tell whether
+    // the video-players toggle (which owns the "Block all Videos" rule) actually changed.
+    private bool _lastVideoPlayersEnabled;
+
     public ObservableCollection<RuleEntryViewModel> Rules { get; } = [];
 
     [ObservableProperty]
@@ -153,13 +157,19 @@ public partial class RulesViewModel : ViewModelBase
     }
 
     // Any config save fires this, rules or not (tray toggles, tray notice flag, ...). Reloading
-    // would silently throw away edits the user has not saved yet.
+    // would silently throw away edits the user has not saved yet. With pending edits, only an
+    // actual VideoPlayersEnabled flip is mirrored in: syncing on every save re-inserted a
+    // "Block all Videos" rule the user had just deleted, or reverted their pending toggle.
     private void HandleConfigChanged()
     {
-        if (HasChanges)
-            SyncVideoPlayersRule();
-        else
+        var videoPlayersEnabled = ConfigManager.Config.VideoPlayersEnabled;
+        var videoPlayersChanged = videoPlayersEnabled != _lastVideoPlayersEnabled;
+        _lastVideoPlayersEnabled = videoPlayersEnabled;
+
+        if (!HasChanges)
             LoadFromConfig();
+        else if (videoPlayersChanged)
+            SyncVideoPlayersRule();
     }
 
     // ConfigManager.SetVideoPlayersEnabled owns this rule outside the editor. Mirror its live
@@ -264,6 +274,7 @@ public partial class RulesViewModel : ViewModelBase
         _isLoading = true;
         Rules.Clear();
 
+        _lastVideoPlayersEnabled = ConfigManager.Config.VideoPlayersEnabled;
         var configRules = PlusConfigManager.Config.UriRules;
         if (configRules == null || configRules.Count == 0)
         {

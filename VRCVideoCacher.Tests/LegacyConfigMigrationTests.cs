@@ -176,4 +176,72 @@ public class LegacyConfigMigrationTests
         Assert.Equal(new ConfigModel().CacheDownloadIdleSeconds, config.CacheDownloadIdleSeconds);
         Assert.Equal(new ConfigModel().CacheYouTubePreferVp9, config.CacheYouTubePreferVp9);
     }
+
+    // PlusConfig.json used to be renamed the moment its values were read, before Config.json was
+    // saved; a failed save or a crash in between lost the settings for good. It must survive the
+    // migration itself and be set aside only by the explicit post-save step.
+    [Fact]
+    public void PlusConfigFileIsKeptUntilItIsRetiredAfterTheSave()
+    {
+        var dir = Directory.CreateTempSubdirectory("vrcvc-plusconfig-").FullName;
+        try
+        {
+            var plusConfigPath = Path.Join(dir, "PlusConfig.json");
+            var configPath = Path.Join(dir, "Config.json");
+            File.WriteAllText(plusConfigPath, """{ "CacheDownloadRateLimitMBs": 7 }""");
+            var config = new ConfigModel();
+
+            var carriedOver = PlusConfigManager.MigratePlusConfigFile(config, plusConfigPath, configPath);
+
+            Assert.True(carriedOver);
+            Assert.Equal(7, config.CacheDownloadRateLimitMBs);
+            Assert.True(File.Exists(plusConfigPath));
+            Assert.False(File.Exists(plusConfigPath + ".bak"));
+
+            PlusConfigManager.RetirePlusConfigFile(plusConfigPath);
+
+            Assert.False(File.Exists(plusConfigPath));
+            Assert.True(File.Exists(plusConfigPath + ".bak"));
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void AnUnreadablePlusConfigFileIsNotRetired()
+    {
+        var dir = Directory.CreateTempSubdirectory("vrcvc-plusconfig-").FullName;
+        try
+        {
+            var plusConfigPath = Path.Join(dir, "PlusConfig.json");
+            File.WriteAllText(plusConfigPath, """{ "CacheDownloadRateLimitMBs": """);
+
+            var carriedOver = PlusConfigManager.MigratePlusConfigFile(
+                new ConfigModel(), plusConfigPath, Path.Join(dir, "Config.json"));
+
+            Assert.False(carriedOver);
+            Assert.True(File.Exists(plusConfigPath));
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void NoPlusConfigFileMeansNothingToRetire()
+    {
+        var dir = Directory.CreateTempSubdirectory("vrcvc-plusconfig-").FullName;
+        try
+        {
+            Assert.False(PlusConfigManager.MigratePlusConfigFile(
+                new ConfigModel(), Path.Join(dir, "PlusConfig.json"), Path.Join(dir, "Config.json")));
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
 }

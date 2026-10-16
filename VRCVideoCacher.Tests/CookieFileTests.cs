@@ -50,6 +50,27 @@ public class CookieFileTests
     }
 
     [Fact]
+    public void ReadsHttpOnlyLoginInfoRow()
+    {
+        // "#HttpOnly_" prefixes the domain of an HttpOnly cookie; it is a row, not a comment.
+        var result = CookieFile.ParseLoginExpiryUtc([
+            "# Netscape HTTP Cookie File",
+            Line("LOGIN_INFO", Expiry2030.ToString(), domain: "#HttpOnly_.youtube.com")
+        ]);
+
+        Assert.Equal(new DateTime(2030, 1, 1, 0, 0, 0, DateTimeKind.Utc), result);
+    }
+
+    [Fact]
+    public void AsCookieRowStripsHttpOnlyPrefixAndSkipsComments()
+    {
+        Assert.Equal(".youtube.com\tTRUE", CookieFile.AsCookieRow("#HttpOnly_.youtube.com\tTRUE"));
+        Assert.Equal(".youtube.com\tTRUE", CookieFile.AsCookieRow(".youtube.com\tTRUE"));
+        Assert.Null(CookieFile.AsCookieRow("# Netscape HTTP Cookie File"));
+        Assert.Null(CookieFile.AsCookieRow("   "));
+    }
+
+    [Fact]
     public void ReturnsNullForSessionCookie()
     {
         // Expiry 0 means "dies with the browser session" — there is no date to warn about,

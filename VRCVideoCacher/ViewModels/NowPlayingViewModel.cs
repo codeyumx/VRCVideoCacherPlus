@@ -89,11 +89,23 @@ public partial class NowPlayingViewModel : ViewModelBase, IDisposable
     {
         if (item == null) return;
 
-        // A cached video streams from our own server (no remote address); anything else is a
-        // direct CDN connection.
-        var result = string.IsNullOrEmpty(item.RemoteIp)
-            ? new SeverResult(API.LocalStreamRegistry.CloseAll(), 0, SeverOutcome.NothingToDo)
-            : await ConnectionSevering.SeverAddressAsync(item.RemoteIp, allowElevation: true);
+        SeverResult result;
+        if (item.IsLocalStream)
+        {
+            // A cached video streams from our own server: close that one response only, never
+            // every other cached video playing alongside it.
+            result = new SeverResult(API.LocalStreamRegistry.CloseForUrl(item.ResolvedUrl), 0, SeverOutcome.NothingToDo);
+        }
+        else if (string.IsNullOrEmpty(item.RemoteIp))
+        {
+            // A direct CDN connection whose address is still being resolved: there is nothing
+            // known to close yet, and it is certainly not one of our cached streams.
+            result = new SeverResult(0, 0, SeverOutcome.NothingToDo);
+        }
+        else
+        {
+            result = await ConnectionSevering.SeverAddressAsync(item.RemoteIp, allowElevation: true);
+        }
 
         var (message, color) = ActiveConnectionsViewModel.DescribeSeverResult(result);
         StatusMessage = message;
@@ -149,6 +161,7 @@ public class ActiveVideoSessionViewModel : ViewModelBase
     public string OriginalUrl => _session.OriginalUrl;
     public string ResolvedUrl => _session.ResolvedUrl;
     public string? RemoteIp => _session.RemoteIp;
+    public bool IsLocalStream => _session.IsLocalStream;
     public string Status => _session.Status;
     public double? Duration => _session.Duration;
     public string? ThumbnailUrl => _session.ThumbnailUrl;

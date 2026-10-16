@@ -63,4 +63,43 @@ public class YtdlArgumentTests
     {
         Assert.Equal(["-f", ""], YtdlManager.SplitArguments(@"-f """""));
     }
+
+    [Fact]
+    public void SplitArguments_UnescapesQuotesInsideDoubleQuotes()
+    {
+        Assert.Equal(["--postprocessor-args", "ffmpeg:-metadata title=\"My Video\""],
+            YtdlManager.SplitArguments(@"--postprocessor-args ""ffmpeg:-metadata title=\""My Video\"""""));
+    }
+
+    [Fact]
+    public void SplitArguments_EscapedQuoteOutsideQuotesIsLiteral()
+    {
+        Assert.Equal(["a\"b", "c"], YtdlManager.SplitArguments(@"a\""b c"));
+    }
+
+    [Fact]
+    public void SplitArguments_KeepsBackslashesNotFollowedByAQuote()
+    {
+        Assert.Equal(["-o", @"\\server\share\%(title)s.%(ext)s", @"C:\ffmpeg\bin"],
+            YtdlManager.SplitArguments(@"-o ""\\server\share\%(title)s.%(ext)s"" C:\ffmpeg\bin"));
+    }
+
+    [Fact]
+    public void SplitArguments_EvenBackslashRunBeforeQuoteHalvesAndCloses()
+    {
+        // A quoted directory with a trailing backslash: \\" is one backslash, then the close.
+        Assert.Equal([@"C:\dir\", "-x"], YtdlManager.SplitArguments(@"""C:\dir\\"" -x"));
+    }
+
+    [Fact]
+    public void SplitArguments_OddBackslashRunBeforeQuoteKeepsBackslashAndQuote()
+    {
+        Assert.Equal([@"a\""b"], YtdlManager.SplitArguments(@"""a\\\""b"""));
+    }
+
+    [Fact]
+    public void SplitArguments_LeavesBackslashesInSingleQuotesAlone()
+    {
+        Assert.Equal([@"a\""b"], YtdlManager.SplitArguments(@"'a\""b'"));
+    }
 }

@@ -23,10 +23,11 @@ public class VRDancingIntegration : Integration
 
     public override Task<VideoInfo?> GetVideoInfo(string url, Uri uri, bool avPro)
     {
-        var code = url.TrimEnd('/').Split('/').Last();
+        var code = ExtractCode(uri);
         var videoId = VideoId.HashUrl(url);
 
-        _ = Task.Run(async () => await VRDancingApiService.DownloadMetadata(code, videoId));
+        if (!string.IsNullOrEmpty(code))
+            _ = Task.Run(async () => await VRDancingApiService.DownloadMetadata(code, videoId));
 
         return Task.FromResult<VideoInfo?>(new VideoInfo
         {
@@ -35,5 +36,15 @@ public class VRDancingIntegration : Integration
             UrlType = UrlType.VRDancing,
             DownloadFormat = DownloadFormat.MP4
         });
+    }
+
+    /// <summary>
+    /// The track code is the last path segment — taken from the path alone so a query
+    /// string or fragment never leaks into the metadata lookup.
+    /// </summary>
+    internal static string ExtractCode(Uri uri)
+    {
+        var segments = uri.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        return segments.Length == 0 ? string.Empty : Uri.UnescapeDataString(segments[^1]);
     }
 }
