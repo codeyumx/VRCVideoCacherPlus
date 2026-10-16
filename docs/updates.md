@@ -28,6 +28,10 @@ bottom as tags only. The fork's own releases start at `2026.6.17`.
 
 ## Unreleased
 
+## [2026.9.30-rc5] — 2026-10-16
+
+`2026.9.30-rc4` with the browser extension attached. (`078b261`)
+
 ### Changed
 
 - Releases attach the browser extension again: the Chrome `.crx`, signed with the
