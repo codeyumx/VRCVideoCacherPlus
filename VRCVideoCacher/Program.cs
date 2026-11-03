@@ -245,7 +245,12 @@ internal sealed class Program
             .WriteTo.File(
                 path: Path.Combine(LogsPath, "VRCVideoCacher.log"),
                 rollingInterval: RollingInterval.Day,
-                retainedFileCountLimit: 5);
+                // The count is of files, i.e. days the app ran, not calendar days: 5 left
+                // under two weeks of history when diagnosing a problem. Each file is capped and
+                // rolls over instead of Serilog's default of going silent at 1 GB.
+                retainedFileCountLimit: 31,
+                fileSizeLimitBytes: 10 * 1024 * 1024,
+                rollOnFileSizeLimit: true);
 
         // The hosts-edit subprocess has no UI, and UiLogSink reads ConfigManager.Config —
         // which under elevation would create a second config under the admin's profile.

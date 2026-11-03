@@ -63,6 +63,11 @@ public class VideoTools
             using var prefetchResponse = await _httpClient.SendAsync(prefetchRequest);
             Log.Information("Video prefetch request returned status code {status}.", (int)prefetchResponse.StatusCode);
 
+            // A refused URL (403 from googlevideo: unsigned or IP-bound to someone else) used to
+            // count as a successful prefetch, so it went to VRChat and AVPro failed to load it.
+            if ((int)prefetchResponse.StatusCode >= 400)
+                return false;
+
             if (prefetchRequest.Method == HttpMethod.Get && prefetchResponse.Content.Headers.ContentType?.MediaType == "application/vnd.apple.mpegurl")
             {
                 var body = await prefetchResponse.Content.ReadAsStringAsync();

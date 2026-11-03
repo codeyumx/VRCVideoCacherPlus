@@ -398,12 +398,22 @@ public class ApiController : WebApiController
         {
             var isPrefetchSuccessful = await VideoTools.Prefetch(response, YoutubePrefetchMaxRetries);
 
-            if (!isPrefetchSuccessful && avPro)
+            // One fresh resolve when the URL is refused: googlevideo hands out URLs that 403,
+            // and a second yt-dlp run often returns one that plays. Before, this only happened
+            // for AVPro, and a 403 didn't even count as a failed prefetch.
+            if (!isPrefetchSuccessful)
             {
-                Log.Warning("Prefetch failed with AVPro, retrying without AVPro.");
+                Log.Warning(avPro
+                    ? "Prefetch failed with AVPro, retrying without AVPro."
+                    : "Prefetch failed, resolving the video once more.");
                 avPro = false;
-                (response, success) = await VideoId.GetUrl(videoInfo, avPro);
-                await VideoTools.Prefetch(response, YoutubePrefetchMaxRetries);
+                var (retryResponse, retrySuccess) = await VideoId.GetUrl(videoInfo, avPro);
+                if (retrySuccess)
+                {
+                    response = retryResponse;
+                    if (!await VideoTools.Prefetch(response, YoutubePrefetchMaxRetries))
+                        Log.Warning("Prefetch failed again for {VideoId}; the video may not play.", videoInfo.VideoId);
+                }
             }
         }
 

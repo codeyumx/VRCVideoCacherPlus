@@ -141,15 +141,21 @@ public class VideoId
             {
                 "-j",
                 "--skip-download",
+                // Only title and duration are wanted. Without this, a client that offers no
+                // playable format failed the whole lookup with "Requested format is not
+                // available" — on every play, with older yt-dlp builds.
+                "--ignore-no-formats-error",
                 "--impersonate", "safari",
                 "--extractor-args", "youtube:player_client=web"
             };
 
             var (rawData, error, exitCode) = await RunYtdlpAsync(args, url, includeCookies: true, ct);
-            if ((exitCode != 0 || string.IsNullOrEmpty(rawData)) && !IsTerminalFailure(error))
+            if ((exitCode != 0 || string.IsNullOrEmpty(rawData)) && !IsTerminalFailure(error) &&
+                !error.Contains("Requested format is not available", StringComparison.Ordinal))
             {
                 // Worth one retry: expired or rejected cookies make yt-dlp fail in a way a
-                // cookie-less request often survives. Pointless for a deleted video.
+                // cookie-less request often survives. Pointless for a deleted video, or for a
+                // format error, which has nothing to do with cookies and only adds a YouTube hit.
                 Log.Warning("Metadata fetch with cookies failed for {VideoId} ({Error}). Retrying without cookies...", videoId, error.Trim());
                 (rawData, error, exitCode) = await RunYtdlpAsync(args, url, includeCookies: false, ct);
             }

@@ -41,6 +41,17 @@ bottom as tags only. The fork's own releases start at `2026.6.17`.
 - **Install instructions for the extension** in the README and on every release page
   (`docs/release-install.md`, appended by the release workflow): unzip and drag the folder onto
   the extensions page in Chromium browsers, temporary or unsigned install in Firefox.
+- **Fixed: refused YouTube URLs were sent to VRChat.** A prefetch that got HTTP 403 counted as a
+  success, so AVPro was handed a URL googlevideo had already refused. A refused prefetch now
+  triggers one fresh resolve, for Unity-player requests as well as AVPro.
+- **Cookies that lose their login are reported and refreshed.** yt-dlp saves the cookie file back
+  after each run; once YouTube expired the session, every later call quietly ran without
+  cookies (and soon hit "Sign in to confirm you're not a bot"). The app now logs this once and
+  asks the extension for fresh cookies.
+- **YouTube metadata lookups no longer fail on format availability** (`--ignore-no-formats-error`),
+  and a format error no longer triggers a pointless second lookup without cookies.
+- **Logs keep 31 files instead of 5**, each capped at 10 MB and rolled over when full, rather than
+  Serilog's default of going silent at 1 GB.
 
 ## [2026.9.30-rc6] — 2026-10-16
 

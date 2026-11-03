@@ -40,6 +40,9 @@ public class YtdlManager
     // Guards the "Deno missing" error so it is reported on transition, not per invocation.
     private static int _denoMissingReported;
 
+    // Guards the "cookies lost their login" warning the same way: reported on transition.
+    private static int _cookiesLostReported;
+
 
     static YtdlManager()
     {
@@ -181,10 +184,24 @@ public class YtdlManager
             Log.Error("Deno runtime not found at path: {DenoPath}", DenoPath);
         }
 
-        if (includeCookies && Program.IsCookiesEnabledAndValid())
+        if (includeCookies && ConfigManager.Config.YtdlpUseCookies)
         {
-            args.Add("--cookies");
-            args.Add(CookiesPath);
+            if (Program.IsCookiesEnabledAndValid())
+            {
+                args.Add("--cookies");
+                args.Add(CookiesPath);
+                Interlocked.Exchange(ref _cookiesLostReported, 0);
+            }
+            else if (Program.DoesCookieFileExist() && Interlocked.Exchange(ref _cookiesLostReported, 1) == 0)
+            {
+                // yt-dlp saves the jar back after every run, and when YouTube expires the
+                // session (it rotates the cookies of an open browser) the saved jar has no
+                // LOGIN_INFO. Every call after that silently ran without cookies, which is what
+                // the "Sign in to confirm you're not a bot" errors followed. Say so once, and ask
+                // the extension for a fresh login instead of waiting for the user to notice.
+                Log.Warning("The cookie file no longer holds a YouTube login (LOGIN_INFO); yt-dlp is running without cookies. Requesting fresh cookies from the browser extension.");
+                API.ApiController.RequestCookieRefresh();
+            }
         }
 
         args.AddRange(SplitArguments(ConfigManager.Config.YtdlpAdditionalArgs));
