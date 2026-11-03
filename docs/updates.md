@@ -28,6 +28,10 @@ bottom as tags only. The fork's own releases start at `2026.6.17`.
 
 ## Unreleased
 
+## [2026.11.3-rc1] — 2026-11-03
+
+Pre-release on top of `2026.9.30`. (`f4409c8`, `1cc7c93`, `055d96f`, `5298bc9`)
+
 - **Cookies panel shows where cookies came from.** The status card now says which browser sent
   the current cookies and when (or that they were pasted manually), and a line lists the
   browsers the VRCVideoCacherPlus extension is connected from right now. The extension sends its
