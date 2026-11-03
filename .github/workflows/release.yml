@@ -40,7 +40,7 @@ jobs:
     name: version
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.tag || github.ref }}
 
@@ -66,11 +66,11 @@ jobs:
     needs: version
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.tag || github.ref }}
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
 
@@ -87,18 +87,18 @@ jobs:
     needs: version
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.tag || github.ref }}
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
 
       - name: Publish yt-dlp-stub
         run: dotnet publish yt-dlp-stub/yt-dlp-stub.csproj -c Release -r win-x64 --self-contained true -o out/yt-dlp-stub
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: yt-dlp-stub
           path: out/yt-dlp-stub/yt-dlp-stub.exe
@@ -113,14 +113,14 @@ jobs:
     needs: version
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.tag || github.ref }}
 
       - name: Package
         run: ./BrowserExtension/build.sh
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: browser-extension
           path: |
@@ -152,16 +152,16 @@ jobs:
           git ls-remote --exit-code --tags "${{ github.server_url }}/${{ github.repository }}" "refs/tags/$TAG" \
             || { echo "::error::no tag $TAG on the remote - push it first"; exit 1; }
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.tag || github.ref }}
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
 
       # Overwrites the checked-in stub with the one the stub job built from this tag.
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: yt-dlp-stub
           path: VRCVideoCacher
@@ -190,7 +190,7 @@ jobs:
           mv "$built" "out/${{ matrix.rid }}/${{ matrix.asset }}"
           chmod +x "out/${{ matrix.rid }}/${{ matrix.asset }}"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.asset }}
           path: out/${{ matrix.rid }}/${{ matrix.asset }}
@@ -201,18 +201,18 @@ jobs:
     needs: [version, test, stub, build, extension]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 0
 
       # The app binaries and the extension; the stub artifact is already embedded in the binaries.
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: VRCVideoCacherPlus*
           path: assets
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: browser-extension
           path: assets/extension

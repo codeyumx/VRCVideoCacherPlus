@@ -52,7 +52,8 @@ public class CacheEvictionTests
             pinTask = Task.Run(() => CacheFilePins.Acquire(name));
 
             // The pin must not land between eviction's check and its delete.
-            Assert.False(pinTask.Wait(TimeSpan.FromMilliseconds(200)));
+            Thread.Sleep(200);
+            Assert.False(pinTask.IsCompleted);
             Assert.False(CacheFilePins.IsPinned(name));
         }
 

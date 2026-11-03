@@ -21,9 +21,9 @@ jobs:
     name: build and test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
 
@@ -37,7 +37,7 @@ jobs:
     name: browser extension
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # chrome/ and firefox/ are separate load-unpacked targets, so the files they share exist
       # twice and can silently diverge. This is the check that catches it; packaging itself is
