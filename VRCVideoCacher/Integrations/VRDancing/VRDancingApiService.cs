@@ -11,7 +11,7 @@ public class VRDancingApiService
 {
     private const string VRDancingAPIBaseURL = "https://dbapi.vrdancing.club/";
     private static readonly ILogger Logger = Program.Logger.ForContext<VRDancingApiService>();
-    private static readonly HttpClient HttpClient = new()
+    private static readonly HttpClient HttpClient = new(Utils.NetConnect.CreateHandler())
     {
         BaseAddress = new Uri(VRDancingAPIBaseURL),
         DefaultRequestHeaders = { { "User-Agent", $"VRCVideoCacher {Program.Version}" } },
@@ -53,7 +53,7 @@ public class VRDancingApiService
             if (vrdData == null)
                 return;
 
-            await ThumbnailManager.TrySaveThumbnail(videoId, vrdData.ThumbnailURL);
+            // Title first: the thumbnail is cosmetic and shouldn't hold back what Now Playing shows.
             DatabaseManager.AddVideoInfoCache(new VideoInfoCache
             {
                 Id = videoId,
@@ -61,6 +61,7 @@ public class VRDancingApiService
                 Author = vrdData.Artist,
                 Type = UrlType.VRDancing
             });
+            await ThumbnailManager.TrySaveThumbnail(videoId, vrdData.ThumbnailURL);
         }
         catch (Exception ex)
         {

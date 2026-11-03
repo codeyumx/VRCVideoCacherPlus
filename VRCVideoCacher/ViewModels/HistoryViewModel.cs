@@ -156,20 +156,21 @@ public partial class HistoryItemViewModel : ViewModelBase
     {
         if (Id != null)
         {
-            // Load from DB
-            var videoInfo = await YouTubeMetadataService.GetVideoMetadataAsync(Id);
+            // Title and thumbnail both come from the id alone, so fetch them together.
+            var videoInfoTask = YouTubeMetadataService.GetVideoMetadataAsync(Id);
+            var localThumbnail = ThumbnailManager.GetThumbnail(Id);
+            var thumbnailTask = Id.Length == 11 && string.IsNullOrEmpty(localThumbnail)
+                ? YouTubeMetadataService.GetThumbnail(Id)
+                : Task.FromResult(localThumbnail);
 
+            var videoInfo = await videoInfoTask;
             if (!string.IsNullOrEmpty(videoInfo?.Title))
             {
                 _title = videoInfo.Title;
                 OnPropertyChanged(nameof(DisplayTitle));
             }
 
-            // Load thumbnail
-            var thumbnailPath = ThumbnailManager.GetThumbnail(Id);
-            if (Id.Length == 11 && string.IsNullOrEmpty(thumbnailPath))
-                thumbnailPath = await YouTubeMetadataService.GetThumbnail(Id);
-
+            var thumbnailPath = await thumbnailTask;
             if (!string.IsNullOrEmpty(thumbnailPath))
             {
                 _thumbnailUrl = thumbnailPath;
@@ -256,7 +257,11 @@ public partial class HistoryViewModel : ViewModelBase
             // wedge Refresh() permanently, making the history UI stop updating after a few videos.
             try
             {
-                foreach (var groupedItems in historyCache.GroupBy(h => h.Id))
+                // Distinct ids are independent (own DB row, own thumbnail file), so a few load
+                // at once; this refresh runs on every play, and one-by-one made each uncached
+                // entry's round trips add up.
+                var options = new ParallelOptions { MaxDegreeOfParallelism = 4 };
+                await Parallel.ForEachAsync(historyCache.GroupBy(h => h.Id), options, async (groupedItems, _) =>
                 {
                     (string? DisplayTitle, string? ThumbnailUrl)? metadata = null;
                     foreach (var item in groupedItems)
@@ -277,7 +282,7 @@ public partial class HistoryViewModel : ViewModelBase
                             Serilog.Log.Warning(ex, "Failed to load metadata for history item {Id}", item.Id);
                         }
                     }
-                }
+                });
             }
             catch (Exception ex)
             {

@@ -355,6 +355,8 @@ internal sealed class Program
             File.Delete(YtdlManager.CookiesPath);
             Logger.Information("Deleted cookie file.");
         }
+
+        File.Delete(YtdlManager.CookieSourcePath);
     }
 
     public static bool DoesCookieFileExist()
@@ -379,9 +381,31 @@ internal sealed class Program
 
     // The jar is a live YouTube session, so it is written owner-only on Unix (yt-dlp runs as
     // the same user), and atomically, so yt-dlp never reads a half-written file and two
-    // browsers answering the same refresh cannot interleave.
-    public static void WriteCookieFile(string cookies) =>
+    // browsers answering the same refresh cannot interleave. The origin goes to a sidecar
+    // file rather than a comment in the jar, so the jar stays exactly what yt-dlp was given.
+    public static void WriteCookieFile(string cookies, CookieOrigin origin)
+    {
         AtomicFile.WriteAllText(YtdlManager.CookiesPath, cookies, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        AtomicFile.WriteAllText(YtdlManager.CookieSourcePath, CookieSource.Serialize(origin));
+    }
+
+    // Where the jar on disk came from, or null when unknown (no jar, or one saved before the
+    // origin was recorded).
+    public static CookieOrigin? GetCookieOrigin()
+    {
+        if (!DoesCookieFileExist() || !File.Exists(YtdlManager.CookieSourcePath))
+            return null;
+
+        try
+        {
+            return CookieSource.Parse(File.ReadAllText(YtdlManager.CookieSourcePath));
+        }
+        catch (IOException ex)
+        {
+            Logger.Warning("Failed to read cookie source: {Error}", ex.Message);
+            return null;
+        }
+    }
 
     // Expiry of the login cookie on disk, or null when there is no cookie file or no
     // expiring LOGIN_INFO line. Parsing rules live in CookieFile.
@@ -436,10 +460,13 @@ internal sealed class Program
                 }
             }
 
-            using var handler = new HttpClientHandler();
-            handler.AllowAutoRedirect = false;
-            handler.CookieContainer = cookieContainer;
-            handler.UseCookies = true;
+            using var handler = new SocketsHttpHandler
+            {
+                AllowAutoRedirect = false,
+                CookieContainer = cookieContainer,
+                UseCookies = true,
+                ConnectCallback = NetConnect.ConnectAsync,
+            };
             using var client = new HttpClient(handler);
             client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36");
 

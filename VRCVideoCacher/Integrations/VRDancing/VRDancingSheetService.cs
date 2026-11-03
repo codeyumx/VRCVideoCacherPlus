@@ -19,7 +19,7 @@ public static class VRDancingSheetService
     private const int MaxRows = 50_000;
     private const int MaxFieldLength = 1024;                  // chars
 
-    private static readonly HttpClient HttpClient = new()
+    private static readonly HttpClient HttpClient = new(Utils.NetConnect.CreateHandler())
     {
         Timeout = TimeSpan.FromSeconds(30),
         MaxResponseContentBufferSize = MaxResponseBytes

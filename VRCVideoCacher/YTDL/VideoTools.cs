@@ -16,6 +16,7 @@ public class VideoTools
         // Recycle connections periodically so stale DNS entries don't stick forever.
         PooledConnectionLifetime = TimeSpan.FromMinutes(2),
         ConnectTimeout = TimeSpan.FromSeconds(10),
+        ConnectCallback = Utils.NetConnect.ConnectAsync,
     })
     {
         Timeout = TimeSpan.FromSeconds(15),

@@ -128,11 +128,11 @@ public class VideoId
         if (existing?.Duration is > 0)
             return existing.Duration;
 
-        // Fast oEmbed lookup so a title appears immediately, ahead of the slower yt-dlp
-        // call below. Deliberately after the cache check: it used to run first, so every
-        // call made an HTTP round trip to YouTube even when the answer was already known.
-        // GetVideoTitleAsync caches what it finds and logs its own failures.
-        await Integrations.YouTube.YouTubeMetadataService.GetVideoTitleAsync(videoId);
+        // Fast oEmbed lookup so a title appears immediately, overlapped with the slower yt-dlp
+        // call below rather than run ahead of it. Deliberately after the cache check: it used
+        // to run first, so every call made an HTTP round trip to YouTube even when the answer
+        // was already known. GetVideoTitleAsync caches what it finds and never throws.
+        var titleTask = Integrations.YouTube.YouTubeMetadataService.GetVideoTitleAsync(videoId);
 
         try
         {
@@ -164,6 +164,9 @@ public class VideoId
             if (data?.Duration is null)
                 return null;
 
+            // Both write the same new row; AddVideoInfoCache is find-then-add, so let the
+            // oEmbed write land first instead of racing it into a key collision.
+            await titleTask;
             DatabaseManager.AddVideoInfoCache(new VideoInfoCache
             {
                 Id = data.Id ?? videoId,

@@ -5,6 +5,8 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Jeek.Avalonia.Localization;
 using VRCVideoCacher.API;
+using VRCVideoCacher.Services;
+using VRCVideoCacher.Utils;
 using VRCVideoCacher.YTDL;
 
 namespace VRCVideoCacher.ViewModels;
@@ -39,11 +41,18 @@ public partial class CookiesViewModel : ViewModelBase
     [ObservableProperty]
     private bool? _liveValid;
 
+    // Browsers drop out of ExtensionPresence silently when they go stale, so the panel
+    // re-reads it on a timer; appearing is pushed through ExtensionPresence.Changed.
+    private readonly DispatcherTimer _presenceTimer = new() { Interval = TimeSpan.FromSeconds(15) };
+
     public CookiesViewModel()
     {
         _useCookies = ConfigManager.Config.YtdlpUseCookies;
         _useBetaExtension = ConfigManager.Config.UseBetaExtension;
         Program.OnCookiesUpdated += OnCookiesUpdated;
+        ExtensionPresence.Changed += () => Dispatcher.UIThread.Post(RefreshExtensionBrowsers);
+        _presenceTimer.Tick += (_, _) => RefreshExtensionBrowsers();
+        _presenceTimer.Start();
         _ = VerifyAsync();
     }
 
@@ -71,6 +80,14 @@ public partial class CookiesViewModel : ViewModelBase
     {
         ConfigManager.Config.UseBetaExtension = value;
         ConfigManager.TrySaveConfig();
+        RefreshExtensionBrowsers();
+    }
+
+    private void RefreshExtensionBrowsers()
+    {
+        OnPropertyChanged(nameof(ShowExtensionBrowsers));
+        OnPropertyChanged(nameof(ExtensionBrowsersText));
+        OnPropertyChanged(nameof(ExtensionBrowsersColor));
     }
 
     private void RefreshStatus()
@@ -81,7 +98,47 @@ public partial class CookiesViewModel : ViewModelBase
         OnPropertyChanged(nameof(ExpiryText));
         OnPropertyChanged(nameof(HasExpiry));
         OnPropertyChanged(nameof(ExpiryColor));
+        OnPropertyChanged(nameof(HasCookieSource));
+        OnPropertyChanged(nameof(CookieSourceText));
     }
+
+    // Which browser the jar on disk came from, and when it arrived.
+    public bool HasCookieSource => HasValidFile && Program.GetCookieOrigin() != null;
+
+    public string CookieSourceText
+    {
+        get
+        {
+            var origin = HasValidFile ? Program.GetCookieOrigin() : null;
+            if (origin == null)
+                return string.Empty;
+
+            var received = File.GetLastWriteTime(YtdlManager.CookiesPath).ToString("g");
+            if (origin.IsManual)
+                return string.Format(Localizer.Get("CookiesSourceManualFormat"), received);
+
+            return origin.Browser == null
+                ? string.Format(Localizer.Get("CookiesSourceExtensionFormat"), received)
+                : string.Format(Localizer.Get("CookiesSourceBrowserFormat"), origin.Browser, received);
+        }
+    }
+
+    // Only the VRCVideoCacherPlus extension can be detected (it long-polls the app), so the
+    // line is shown for Beta users, or whenever a browser is actually connected.
+    public bool ShowExtensionBrowsers => UseBetaExtension || ExtensionPresence.Connected().Count > 0;
+
+    public string ExtensionBrowsersText
+    {
+        get
+        {
+            var browsers = ExtensionPresence.Connected();
+            return browsers.Count == 0
+                ? Localizer.Get("CookiesExtensionNotConnected")
+                : string.Format(Localizer.Get("CookiesExtensionConnectedFormat"), string.Join(", ", browsers));
+        }
+    }
+
+    public IBrush ExtensionBrowsersColor => ExtensionPresence.Connected().Count > 0 ? Green : Grey;
 
     // Warn once the login cookie is within a week of lapsing — enough notice to refresh
     // before playback starts failing, without nagging for the whole life of the cookie.
@@ -214,7 +271,7 @@ public partial class CookiesViewModel : ViewModelBase
             return;
         }
 
-        Program.WriteCookieFile(cookies);
+        Program.WriteCookieFile(cookies, CookieOrigin.Manual);
         Program.NotifyCookiesUpdated();
 
         var live = await Program.ValidateCookiesAsync();

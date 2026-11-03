@@ -11,7 +11,7 @@ public class BulkPreCache
     // the 100s default cancelled anything large. Unlike the main download path there is no
     // per-read stall guard here, so an overall ceiling is what stops a dead mirror from
     // hanging the startup pre-cache indefinitely.
-    private static readonly HttpClient HttpClient = new()
+    private static readonly HttpClient HttpClient = new(NetConnect.CreateHandler())
     {
         DefaultRequestHeaders = { { "User-Agent", "VRCVideoCacher" } },
         Timeout = TimeSpan.FromMinutes(30)

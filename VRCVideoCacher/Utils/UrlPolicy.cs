@@ -70,16 +70,6 @@ public static class UrlPolicy
             throw new HttpRequestException($"Refusing to connect to {endPoint.Host}: blocked address.");
         }
 
-        var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
-        try
-        {
-            await socket.ConnectAsync(allowed, endPoint.Port, cancellationToken);
-            return new NetworkStream(socket, ownsSocket: true);
-        }
-        catch
-        {
-            socket.Dispose();
-            throw;
-        }
+        return await NetConnect.ConnectAsync(allowed, endPoint.Port, cancellationToken);
     }
 }

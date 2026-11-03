@@ -10,7 +10,7 @@ public class Updater
 {
     private const string UpdateUrl = Program.LatestReleaseApiUrl;
     private static readonly string ReleaseAssetName = OperatingSystem.IsWindows() ? "VRCVideoCacherPlus.exe" : "VRCVideoCacherPlus";
-    private static readonly HttpClient HttpClient = new()
+    private static readonly HttpClient HttpClient = new(Utils.NetConnect.CreateHandler())
     {
         DefaultRequestHeaders = { { "User-Agent", "VRCVideoCacher.Updater" } }
     };

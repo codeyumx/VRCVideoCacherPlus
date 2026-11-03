@@ -159,7 +159,7 @@ public class HlsIntegration : Integration
     private static TimeSpan EffectiveTtl(ProbeResult result) =>
         (result.IsHls || result.IsTransportStream) ? ProbeTtl : NegativeProbeTtl;
 
-    public override async Task<VideoInfo?> GetVideoInfo(string url, Uri uri, bool avPro)
+    public override Task<VideoInfo?> GetVideoInfo(string url, Uri uri, bool avPro)
     {
         // Hash the probe key (path + content-identifying query) so signed CDN URLs
         // (rotating query tokens per play) resolve to a stable videoId — otherwise the
@@ -173,6 +173,24 @@ public class HlsIntegration : Integration
             DownloadFormat = DownloadFormat.MP4
         };
 
+        // Nothing VRChat waits on needs the probe: HLS is answered with an empty string and
+        // plays natively. The probe only records title/duration and gates caching, so it runs
+        // in the background; /getvideo joins it (deduplicated) after it has responded.
+        _ = ProbeAndRecordAsync(url, uri, videoId);
+        return Task.FromResult<VideoInfo?>(videoInfo);
+    }
+
+    // Title and duration for display and cache-gating, from the (shared, cached) probe.
+    // Never throws: a failed probe reads as unknown.
+    public static async Task<(string? Title, double? Duration)> GetProbedDetailsAsync(string url)
+    {
+        var probe = await ProbeCached(url);
+        var title = probe.Title ?? (Uri.TryCreate(url, UriKind.Absolute, out var uri) ? DeriveTitleFromUrl(uri) : null);
+        return (title, probe.Duration);
+    }
+
+    private static async Task ProbeAndRecordAsync(string url, Uri uri, string videoId)
+    {
         try
         {
             var probe = await ProbeCached(url);
@@ -200,8 +218,6 @@ public class HlsIntegration : Integration
         {
             Log.Warning("Failed to probe HLS manifest for {URL}: {Error}", url, ex.Message);
         }
-
-        return videoInfo;
     }
 
     /// <summary>

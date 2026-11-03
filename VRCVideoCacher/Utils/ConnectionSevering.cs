@@ -441,37 +441,46 @@ public static class ConnectionSevering
         // VRChat's sockets only, resolved through procfs (readable as the owning user, and as
         // root in the elevated helper).
         var sockets = NetworkConnections.ListVrChatSocketsLinux();
+        var targets = addresses
+            .Where(address => !string.IsNullOrWhiteSpace(address))
+            .SelectMany(address => sockets
+                .Where(s => SameAddress(s.RemoteAddress, address))
+                .Select(socket => (Address: address,
+                    Args: BuildSsKillArgs(socket.LocalAddress, socket.LocalPort, socket.RemoteAddress, socket.RemotePort))))
+            .ToList();
+
         var severedAddresses = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (targets.Count == 0)
+            return new RemoteSever(0, ClassifyAttempts(0, false, false), severedAddresses);
+
+        // Each `ss -K` destroys a different socket, so they run at once; the first runs alone
+        // because an Unsupported answer (no ss installed) means the rest would fail the same way.
+        var first = await RunSsKillAsync(targets[0].Args, targets[0].Address);
+        if (first == SeverOutcome.Unsupported)
+            return new RemoteSever(0, SeverOutcome.Unsupported, severedAddresses);
+
+        var rest = await Task.WhenAll(targets.Skip(1).Select(t => RunSsKillAsync(t.Args, t.Address)));
+        var outcomes = rest.Prepend(first).Zip(targets, (outcome, target) => (Outcome: outcome, target.Address));
+
         var severed = 0;
         var denied = false;
         var failed = false;
-
-        foreach (var address in addresses)
+        foreach (var (outcome, address) in outcomes)
         {
-            if (string.IsNullOrWhiteSpace(address))
-                continue;
-
-            foreach (var socket in sockets.Where(s => SameAddress(s.RemoteAddress, address)))
+            switch (outcome)
             {
-                var args = BuildSsKillArgs(socket.LocalAddress, socket.LocalPort, socket.RemoteAddress, socket.RemotePort);
-                var outcome = await RunSsKillAsync(args, address);
-
-                switch (outcome)
-                {
-                    case SeverOutcome.Severed:
-                        severed++;
-                        severedAddresses.Add(address);
-                        break;
-                    case SeverOutcome.NotPermitted:
-                        denied = true;
-                        break;
-                    case SeverOutcome.Failed:
-                        failed = true;
-                        break;
-                    case SeverOutcome.Unsupported:
-                        // ss is not installed; no point trying the remaining sockets.
-                        return new RemoteSever(severed, severed > 0 ? SeverOutcome.Severed : SeverOutcome.Unsupported, severedAddresses);
-                }
+                case SeverOutcome.Severed:
+                    severed++;
+                    severedAddresses.Add(address);
+                    break;
+                case SeverOutcome.NotPermitted:
+                    denied = true;
+                    break;
+                case SeverOutcome.Failed:
+                case SeverOutcome.Unsupported:
+                    // Unsupported after the first succeeded can only mean ss vanished mid-run.
+                    failed = true;
+                    break;
             }
         }
 

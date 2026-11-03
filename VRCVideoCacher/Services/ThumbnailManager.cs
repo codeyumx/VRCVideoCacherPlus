@@ -8,7 +8,7 @@ public static class ThumbnailManager
     public static readonly string CacheDir = Path.Join(Program.DataPath, "MetadataCache");
     public static readonly string ThumbnailCacheDir = Path.Join(CacheDir, "thumbnails");
 
-    private static readonly HttpClient HttpClient = new()
+    private static readonly HttpClient HttpClient = new(Utils.NetConnect.CreateHandler())
     {
         DefaultRequestHeaders = { { "User-Agent", "VRCVideoCacher" } },
         Timeout = TimeSpan.FromSeconds(10)

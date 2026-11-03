@@ -11,27 +11,33 @@
 - [Chrome Extension](https://chromewebstore.google.com/detail/vrcvideocacher-cookies-ex/kfgelknbegappcajiflgfbjbdpbpokge)
 - [Firefox Extension](https://addons.mozilla.org/en-US/firefox/addon/vrcvideocachercookiesexporter)
 
-The VRCVideoCacherPlus extensions ([BrowserExtension/](BrowserExtension/)) are in early testing and should send cookies. You can choose: manual send & copy, automatic sharing, and/or app-triggered cookie refresh. They're not on the extension stores yet, so install them unpacked. Unpacked extensions don't update automatically: after pulling a new version, reload the extension yourself.
+The VRCVideoCacherPlus extensions ([BrowserExtension/](BrowserExtension/)) are in early testing and should send cookies. You can choose: manual send & copy, automatic sharing, and/or app-triggered cookie refresh. They're not on the extension stores yet, so install them by hand as described below. Hand-installed extensions don't update automatically: after downloading a new version, replace the files and reload the extension yourself.
 
-<details>
-<summary>How to install the unpacked extension (Chrome / Firefox)</summary>
+### Installing the VRCVideoCacherPlus extension
 
-Download the extension from the [latest release](https://github.com/codeyumx/VRCVideoCacherPlus/releases): `VRCVideoCacherPlus-chrome-*.zip` or `VRCVideoCacherPlus-firefox-*.xpi`. You can also clone this repo and use the `BrowserExtension/` folder.
+Download the extension from the [latest release](https://github.com/codeyumx/VRCVideoCacherPlus/releases/latest) (under **Assets**): `VRCVideoCacherPlus-chrome-*.zip` for Chrome and other Chromium browsers, `VRCVideoCacherPlus-firefox-*.xpi` for Firefox.
 
-**Chrome (and Chromium-based browsers like Edge, Brave):**
-1. Extract `VRCVideoCacherPlus-chrome-*.zip` into a folder you'll keep. The browser loads it from there, so don't delete it.
-2. Open `chrome://extensions`
-3. Enable **Developer mode** (top right)
-4. Click **Load unpacked** and select the extracted folder (the one containing `manifest.json`), or `BrowserExtension/chrome/` from a clone
+**Chrome, Edge, Brave, Opera (any Chromium browser):**
+1. Unzip `VRCVideoCacherPlus-chrome-*.zip` into a folder you'll keep, e.g. `Documents\VRCVideoCacherPlus-extension`. The browser loads the extension from that folder every time it starts, so don't delete or move it.
+2. Open the extensions page: `chrome://extensions` (Edge: `edge://extensions`, Brave: `brave://extensions`, Opera: `opera://extensions`).
+3. Turn on **Developer mode** (toggle in the top right; in Edge it's in the left sidebar).
+4. Drag the unzipped folder (the one containing `manifest.json`) onto the extensions page and drop it. Or click **Load unpacked** and select that folder.
+5. Optional: pin the extension from the puzzle-piece menu so its popup is one click away.
 
-Chromium browsers only install a `.crx` from their web store, so there is no `.crx` in the release.
+Drag the **unzipped folder**, not the `.zip`. Chromium browsers refuse zipped or `.crx` extensions that don't come from their web store.
 
 **Firefox:**
-1. Open `about:debugging#/runtime/this-firefox`
-2. Click **Load Temporary Add-on…** and select the downloaded `.xpi`, or `BrowserExtension/firefox/manifest.json` from a clone
-3. Note: temporary add-ons are removed when Firefox closes and must be re-loaded each time. For a persistent install, use [Firefox Developer Edition or Nightly](https://www.mozilla.org/firefox/channel/desktop/) with `xpinstall.signatures.required` set to `false` in `about:config`, and install the `.xpi` via `about:addons`
 
-</details>
+The `.xpi` isn't signed by Mozilla, so regular Firefox only loads it until you close the browser:
+1. Open `about:debugging#/runtime/this-firefox`
+2. Click **Load Temporary Add-on…** and select the downloaded `.xpi`
+3. Repeat this each time Firefox restarts.
+
+To keep it installed permanently, use [Firefox Developer Edition or Nightly](https://www.mozilla.org/firefox/channel/desktop/) (or Firefox ESR / LibreWolf): set `xpinstall.signatures.required` to `false` in `about:config`, then drag the `.xpi` onto the Firefox window (or open `about:addons` → gear icon → **Install Add-on From File…**) and confirm **Add**.
+
+**From a clone of this repo:** load `BrowserExtension/chrome/` the same way as the unzipped folder, or in Firefox pick `BrowserExtension/firefox/manifest.json` under **Load Temporary Add-on…**.
+
+After installing, open YouTube while signed in. The app's **Cookies** panel shows which browser the extension is connected from and which browser the current cookies came from.
 
 ---
 

@@ -28,6 +28,20 @@ bottom as tags only. The fork's own releases start at `2026.6.17`.
 
 ## Unreleased
 
+- **Cookies panel shows where cookies came from.** The status card now says which browser sent
+  the current cookies and when (or that they were pasted manually), and a line lists the
+  browsers the VRCVideoCacherPlus extension is connected from right now. The extension sends its
+  browser name (`X-VRCVideoCacher-Browser`, e.g. "Brave 131", "Firefox 132"); uploads from the
+  original extension are named from their User-Agent. The origin is kept in
+  `youtube_cookies.source` next to the cookie jar, which is passed to yt-dlp unchanged.
+- **Fixed: cookie validation and other app downloads failing with "access a socket in a way
+  forbidden" (10013) under a VPN split tunnel.** .NET reached IPv4 hosts through dual-mode IPv6
+  sockets, which Mullvad's split-tunnel driver refuses for excluded apps. Every HTTP client now
+  connects with a socket per address family (`NetConnect`), so IPv6 hosts still work.
+- **Install instructions for the extension** in the README and on every release page
+  (`docs/release-install.md`, appended by the release workflow): unzip and drag the folder onto
+  the extensions page in Chromium browsers, temporary or unsigned install in Firefox.
+
 ## [2026.9.30-rc6] — 2026-10-16
 
 `2026.9.30-rc5` with the Chrome extension as a `.zip`. (`fd0ca40`)

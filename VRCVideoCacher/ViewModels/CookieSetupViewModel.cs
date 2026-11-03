@@ -219,7 +219,7 @@ public partial class CookieSetupViewModel : ViewModelBase
             return;
         }
 
-        Program.WriteCookieFile(cookies);
+        Program.WriteCookieFile(cookies, CookieOrigin.Manual);
         Program.NotifyCookiesUpdated();
 
         // Well-formed: now check they actually work against YouTube.

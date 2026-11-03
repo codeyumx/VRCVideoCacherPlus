@@ -44,7 +44,7 @@ async function refreshLoop() {
   try {
     while (true) {
       try {
-        const res = await fetch(ENDPOINT + "/refresh-wait", { headers: EXT_HEADER });
+        const res = await fetch(ENDPOINT + "/refresh-wait", { headers: await extHeaders() });
         if (!res.ok) {
           await failed();
         } else if ((await res.text()).trim() !== "1") {

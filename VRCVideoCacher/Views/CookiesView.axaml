@@ -26,9 +26,21 @@
                                     <TextBlock Text="{Binding ExpiryText}" FontSize="12" Margin="0,4,0,0"
                                                Foreground="{Binding ExpiryColor}"
                                                IsVisible="{Binding HasExpiry}"/>
+                                    <TextBlock Text="{Binding CookieSourceText}" FontSize="12" Margin="0,4,0,0"
+                                               Foreground="#aaaaaa"
+                                               IsVisible="{Binding HasCookieSource}"/>
                                 </StackPanel>
                             </StackPanel>
                         </Border>
+
+                        <!-- Browsers the VRCVideoCacherPlus extension is connected from right now -->
+                        <StackPanel Orientation="Horizontal" Spacing="8"
+                                    IsVisible="{Binding ShowExtensionBrowsers}">
+                            <mi:MaterialIcon Kind="Puzzle" Width="16" Height="16"
+                                             Foreground="{Binding ExtensionBrowsersColor}"/>
+                            <TextBlock Text="{Binding ExtensionBrowsersText}" Foreground="#cccccc"
+                                       VerticalAlignment="Center" TextWrapping="Wrap"/>
+                        </StackPanel>
 
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <CheckBox IsChecked="{Binding UseCookies}" Content="{l:Localize UseYouTubeCookies}"

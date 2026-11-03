@@ -39,7 +39,7 @@ public class PyPyDanceApiService
     private static readonly ILogger Logger = Program.Logger.ForContext<PyPyDanceApiService>();
     private static DateTime _lastFetch = DateTime.MinValue;
     private static List<PyPyDanceSong> _songs = [];
-    private static readonly HttpClient HttpClient = new()
+    private static readonly HttpClient HttpClient = new(Utils.NetConnect.CreateHandler())
     {
         DefaultRequestHeaders = { { "User-Agent", $"VRCVideoCacher {Program.Version}" } },
         Timeout = TimeSpan.FromSeconds(10)
@@ -76,8 +76,9 @@ public class PyPyDanceApiService
     {
         try
         {
+            // The thumbnail and the song lookup are independent; fetch them together.
             var thumbnailUrl = $"https://api.pypy.dance/thumb?id={idInt}";
-            await ThumbnailManager.TrySaveThumbnail(videoId, thumbnailUrl);
+            var thumbnailTask = ThumbnailManager.TrySaveThumbnail(videoId, thumbnailUrl);
 
             var songInfo = await GetVideoInfo(idInt);
             int? duration = null;
@@ -94,6 +95,8 @@ public class PyPyDanceApiService
                 Duration = duration,
                 Type = UrlType.PyPyDance
             });
+
+            await thumbnailTask;
         }
         catch (Exception ex)
         {

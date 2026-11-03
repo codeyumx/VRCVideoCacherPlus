@@ -6,6 +6,7 @@ using VRCVideoCacher.Database;
 using VRCVideoCacher.Models;
 using VRCVideoCacher.Services;
 using VRCVideoCacher.YTDL;
+using VRCVideoCacher.Utils;
 using VRCVideoCacher.Integrations;
 using VRCVideoCacher.Integrations.Hls;
 using VRCVideoCacher.Integrations.YouTube;
@@ -44,6 +45,12 @@ public class ApiController : WebApiController
     private bool IsNewExtension =>
         HttpContext.Request.Headers[NewExtensionHeader] == NewExtensionId;
 
+    // The browser this request came from, for the Cookies panel. The new extension names
+    // itself; the old one is identified from its User-Agent where possible.
+    private string? RequestBrowser =>
+        CookieSource.Identify(HttpContext.Request.Headers[CookieSource.BrowserHeader],
+            HttpContext.Request.Headers["User-Agent"]);
+
     private static readonly Serilog.ILogger Log = Program.Logger.ForContext<ApiController>();
 
     // [OLD + NEW EXTENSION] CORS preflight for the youtube-cookies POST. Used by BOTH the
@@ -58,7 +65,8 @@ public class ApiController : WebApiController
     {
         ApplyCorsHeaders();
         HttpContext.Response.Headers["Access-Control-Allow-Methods"] = "POST, OPTIONS";
-        HttpContext.Response.Headers["Access-Control-Allow-Headers"] = $"Content-Type, {NewExtensionHeader}";
+        HttpContext.Response.Headers["Access-Control-Allow-Headers"] =
+            $"Content-Type, {NewExtensionHeader}, {CookieSource.BrowserHeader}";
         HttpContext.Response.Headers["Access-Control-Max-Age"] = "86400";
         HttpContext.Response.StatusCode = 204;
         return Task.CompletedTask;
@@ -77,6 +85,9 @@ public class ApiController : WebApiController
             await HttpContext.SendStringAsync("0", "text/plain", Encoding.UTF8);
             return;
         }
+
+        if (RequestBrowser is { } browser)
+            ExtensionPresence.Seen(browser);
 
         if (!_cookieRefreshRequested)
         {
@@ -123,16 +134,21 @@ public class ApiController : WebApiController
             return;
         }
 
-        Program.WriteCookieFile(cookies);
+        var browser = RequestBrowser;
+        Program.WriteCookieFile(cookies, CookieOrigin.Extension(browser));
         // Only the new extension participates in the refresh-flag lifecycle; the old
         // extension's POST is handled identically to before (it never touches this flag).
         if (IsNewExtension)
+        {
             _cookieRefreshRequested = false;
+            if (browser != null)
+                ExtensionPresence.Seen(browser);
+        }
 
         HttpContext.Response.StatusCode = 200;
         await HttpContext.SendStringAsync("Cookies received.", "text/plain", Encoding.UTF8);
 
-        Log.Information("Received Youtube cookies from browser extension.");
+        Log.Information("Received Youtube cookies from browser extension ({Browser}).", browser ?? "unknown browser");
         Program.NotifyCookiesUpdated();
         if (!ConfigManager.Config.YtdlpUseCookies)
             Log.Warning("Config is NOT set to use cookies from browser extension.");
@@ -337,11 +353,25 @@ public class ApiController : WebApiController
         // We still queue the download below so it gets cached in the background.
         if (videoInfo.UrlType == UrlType.Hls)
         {
-            var hlsDuration = DatabaseManager.GetVideoInfoCache(videoInfo.VideoId)?.Duration;
-            ActiveStreamTracker.AssociateUrlInfo(videoInfo.VideoUrl, videoInfo.VideoUrl, dbCache?.Title ?? videoInfo.VideoUrl, videoInfo.VideoId, hlsDuration);
+            ActiveStreamTracker.AssociateUrlInfo(videoInfo.VideoUrl, videoInfo.VideoUrl, dbCache?.Title ?? videoInfo.VideoUrl, videoInfo.VideoId, dbCache?.Duration);
             Log.Information("HLS URL: passing through without yt-dlp resolution.");
             await HttpContext.SendStringAsync(string.Empty, "text/plain", Encoding.UTF8);
-            ActiveStreamTracker.RecordActivity(videoInfo.VideoId, hlsDuration);
+            ActiveStreamTracker.RecordActivity(videoInfo.VideoId, dbCache?.Duration);
+
+            // The manifest probe started in HlsIntegration.GetVideoInfo runs while VRChat is
+            // already loading; join it now for the title, the duration and the cache gate.
+            var (probedTitle, probedDuration) = await HlsIntegration.GetProbedDetailsAsync(videoInfo.VideoUrl);
+            var hlsDuration = dbCache?.Duration ?? probedDuration;
+
+            // First play (or one whose earlier probe found no duration): the session was
+            // registered before the probe finished, so fill in what it found.
+            if (dbCache?.Title == null || dbCache.Duration == null)
+            {
+                ActiveStreamTracker.AssociateUrlInfo(videoInfo.VideoUrl, videoInfo.VideoUrl,
+                    dbCache?.Title ?? probedTitle ?? videoInfo.VideoUrl, videoInfo.VideoId, hlsDuration);
+                ActiveStreamTracker.RecordActivity(videoInfo.VideoId, hlsDuration);
+            }
+
             if (ConfigManager.Config.CacheHlsPlaylists && IsHlsCacheable(videoInfo, hlsDuration))
                 VideoDownloader.QueueDownload(videoInfo);
             return;

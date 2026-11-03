@@ -11,16 +11,18 @@ namespace VRCVideoCacher.YTDL;
 public class YtdlManager
 {
     private static readonly ILogger Log = Program.Logger.ForContext<YtdlManager>();
-    private static readonly HttpClient HttpClient = new()
+    private static readonly HttpClient HttpClient = new(Utils.NetConnect.CreateHandler())
     {
         DefaultRequestHeaders = { { "User-Agent", "VRCVideoCacher" } }
     };
-    private static readonly HttpClient DownloadHttpClient = new()
+    private static readonly HttpClient DownloadHttpClient = new(Utils.NetConnect.CreateHandler())
     {
         DefaultRequestHeaders = { { "User-Agent", "VRCVideoCacher" } },
         Timeout = TimeSpan.FromMinutes(10)
     };
     public static readonly string CookiesPath;
+    // Which browser (or a manual paste) produced the jar at CookiesPath; see Program.WriteCookieFile.
+    public static readonly string CookieSourcePath;
 
     public static readonly string YtdlPath =
         Path.Join(Program.UtilsPath, OperatingSystem.IsWindows() ? "yt-dlp.exe" : "yt-dlp");
@@ -42,6 +44,7 @@ public class YtdlManager
     static YtdlManager()
     {
         CookiesPath = Path.Join(Program.DataPath, "youtube_cookies.txt");
+        CookieSourcePath = Path.Join(Program.DataPath, "youtube_cookies.source");
 
         // try to locate in PATH
         if (LaunchArgs.UseGlobalPath)

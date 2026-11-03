@@ -224,6 +224,13 @@ jobs:
           set -euo pipefail
           ./scripts/release-notes.sh "$TAG" > notes.md
 
+          # Every release carries the install steps, the extension's above all: it is installed
+          # by hand, and the release page is where people land to download it.
+          {
+            echo
+            cat docs/release-install.md
+          } >> notes.md
+
           # A trailing link so the diff against the previous release is one click away.
           previous=$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || true)
           if [ -n "$previous" ]; then
