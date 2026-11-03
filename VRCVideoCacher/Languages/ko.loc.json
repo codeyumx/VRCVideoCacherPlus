@@ -155,6 +155,8 @@
   "CookiesSourceManualFormat": "수동으로 붙여넣음 · {0}",
   "CookiesExtensionConnectedFormat": "확장 프로그램 연결됨: {0}",
   "CookiesExtensionNotConnected": "어떤 브라우저에서도 확장 프로그램이 연결되지 않음",
+  "CookiesResetSetup": "삭제 후 다시 설정",
+  "CookiesResetSetupTooltip": "현재 쿠키를 삭제하고, 쿠키를 가져올 브라우저를 선택하는 쿠키 설정을 엽니다.",
   "Stats": "통계",
   "CacheHitRate": "캐시 적중률",
   "BandwidthSaved": "절약한 대역폭",

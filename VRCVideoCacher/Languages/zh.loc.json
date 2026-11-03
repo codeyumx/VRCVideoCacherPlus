@@ -155,6 +155,8 @@
   "CookiesSourceManualFormat": "手动粘贴 · {0}",
   "CookiesExtensionConnectedFormat": "扩展已连接：{0}",
   "CookiesExtensionNotConnected": "扩展未在任何浏览器中连接",
+  "CookiesResetSetup": "清除并重新设置",
+  "CookiesResetSetupTooltip": "删除当前 Cookie，并打开 Cookie 设置，在其中选择从哪个浏览器获取 Cookie。",
   "Stats": "统计",
   "CacheHitRate": "缓存命中率",
   "BandwidthSaved": "节省的流量",

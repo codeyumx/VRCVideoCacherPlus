@@ -155,6 +155,8 @@
   "CookiesSourceManualFormat": "Вставлено вручную · {0}",
   "CookiesExtensionConnectedFormat": "Расширение подключено в: {0}",
   "CookiesExtensionNotConnected": "Расширение не подключено ни в одном браузере",
+  "CookiesResetSetup": "Очистить и настроить заново",
+  "CookiesResetSetupTooltip": "Удаляет текущие cookie и открывает настройку cookie, где вы выбираете браузер, из которого их брать.",
   "Stats": "Статистика",
   "CacheHitRate": "Доля попаданий в кэш",
   "BandwidthSaved": "Сэкономлено трафика",

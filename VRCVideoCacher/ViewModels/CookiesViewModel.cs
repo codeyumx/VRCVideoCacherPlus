@@ -292,4 +292,13 @@ public partial class CookiesViewModel : ViewModelBase
         LiveValid = null;
         Program.NotifyCookiesUpdated();
     }
+
+    // Start over: drop the current cookies (and the browser they were recorded as coming
+    // from) and walk through the setup again, e.g. to switch browser or YouTube account.
+    [RelayCommand]
+    private async Task ResetCookieSetup()
+    {
+        ClearCookies();
+        await CookieSetupViewModel.ShowDialogAsync();
+    }
 }

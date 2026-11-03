@@ -155,6 +155,8 @@
   "CookiesSourceManualFormat": "Colados manualmente · {0}",
   "CookiesExtensionConnectedFormat": "Extensão conectada em: {0}",
   "CookiesExtensionNotConnected": "Extensão não conectada em nenhum navegador",
+  "CookiesResetSetup": "Limpar e configurar de novo",
+  "CookiesResetSetupTooltip": "Apaga os cookies atuais e abre a configuração de cookies, onde você escolhe o navegador de onde virão os cookies.",
   "Stats": "Estatísticas",
   "CacheHitRate": "Taxa de acerto do cache",
   "BandwidthSaved": "Banda economizada",

@@ -155,6 +155,8 @@
   "CookiesSourceManualFormat": "Pasted manually · {0}",
   "CookiesExtensionConnectedFormat": "Extension connected in: {0}",
   "CookiesExtensionNotConnected": "Extension not connected in any browser",
+  "CookiesResetSetup": "Clear and set up again",
+  "CookiesResetSetupTooltip": "Deletes the current cookies and opens the cookie setup, where you pick the browser to take cookies from.",
   "Stats": "Stats",
   "CacheHitRate": "Cache Hit Rate",
   "BandwidthSaved": "Bandwidth Saved",

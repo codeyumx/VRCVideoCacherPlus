@@ -282,27 +282,10 @@ public partial class DashboardViewModel : ViewModelBase
     [RelayCommand]
     private async Task SetupCookieExtension()
     {
-        if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-        {
-            if (!ConfigManager.Config.YtdlpUseCookies)
-            {
-                await new PopupWindow(Localizer.Get("CookiesDisabledWarning")).ShowDialog(desktop.MainWindow!);
-                return;
-            }
+        await CookieSetupViewModel.ShowDialogAsync();
 
-            var viewModel = new CookieSetupViewModel();
-            var window = new CookieSetupWindow
-            {
-                DataContext = viewModel
-            };
-
-            viewModel.RequestClose += () => window.Close();
-
-            await window.ShowDialog(desktop.MainWindow!);
-
-            // Refresh cookies status after dialog closes
-            _ = ValidateCookiesAsync();
-        }
+        // Refresh cookies status after dialog closes
+        _ = ValidateCookiesAsync();
     }
 
     [RelayCommand]

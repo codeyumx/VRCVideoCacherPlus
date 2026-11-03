@@ -52,6 +52,9 @@ bottom as tags only. The fork's own releases start at `2026.6.17`.
   and a format error no longer triggers a pointless second lookup without cookies.
 - **Logs keep 31 files instead of 5**, each capped at 10 MB and rolled over when full, rather than
   Serilog's default of going silent at 1 GB.
+- **"Clear and set up again" on the Cookies page.** Deletes the current cookies (and their
+  recorded source) and opens the cookie setup, starting at browser selection, to switch browser
+  or YouTube account. The Dashboard's setup button opens the same flow.
 
 ## [2026.9.30-rc6] — 2026-10-16
 

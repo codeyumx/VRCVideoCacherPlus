@@ -57,6 +57,13 @@
                                     <TextBlock Text="{l:Localize ClearCookies}"/>
                                 </StackPanel>
                             </Button>
+                            <Button Command="{Binding ResetCookieSetupCommand}" IsEnabled="{Binding UseCookies}"
+                                    ToolTip.Tip="{l:Localize CookiesResetSetupTooltip}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <mi:MaterialIcon Kind="RestartAlert" Width="16" Height="16"/>
+                                    <TextBlock Text="{l:Localize CookiesResetSetup}"/>
+                                </StackPanel>
+                            </Button>
                         </StackPanel>
 
                         <CheckBox IsChecked="{Binding UseBetaExtension}" Content="{l:Localize UseBetaExtension}"

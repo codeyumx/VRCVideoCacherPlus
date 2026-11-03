@@ -155,6 +155,8 @@
   "CookiesSourceManualFormat": "Kézzel beillesztve · {0}",
   "CookiesExtensionConnectedFormat": "A bővítmény csatlakozik itt: {0}",
   "CookiesExtensionNotConnected": "A bővítmény egyik böngészőben sem csatlakozik",
+  "CookiesResetSetup": "Törlés és újrabeállítás",
+  "CookiesResetSetupTooltip": "Törli a jelenlegi sütiket, és megnyitja a sütibeállítást, ahol kiválaszthatod, melyik böngészőből érkezzenek a sütik.",
   "Stats": "Statisztika",
   "CacheHitRate": "Gyorsítótár-találati arány",
   "BandwidthSaved": "Megtakarított sávszélesség",

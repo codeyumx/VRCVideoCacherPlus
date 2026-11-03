@@ -155,6 +155,8 @@
   "CookiesSourceManualFormat": "手動で貼り付け · {0}",
   "CookiesExtensionConnectedFormat": "拡張機能の接続先: {0}",
   "CookiesExtensionNotConnected": "どのブラウザーでも拡張機能が接続されていません",
+  "CookiesResetSetup": "削除して再設定",
+  "CookiesResetSetupTooltip": "現在の Cookie を削除し、Cookie の取得元ブラウザーを選ぶセットアップを開きます。",
   "Stats": "統計",
   "CacheHitRate": "キャッシュヒット率",
   "BandwidthSaved": "節約した通信量",

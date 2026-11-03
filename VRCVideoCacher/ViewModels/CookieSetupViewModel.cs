@@ -26,6 +26,26 @@ public partial class CookieSetupViewModel : ViewModelBase
     // Set by the View to show a file picker and return the selected executable path (or null).
     public Func<Task<string?>>? PickBrowserExecutable { get; set; }
 
+    // Opens the setup wizard as a dialog over the main window. Shared by the Dashboard and the
+    // Cookies panel so both start the same flow, browser selection included.
+    public static async Task ShowDialogAsync()
+    {
+        if (Avalonia.Application.Current?.ApplicationLifetime is not
+            Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime { MainWindow: { } owner })
+            return;
+
+        if (!ConfigManager.Config.YtdlpUseCookies)
+        {
+            await new Views.PopupWindow(Localizer.Get("CookiesDisabledWarning")).ShowDialog(owner);
+            return;
+        }
+
+        var viewModel = new CookieSetupViewModel();
+        var window = new Views.CookieSetupWindow { DataContext = viewModel };
+        viewModel.RequestClose += () => window.Close();
+        await window.ShowDialog(owner);
+    }
+
     [ObservableProperty]
     private int _currentStep = 1;
 
