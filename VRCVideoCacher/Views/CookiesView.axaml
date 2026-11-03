@@ -42,7 +42,8 @@
                                        VerticalAlignment="Center" TextWrapping="Wrap"/>
                         </StackPanel>
 
-                        <StackPanel Orientation="Horizontal" Spacing="8">
+                        <!-- Wraps instead of running off the panel: four controls don't fit one line at the minimum window width. -->
+                        <WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="8">
                             <CheckBox IsChecked="{Binding UseCookies}" Content="{l:Localize UseYouTubeCookies}"
                                       VerticalAlignment="Center"/>
                             <Button Command="{Binding VerifyCommand}" IsEnabled="{Binding !IsVerifying}">
@@ -64,7 +65,7 @@
                                     <TextBlock Text="{l:Localize CookiesResetSetup}"/>
                                 </StackPanel>
                             </Button>
-                        </StackPanel>
+                        </WrapPanel>
 
                         <CheckBox IsChecked="{Binding UseBetaExtension}" Content="{l:Localize UseBetaExtension}"
                                   ToolTip.Tip="{l:Localize UseBetaExtensionTooltip}"/>

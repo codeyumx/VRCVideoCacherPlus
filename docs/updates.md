@@ -55,6 +55,12 @@ bottom as tags only. The fork's own releases start at `2026.6.17`.
 - **"Clear and set up again" on the Cookies page.** Deletes the current cookies (and their
   recorded source) and opens the cookie setup, starting at browser selection, to switch browser
   or YouTube account. The Dashboard's setup button opens the same flow.
+- **Fixed: the sidebar didn't scroll.** With the update banner showing, or in a short window, the
+  bottom tabs were cut off; the tab list now scrolls. The Cookies page buttons wrap instead of
+  running off the panel.
+- **Uploads from an unidentified Chromium browser read "Chrome/Chromium", not "Chrome".** Brave
+  sends a plain Chrome User-Agent, so the old extension's uploads from Brave were labelled Chrome.
+  The extension is now 1.1.0, so an outdated hand-installed copy is easy to spot.
 
 ## [2026.9.30-rc6] — 2026-10-16
 

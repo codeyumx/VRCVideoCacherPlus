@@ -39,15 +39,16 @@ public static class CookieSource
     }
 
     // Chromium forks append their own token after "Chrome/", so they are checked first.
-    // Brave deliberately sends a plain Chrome User-Agent, so it reads as Chrome here; only
-    // the new extension's header can tell it apart.
+    // Brave (and Vivaldi on some versions) send a plain Chrome User-Agent, so a bare "Chrome/"
+    // only proves Chromium: naming it "Chrome" mislabelled Brave uploads. Only the new
+    // extension's header can name those browsers.
     private static readonly (string Token, string Name)[] UserAgentTokens =
     [
         ("Edg/", "Microsoft Edge"),
         ("OPR/", "Opera"),
         ("Vivaldi/", "Vivaldi"),
         ("Firefox/", "Firefox"),
-        ("Chrome/", "Chrome"),
+        ("Chrome/", "Chrome/Chromium"),
     ];
 
     public static string? FromUserAgent(string? userAgent)

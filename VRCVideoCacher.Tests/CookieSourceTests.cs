@@ -12,7 +12,7 @@ public class CookieSourceTests
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
     [Theory]
-    [InlineData(ChromeUa, "Chrome")]
+    [InlineData(ChromeUa, "Chrome/Chromium")]
     [InlineData(ChromeUa + " Edg/131.0.0.0", "Microsoft Edge")]
     [InlineData(ChromeUa + " OPR/115.0.0.0", "Opera")]
     [InlineData("Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:132.0) Gecko/20100101 Firefox/132.0", "Firefox")]
@@ -32,7 +32,7 @@ public class CookieSourceTests
     [Fact]
     public void FallsBackToUserAgentWhenHeaderIsBlank()
     {
-        Assert.Equal("Chrome", CookieSource.Identify("   ", ChromeUa));
+        Assert.Equal("Chrome/Chromium", CookieSource.Identify("   ", ChromeUa));
         Assert.Null(CookieSource.Identify(null, "curl/8.0"));
     }
 
